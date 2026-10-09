@@ -555,8 +555,12 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
                   </Row>
                   {settings.sync.commit && (
                     <div class={styles.section}>
-                      <Field label="Branch"><Textbox value={settings.sync.branch} onValueInput={(v) => patch({ sync: { ...settings.sync, branch: v } })} placeholder="(current branch)" /></Field>
-                      <Field label="Message"><Textbox value={settings.sync.message} onValueInput={(v) => patch({ sync: { ...settings.sync, message: v } })} /></Field>
+                      <Field label="Branch"><Textbox value={settings.sync.branch} onValueInput={(v) => patch({ sync: { ...settings.sync, branch: v } })} placeholder={settings.sync.push ? 'icons/update-<date>' : '(current branch)'} /></Field>
+                      {!settings.sync.push && <Field label="Message"><Textbox value={settings.sync.message} onValueInput={(v) => patch({ sync: { ...settings.sync, message: v } })} /></Field>}
+                      <Row info={{ title: 'Push the branch', body: <span>After committing, pushes the branch to <code>origin</code> with <strong>your own git credentials</strong> (SSH key or credential manager); no token is stored here. It <strong>never pushes to the default branch</strong> (main, master…) and never forces. The commit message and a pull / merge request description are generated from the changes; you get a link that opens the pull (GitHub) or merge (GitLab) request page with both filled in. Needs the companion started with <code>--git --allow-push</code>.</span> }}>
+                        <Toggle value={settings.sync.push} onValueChange={(v) => patch({ sync: { ...settings.sync, push: v } })}>Push the branch to origin</Toggle>
+                      </Row>
+                      {settings.sync.push && <div class={styles.muted}>Start the helper with <code>--git --allow-push</code>. The pull / merge request page opens from the result screen.</div>}
                     </div>
                   )}
                   <div class={styles.fieldRow}>

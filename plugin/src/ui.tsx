@@ -3,7 +3,7 @@ import { emit, on } from '@create-figma-plugin/utilities'
 import { ComponentChildren, h } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { summariseCategories } from './core/categories'
-import { buildFiles } from './core/generators'
+import { buildFiles, TARGETS } from './core/generators'
 import { fixesReportMarkdown, fixPlanMarkdown } from './core/generators/manifest'
 import { BASELINE_LABEL, BaselineSource, catalogToSnapshot, changesByName, CHANGE_KINDS, CHANGE_LABEL, ChangeKind, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline, Snapshot, snapshotToCatalog } from './core/baseline'
 import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from './core/changelog'
@@ -31,7 +31,8 @@ import { InspectPanel } from './ui/Inspect'
 import { countChanges, filterIcons, groupIssues, IssueGroup, isAlert, isBlocked, presentChangeKinds } from './ui/selectors'
 import { useBaselines } from './ui/hooks/useBaselines'
 import { useScan } from './ui/hooks/useScan'
-import { useSync } from './ui/hooks/useSync'
+import { pushBranch, useSync } from './ui/hooks/useSync'
+import { pullRequestText } from './core/pullRequest'
 import { copyText, cx, download, notify, plural } from './ui/util'
 import { recentLog } from './log'
 import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
@@ -276,7 +277,16 @@ function Plugin() {
   }
   const onExportConfig = () => download('toolkit.config.json', exportConfig(settings), 'application/json')
 
-  const sync = useSync(settings, makeFiles, () => baseline.snapshotNow('local'))
+  const sync = useSync(settings, makeFiles, () => baseline.snapshotNow('local'), () =>
+    pullRequestText({
+      diff: release.diff,
+      version: release.version,
+      iconCount: exportable.length,
+      formats: TARGETS.filter((t) => settings.formats[t.key]).map((t) => t.label),
+      warnings: exportable.filter((i) => i.findings.some((f) => f.severity === 'warn')).length,
+      date: new Date().toISOString().slice(0, 10)
+    })
+  )
   const scanVariables = useMemo(() => {
     const seen = new Map<string, { variable: string; collection?: string }>()
     for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection })
@@ -749,7 +759,10 @@ function Plugin() {
           plan={sync.plan}
           subdir={settings.sync.subdir}
           commit={settings.sync.commit}
-          branch={settings.sync.branch}
+          branch={pushBranch(settings) || settings.sync.branch}
+          push={settings.sync.push}
+          onOpen={sync.open}
+          onCopy={(text) => notify(copyText(text) ? 'Description copied' : 'Copy is blocked here; open the details and copy it', false)}
           sending={sync.sending}
           result={sync.result}
           error={sync.error}

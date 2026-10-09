@@ -13,8 +13,8 @@ import { readShared, writeShared } from './main/shared'
 import { serializeShared } from './core/config'
 import { scan } from './main/scan'
 import { log, recentLog } from './log'
-import { RequestDiagnosticsHandler, DiagnosticsHandler } from './types'
-import { clampSize, validBaseline, validDevResources, validFixRequests, validSharedConfig } from './main/guards'
+import { RequestDiagnosticsHandler, DiagnosticsHandler, OpenExternalHandler } from './types'
+import { clampSize, validExternalUrl, validBaseline, validDevResources, validFixRequests, validSharedConfig } from './main/guards'
 import { migrateSettings } from './core/settingsSchema'
 import { fileIdentity, readLocalBaseline, readSharedBaseline, writeLocalBaseline, writeSharedBaseline } from './main/baseline'
 
@@ -103,6 +103,11 @@ export default async function () {
       ...recentLog()
     ].join('\n')
     emit<DiagnosticsHandler>('DIAGNOSTICS', text)
+  }))
+
+  // "Open pull request page": the helper returns the link, the UI asks, only https is opened
+  on<OpenExternalHandler>('OPEN_EXTERNAL', safe('Opening the link', (url) => {
+    if (validExternalUrl(url)) figma.openExternal(url)
   }))
 
   figma.on('selectionchange', emitSelection)

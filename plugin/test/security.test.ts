@@ -145,7 +145,7 @@ describe('data read from the file, the repo or the user is validated', () => {
   })
 })
 
-import { clampSize, validBaseline, validDevResources, validFixRequests, validSharedConfig } from '../src/main/guards'
+import { clampSize, validExternalUrl, validBaseline, validDevResources, validFixRequests, validSharedConfig } from '../src/main/guards'
 import { serializeShared } from '../src/core/config'
 
 describe('main-thread guards (the UI is untrusted input)', () => {
@@ -194,5 +194,12 @@ describe('snippets escape layer-derived values', () => {
       expect(out).not.toMatch(/"hi"|<b>|onload="y"/)
     }
     expect(reactSnippet(evil)).toContain("red\\'};alert(1);//")
+  })
+})
+
+describe('opening links', () => {
+  it('only https, one line, bounded', () => {
+    expect(validExternalUrl('https://github.com/acme/icons/compare/main...icons/update?expand=1&title=T')).toBe(true)
+    for (const bad of ['http://x.y', 'javascript:alert(1)', 'https://a b', 'https://x.y/"onclick', 'file:///etc/passwd', '', 5, 'https://x.y/' + 'a'.repeat(9000)]) expect(validExternalUrl(bad), String(bad).slice(0, 30)).toBe(false)
   })
 })

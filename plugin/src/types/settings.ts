@@ -28,6 +28,8 @@ export interface SyncSettings {
   token: string
   subdir: string
   commit: boolean
+  /** push the committed branch to origin (never the default branch); needs commit and a helper started with --allow-push */
+  push: boolean
   message: string
   branch: string
 }
@@ -124,7 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
   labs: false,
   labsBranchAck: false,
   compositeFrames: 'ignore',
-  sync: { enabled: false, url: 'http://localhost:5199', token: '', subdir: 'icons', commit: false, message: 'chore(icons): update from Figma', branch: '' },
+  sync: { enabled: false, url: 'http://localhost:5199', token: '', subdir: 'icons', commit: false, push: false, message: 'chore(icons): update from Figma', branch: '' },
   precision: 3,
   formats: {
     svg: true,

@@ -80,7 +80,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   sync: rule(
     false,
     shape<Settings['sync']>(
-      { enabled: bool, url: str(200), token: str(200), subdir: str(200), commit: bool, message: str(300), branch: str(100) },
+      { enabled: bool, url: str(200), token: str(200), subdir: str(200), commit: bool, push: bool, message: str(300), branch: str(100) },
       DEFAULT_SETTINGS.sync
     )
   ),

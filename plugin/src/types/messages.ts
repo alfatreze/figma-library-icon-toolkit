@@ -7,6 +7,7 @@ import type { RawIcon, ScanSummary, ScanOptions, DevResourceItem } from './domai
 import type { ApplyFixRequest, FixResult } from './fixes'
 
 export interface Messages {
+  OPEN_EXTERNAL: [url: string]
   REQUEST_DIAGNOSTICS: []
   DIAGNOSTICS: [text: string]
   SCAN: [options: ScanOptions]
@@ -65,3 +66,4 @@ export type BaselinesHandler = Handler<'BASELINES'>
 export type BaselineSavedHandler = Handler<'BASELINE_SAVED'>
 export type RequestDiagnosticsHandler = Handler<'REQUEST_DIAGNOSTICS'>
 export type DiagnosticsHandler = Handler<'DIAGNOSTICS'>
+export type OpenExternalHandler = Handler<'OPEN_EXTERNAL'>

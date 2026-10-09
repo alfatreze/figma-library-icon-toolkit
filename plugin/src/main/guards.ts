@@ -14,6 +14,9 @@ export const MAX_FIX_REQUESTS = 5000
 const NODE_ID = /^\d{1,10}:\d{1,10}$/
 const FIX_ACTIONS: FixActionId[] = ['replace-with-instance', 'convert-to-component', 'wrap-and-convert', 'rename-layers', 'apply-name']
 
+/** a link the UI asks us to open in the browser: https only, one line, bounded (it comes from the local helper, which is data, not code) */
+export const validExternalUrl = (u: unknown): u is string => typeof u === 'string' && u.length <= 8000 && /^https:\/\/[^\s"'<>`]+$/.test(u)
+
 export const isNodeId = (v: unknown): v is string => typeof v === 'string' && NODE_ID.test(v)
 
 export function validBaseline(text: unknown, target: unknown): target is 'local' | 'shared' {

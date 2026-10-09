@@ -176,9 +176,66 @@ function httpError(status, message) {
   return e
 }
 
-async function git(root, args) {
-  const { stdout } = await run('git', ['-C', root, ...args], { maxBuffer: 10 * 1024 * 1024 })
+async function git(root, args, extra = {}) {
+  const { stdout } = await run('git', ['-C', root, ...args], { maxBuffer: 10 * 1024 * 1024, ...extra })
   return stdout.trim()
+}
+
+// ---- remotes: where "origin" lives and how to get to a pull / merge request page ----
+
+/** { host, path, provider } from an https or ssh remote URL; credentials in the URL are dropped. Provider is 'github', 'gitlab' or null. */
+export function parseRemote(url) {
+  if (typeof url !== 'string') return null
+  const u = url.trim()
+  let host
+  let path
+  let m = /^(?:ssh:\/\/)?(?:[^@/\s]+@)?([^:/\s]+)(?::\d+)?[:/](.+?)(?:\.git)?\/?$/.exec(u)
+  const web = /^https?:\/\/(?:[^@/\s]+@)?([^/\s:]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/.exec(u)
+  if (web) m = web
+  if (!m) return null
+  host = m[1].toLowerCase()
+  path = m[2].replace(/^\/+/, '')
+  if (!/^[a-z0-9.-]+$/.test(host) || !/^[\w.\-/]+$/.test(path) || !path.includes('/')) return null
+  const provider = host.includes('github') ? 'github' : host.includes('gitlab') ? 'gitlab' : null
+  return { host, path, provider }
+}
+
+const seg = (v) => v.split('/').map(encodeURIComponent).join('/')
+const MAX_LINK_TEXT = 3000 // keep the link under browser and server limits; the full text is returned separately
+
+/** URL of the "open a pull / merge request" page with title and description prefilled, or null for unknown hosts */
+export function compareLink(remote, base, branch, title = '', body = '') {
+  if (!remote || !remote.provider || !base || !branch) return null
+  const t = String(title).slice(0, 200)
+  const b = String(body).length > MAX_LINK_TEXT ? String(body).slice(0, MAX_LINK_TEXT) + '\n\n…(description shortened; paste the full text from the plugin)' : String(body)
+  const root = `https://${remote.host}/${seg(remote.path)}`
+  if (remote.provider === 'github') return `${root}/compare/${seg(base)}...${seg(branch)}?expand=1&title=${encodeURIComponent(t)}&body=${encodeURIComponent(b)}`
+  return `${root}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${encodeURIComponent(branch)}&merge_request%5Btarget_branch%5D=${encodeURIComponent(base)}&merge_request%5Btitle%5D=${encodeURIComponent(t)}&merge_request%5Bdescription%5D=${encodeURIComponent(b)}`
+}
+
+async function remoteInfo(root) {
+  try {
+    return parseRemote(await git(root, ['remote', 'get-url', 'origin']))
+  } catch {
+    return null
+  }
+}
+
+/** the branch pull requests target: origin's HEAD, else main / master, else "main" */
+async function defaultBranch(root) {
+  try {
+    return (await git(root, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).replace(/^origin\//, '')
+  } catch {
+    for (const b of ['main', 'master']) {
+      try {
+        await git(root, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${b}`])
+        return b
+      } catch {
+        /* try the next one */
+      }
+    }
+    return 'main'
+  }
 }
 
 async function gitInfo(root) {
@@ -222,7 +279,8 @@ export function startServer(opts) {
 
       if (req.method === 'GET' && req.url === '/status') {
         const info = opts.git ? await gitInfo(root) : { repo: false, disabled: true }
-        send(200, { ok: true, dir: root, git: info, allowGit: !!opts.git, allowPush: !!opts.allowPush })
+        const remote = opts.git && info.repo ? await remoteInfo(root) : null
+        send(200, { ok: true, dir: root, git: info, allowGit: !!opts.git, allowPush: !!opts.allowPush, remote: remote ? { host: remote.host, repo: remote.path, provider: remote.provider } : null, defaultBranch: opts.git && info.repo ? await defaultBranch(root) : null })
         return
       }
       if (req.method === 'GET' && req.url.startsWith('/catalog')) {
@@ -246,6 +304,19 @@ export function startServer(opts) {
         if (body.dryRun) {
           send(200, { ok: true, dryRun: true, ...summary })
           return
+        }
+        // Refuse a push that cannot be allowed BEFORE anything is written or committed (no stray local commit on main).
+        if (body.push) {
+          if (!body.commit) throw httpError(400, 'Push needs "commit" to be on')
+          if (!opts.git) throw httpError(403, 'Git is disabled. Start the companion with --git')
+          if (!opts.allowPush) throw httpError(403, 'Push is disabled. Start the companion with --allow-push')
+          const info = await gitInfo(root)
+          if (!info.repo) throw httpError(400, 'The folder is not a git repository')
+          const base = await defaultBranch(root)
+          const target = body.branch ? String(body.branch) : info.branch
+          if (target === base || target === 'HEAD') {
+            throw httpError(400, `Not pushing to ${target === 'HEAD' ? 'a detached HEAD' : `"${base}"`}: choose a branch such as icons/update so the change can be reviewed.`)
+          }
         }
         for (const [rel, content] of plan.next) {
           const full = join(plan.target, rel)
@@ -283,9 +354,24 @@ export function startServer(opts) {
             committed = { branch: await git(root, ['rev-parse', '--abbrev-ref', 'HEAD']), sha: await git(root, ['rev-parse', '--short', 'HEAD']), files: staged.split('\n').length }
           } else committed = { branch: info.branch, sha: null, files: 0 }
           if (body.push) {
-            if (!opts.allowPush) throw httpError(403, 'Push is disabled. Start the companion with --allow-push')
-            await git(root, ['push', '-u', 'origin', committed.branch])
+            const base = await defaultBranch(root)
+            if (committed.branch === base || committed.branch === 'HEAD') throw httpError(400, `Not pushing to "${base}"`) // belt and braces: the check above already ran
+            try {
+              // never force; never prompt (a hidden credential prompt would hang the request); credentials are the user's own git setup
+              await git(root, ['push', '-u', 'origin', committed.branch], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 60000 })
+            } catch (e) {
+              const detail = String(e.stderr || e.message || '').split('\n').map((l) => l.trim()).filter(Boolean).slice(-2).join(' ')
+              throw httpError(502, `Push failed: ${detail || 'unknown error'}. Check that "origin" exists and that git can sign in to it from a terminal.`)
+            }
             committed.pushed = true
+            const remote = await remoteInfo(root)
+            const title = String(body.prTitle ?? body.message ?? '')
+            committed.links = {
+              provider: remote ? remote.provider : null,
+              base,
+              branch: committed.branch,
+              compare: compareLink(remote, base, committed.branch, title, String(body.prBody ?? ''))
+            }
           }
         }
         send(200, { ok: true, dryRun: false, ...summary, committed })

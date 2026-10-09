@@ -176,3 +176,104 @@ test('oversized bodies are refused up front', async () => {
     s.server.close()
   }
 })
+
+import { compareLink, parseRemote } from './icon-sync.mjs'
+
+test('parseRemote understands https and ssh remotes and drops credentials', () => {
+  assert.deepEqual(parseRemote('git@github.com:acme/icons.git'), { host: 'github.com', path: 'acme/icons', provider: 'github' })
+  assert.deepEqual(parseRemote('https://user:tok@github.com/acme/icons'), { host: 'github.com', path: 'acme/icons', provider: 'github' })
+  assert.deepEqual(parseRemote('https://gitlab.com/group/sub/repo.git'), { host: 'gitlab.com', path: 'group/sub/repo', provider: 'gitlab' })
+  assert.deepEqual(parseRemote('ssh://git@gitlab.example.com:2222/team/app.git'), { host: 'gitlab.example.com', path: 'team/app', provider: 'gitlab' })
+  assert.equal(parseRemote('git@git.example.org:team/app.git').provider, null)
+  assert.equal(parseRemote('/some/local/path.git'), null)
+  assert.equal(parseRemote('not a url'), null)
+})
+
+test('compareLink builds a prefilled pull / merge request page, and nothing for unknown hosts', () => {
+  const gh = compareLink(parseRemote('git@github.com:acme/icons.git'), 'main', 'icons/update', 'Update icons', 'Body & <b>')
+  assert.equal(gh, 'https://github.com/acme/icons/compare/main...icons/update?expand=1&title=Update%20icons&body=Body%20%26%20%3Cb%3E')
+  const gl = compareLink(parseRemote('https://gitlab.com/g/s/r.git'), 'main', 'icons/update', 'T', 'B')
+  assert.match(gl, /^https:\/\/gitlab\.com\/g\/s\/r\/-\/merge_requests\/new\?merge_request%5Bsource_branch%5D=icons%2Fupdate&merge_request%5Btarget_branch%5D=main/)
+  assert.equal(compareLink(parseRemote('git@git.example.org:team/app.git'), 'main', 'x'), null)
+  const long = compareLink(parseRemote('git@github.com:a/b.git'), 'main', 'x', 'T', 'y'.repeat(10000))
+  assert.ok(long.length < 7000)
+  assert.ok(decodeURIComponent(long).includes('description shortened'))
+})
+
+test('push: sends the branch to origin, never to main, never forced, and returns the pull-request link', async () => {
+  const remote = mkdtempSync(join(tmpdir(), 'ilt-remote-'))
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', remote])
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-push-'))
+  const g = (...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' }).trim()
+  g('init', '-q', '-b', 'main')
+  g('config', 'user.email', 't@example.com')
+  g('config', 'user.name', 'T')
+  writeFileSync(join(dir, 'README.md'), 'x')
+  g('add', '.')
+  g('commit', '-q', '-m', 'init')
+  g('remote', 'add', 'origin', remote)
+  g('push', '-q', '-u', 'origin', 'main')
+  g('remote', 'set-head', 'origin', 'main')
+  // pretend origin is on GitHub for the link, while pushes still go to the local bare repo
+  g('remote', 'set-url', 'origin', 'git@github.com:acme/icons.git')
+  g('remote', 'set-url', '--push', 'origin', remote)
+
+  const noPush = await startServer({ dir, port: 0, git: true })
+  try {
+    const r = await post(noPush, { subdir: 'icons', commit: true, push: true, branch: 'icons/update', files: { 'a.svg': '1' } })
+    assert.equal(r.status, 403, 'push needs --allow-push')
+  } finally {
+    noPush.server.close()
+  }
+  assert.equal(g('branch', '--list', 'icons/update'), '', 'a refused push leaves no branch, no files and no commit behind')
+  assert.equal(existsSync(join(dir, 'icons')), false)
+
+  const s = await startServer({ dir, port: 0, git: true, allowPush: true })
+  try {
+    const status = await (await fetch(`http://127.0.0.1:${s.port}/status`, { headers: { 'x-toolkit-token': s.token } })).json()
+    assert.equal(status.remote.provider, 'github')
+    assert.equal(status.defaultBranch, 'main')
+
+    // the default branch is refused, whether named or implied
+    const toMain = await post(s, { subdir: 'icons', commit: true, push: true, branch: 'main', files: { 'a.svg': '1' } })
+    assert.equal(toMain.status, 400)
+    const implied = await post(s, { subdir: 'icons', commit: true, push: true, files: { 'a.svg': '1' } })
+    assert.equal(implied.status, 400)
+    assert.equal(g('log', '-1', '--format=%s'), 'init', 'nothing was committed to main')
+    assert.equal(existsSync(join(dir, 'icons')), false, 'nothing was written')
+
+    const ok = await post(s, { subdir: 'icons', commit: true, push: true, branch: 'icons/update-2026-10-09', message: 'Update icons', prTitle: 'Update icons to 1.3.0', prBody: 'Added **2** icons', files: { 'a.svg': '1' } })
+    assert.equal(ok.status, 200, JSON.stringify(ok.json))
+    assert.equal(ok.json.committed.pushed, true)
+    assert.equal(ok.json.committed.links.provider, 'github')
+    assert.equal(ok.json.committed.links.base, 'main')
+    assert.match(ok.json.committed.links.compare, /^https:\/\/github\.com\/acme\/icons\/compare\/main\.\.\.icons\/update-2026-10-09\?expand=1&title=Update%20icons%20to%201\.3\.0&body=/)
+    // really on the remote, and main is untouched
+    const heads = execFileSync('git', ['-C', remote, 'branch', '--list'], { encoding: 'utf8' })
+    assert.match(heads, /icons\/update-2026-10-09/)
+    assert.equal(execFileSync('git', ['-C', remote, 'log', '-1', '--format=%s', 'main'], { encoding: 'utf8' }).trim(), 'init')
+  } finally {
+    s.server.close()
+  }
+})
+
+test('push failure is reported in plain words and does not hang', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-nopush-'))
+  const g = (...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' }).trim()
+  g('init', '-q', '-b', 'main')
+  g('config', 'user.email', 't@example.com')
+  g('config', 'user.name', 'T')
+  writeFileSync(join(dir, 'README.md'), 'x')
+  g('add', '.')
+  g('commit', '-q', '-m', 'init')
+  g('remote', 'add', 'origin', join(tmpdir(), 'does-not-exist-' + Date.now()))
+  const s = await startServer({ dir, port: 0, git: true, allowPush: true })
+  try {
+    const r = await post(s, { subdir: 'icons', commit: true, push: true, branch: 'icons/update', files: { 'a.svg': '1' } })
+    assert.equal(r.status, 502)
+    assert.match(r.json.error, /^Push failed:/)
+    assert.match(r.json.error, /origin/)
+  } finally {
+    s.server.close()
+  }
+})

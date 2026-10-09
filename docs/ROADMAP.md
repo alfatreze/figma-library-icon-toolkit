@@ -51,7 +51,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | Idea | Notes | Size |
 |---|---|---|
 | **Drift check in CI**: a small CLI/GitHub Action that compares the repo's `icons.json` with the Figma file (REST API, token supplied by the team) and fails or comments on a PR | Needs a Figma token and a headless path; the plugin alone cannot run in CI | L |
-| **Open a pull request** from the local helper (branch, commit, push, PR) | Today it writes and optionally commits; PR creation needs a GitHub token and a clear permission model | M |
+| **Create the pull / merge request from the plugin** (direct API, "option B") | Pushing a branch and opening a prefilled PR/MR page already works through the local helper (v0.4). Creating the PR itself needs a token and network permissions in the manifest, so it is the next step toward not needing the helper | M |
 | Visual regression between releases (render old and new, diff) | Builds on the existing render test | M |
 | Several libraries in one export (brand + product sets) with namespaces | Needs an identity and versioning model across files | L |
 | Interface translations | After the plural helper and a string catalogue | M |

@@ -7,6 +7,11 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+### Added
+- **Push to GitHub or GitLab through the local helper.** Project sync can now push the committed branch to `origin` with your own git credentials (SSH key or credential manager; no token in Figma). After a push the result screen offers **Open pull request page** (GitHub) or **Open merge request page** (GitLab) with the title and description prefilled, and **Copy description**. The description is generated from the changes: counts of added, renamed, removed and changed icons, a breaking-change note, the version, the changelog, the formats and how many icons still carry warnings. Works with github.com, gitlab.com and self-hosted hosts whose name contains `github` or `gitlab`; other hosts push fine and show no link.
+- Safety: the helper never pushes the default branch (it reads `origin/HEAD`, else main / master) and refuses before writing or committing anything; never forces; never waits on a credential prompt (60 s limit); push failures are reported in plain words. The branch defaults to `icons/update-<date>`.
+- Settings → Labs → Project sync: **Push the branch to origin**; **Test connection** now shows the origin host, repository and default branch, and warns when the helper was not started with `--allow-push`.
+
 ## [0.3.1] - 2026-10-09
 
 ### Fixed
