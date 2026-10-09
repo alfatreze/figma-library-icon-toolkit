@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
 import { describe, expect, it } from 'vitest'
+import { changesByName, chunkText, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline } from '../src/core/baseline'
 import { buildName, parseVariantName, slugify, validateName } from '../src/core/naming'
 import { prefixIds, themeSvg } from '../src/core/svg'
 import { tokenVarName, parseMapping } from '../src/core/tokens'
@@ -514,5 +515,38 @@ describe('duplicate groups can be marked intentional', () => {
     const ignored = processIcons([r], { ...DEFAULT_SETTINGS, ignoredDuplicates: ['g1'] }, {})
     expect(ignored.icons[0].fixes).toEqual([])
     expect(ignored.icons[0].findings.some((f) => f.ruleId === 'duplicate-component')).toBe(false)
+  })
+})
+
+describe('baseline snapshots', () => {
+  const icons = Array.from({ length: 700 }, (_, i) => ({ name: `icon-${i}`, hash: `h${i}`, colorHash: `c${i}`, category: ['a'], figma: { componentKey: `k${i}`, layerName: `Icon/${i}` } }))
+  it('round-trips through deflate + base64 and stays small', () => {
+    const snap = makeSnapshot(icons, { at: '2026-10-09T00:00:00Z', version: '1.2.0' })
+    const text = encodeSnapshot(snap)
+    expect(text.length).toBeLessThan(60000)
+    const back = decodeSnapshot(text)!
+    expect(back.icons).toHaveLength(700)
+    expect(back.version).toBe('1.2.0')
+    expect(decodeSnapshot('garbage')).toBeNull()
+  })
+  it('chunks without losing data', () => {
+    const t = 'x'.repeat(250000)
+    const parts = chunkText(t)
+    expect(parts.length).toBe(3)
+    expect(parts.join('')).toBe(t)
+  })
+  it('maps a diff to per-icon change kinds', () => {
+    const prev = { icons: [{ name: 'a', hash: '1', figma: { componentKey: 'k1' } }, { name: 'b', hash: '2', figma: { componentKey: 'k2' } }] }
+    const cur = [{ name: 'a', hash: '9', figma: { componentKey: 'k1' } }, { name: 'c', hash: '2', figma: { componentKey: 'k2' } }, { name: 'd', hash: '4' }]
+    const m = changesByName(diffCatalogs(prev, cur))
+    expect(m.get('a')?.has('changed')).toBe(true)
+    expect(m.get('c')?.has('renamed')).toBe(true)
+    expect(m.get('d')?.has('added')).toBe(true)
+  })
+  it('prefers repo > shared > local > file', () => {
+    const s = makeSnapshot([], { at: 'x' })
+    expect(pickBaseline({ local: s, shared: s })).toBe('shared')
+    expect(pickBaseline({ file: s, local: s })).toBe('local')
+    expect(pickBaseline({})).toBeNull()
   })
 })

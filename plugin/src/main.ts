@@ -3,7 +3,7 @@ import {
   ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixCandidate, FixesAppliedHandler, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, LocateHandler, NotifyHandler, ResizeHandler, SaveSettingsHandler,
   ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanStartHandler, SelectionHandler,
-  Settings, SettingsLoadedHandler, UiReadyHandler
+  Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler
 } from './types'
 import { registerCodegen } from './main/codegen'
 import { applyFix } from './main/apply'
@@ -11,6 +11,7 @@ import { loadSettings, SETTINGS_KEY } from './main/settings'
 import { readShared, writeShared } from './main/shared'
 import { serializeShared } from './core/config'
 import { scan } from './main/scan'
+import { fileIdentity, readLocalBaseline, readSharedBaseline, writeLocalBaseline, writeSharedBaseline } from './main/baseline'
 
 const MIN = { w: 360, h: 460 }
 const MAX = { w: 1000, h: 1100 }
@@ -37,6 +38,23 @@ export default async function () {
     emitSelection()
     const shared = await readShared()
     emit<SharedConfigHandler>('SHARED_CONFIG', shared ? shared.publishedAt : null, shared ? shared.publishedBy ?? null : null, shared ? shared.config : null)
+    emit<BaselinesHandler>('BASELINES', await readLocalBaseline(), await readSharedBaseline(), fileIdentity())
+  })
+
+  // Local baseline is automatic (clientStorage, no file write). The shared one writes into the file: UI offers it only in Labs.
+  on<SaveBaselineHandler>('SAVE_BASELINE', async (text, target) => {
+    try {
+      if (target === 'local') {
+        await writeLocalBaseline(text)
+        emit<BaselineSavedHandler>('BASELINE_SAVED', 'local', true, 'Saved on this computer')
+      } else {
+        const res = await writeSharedBaseline(text)
+        emit<BaselineSavedHandler>('BASELINE_SAVED', 'shared', res.ok, res.message)
+      }
+    } catch (e) {
+      emit<BaselineSavedHandler>('BASELINE_SAVED', target, false, e instanceof Error ? e.message : String(e))
+    }
+    emit<BaselinesHandler>('BASELINES', await readLocalBaseline(), await readSharedBaseline(), fileIdentity())
   })
 
   // Opt-in write (Labs): publishes the library settings into the file so Dev Mode and teammates use the same config.

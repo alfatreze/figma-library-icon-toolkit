@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { summariseCategories } from './core/categories'
 import { buildFiles } from './core/generators'
 import { fixesReportMarkdown, fixPlanMarkdown } from './core/generators/manifest'
+import { BASELINE_LABEL, BaselineSource, catalogToSnapshot, changesByName, CHANGE_KINDS, CHANGE_LABEL, ChangeKind, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline, Snapshot, snapshotToCatalog } from './core/baseline'
 import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from './core/changelog'
 import { exportConfig, parseConfig, serializeShared } from './core/config'
 import { TIER_LABEL } from './core/library'
@@ -27,7 +28,7 @@ import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
 import {
   ApplyFixRequest, ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixActionId, FixCandidate, FixesAppliedHandler, FixResult, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, Finding, FormatId, Icon, LocateHandler, NotifyHandler, RawIcon, ResizeHandler,
-  SaveSettingsHandler, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanScope,
+  SaveSettingsHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanScope,
   ScanStartHandler, ScanSummary, SelectionHandler, Settings, SettingsLoadedHandler, Severity, UiReadyHandler
 } from './types'
 
@@ -108,7 +109,13 @@ function Plugin() {
   const [showSettings, setShowSettings] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOverrides, setOutlineOverrides] = useState<Record<string, boolean>>({})
-  const [prevCatalog, setPrevCatalog] = useState<PreviousCatalog | null>(null)
+  const [fileCatalog, setFileCatalog] = useState<PreviousCatalog | null>(null)
+  const [repoCatalog, setRepoCatalog] = useState<PreviousCatalog | null>(null)
+  const [localSnap, setLocalSnap] = useState<Snapshot | null>(null)
+  const [sharedSnap, setSharedSnap] = useState<Snapshot | null>(null)
+  const [baselineChoice, setBaselineChoice] = useState<BaselineSource | 'none' | null>(null) // null = most authoritative available
+  const [baselineMsg, setBaselineMsg] = useState('')
+  const [changeFilter, setChangeFilter] = useState<ChangeKind | null>(null)
   const [prevError, setPrevError] = useState('')
   const [diffOpen, setDiffOpen] = useState<string | null>(null)
   const [configMessage, setConfigMessage] = useState('')
@@ -134,6 +141,13 @@ function Plugin() {
         setSettings(s)
         setLoaded(true)
       }),
+      on<BaselinesHandler>('BASELINES', (local, shared) => {
+        setLocalSnap(decodeSnapshot(local))
+        setSharedSnap(decodeSnapshot(shared))
+      }),
+      on<BaselineSavedHandler>('BASELINE_SAVED', (target, ok, message) => {
+        if (target === 'shared' || !ok) setBaselineMsg(message)
+      }),
       on<SharedConfigHandler>('SHARED_CONFIG', (at, by, config) => setSharedCfg(at && config ? { at, by, config } : null)),
       on<ConfigPublishedHandler>('CONFIG_PUBLISHED', (ok, message) => setConfigMessage(message + (ok ? '.' : ''))),
       on<SelectionHandler>('SELECTION', (count, names) => setSelection({ count, names })),
@@ -154,6 +168,7 @@ function Plugin() {
         setRuleFilter(null)
         setCatFilter('')
         setStatus('all')
+        setChangeFilter(null)
         setLimit(PAGE_SIZE)
       }),
       on<ScanPhaseHandler>('SCAN_PHASE', (t) => setPhase(t)),
@@ -228,18 +243,6 @@ function Plugin() {
   }, [icons])
   const actionable = groups.filter((x) => x.severity !== 'info')
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return icons.filter((i) => {
-      if (status === 'blocked' && !blockedIcons.includes(i)) return false
-      if (status === 'alerts' && !alertIcons.includes(i)) return false
-      if (status === 'excluded' && !off.has(i.key)) return false
-      if (ruleFilter && !i.findings.some((f) => f.ruleId === ruleFilter)) return false
-      if (catFilter && i.category.join('/') !== catFilter) return false
-      if (!q) return true
-      return (i.name + ' ' + i.layerName + ' ' + i.categoryLabel + ' ' + i.tags.join(' ')).toLowerCase().includes(q)
-    })
-  }, [icons, query, status, ruleFilter, catFilter, off, blockedIcons, alertIcons])
 
   const included = useMemo(() => icons.filter((i) => !off.has(i.key)), [icons, off])
   const exportable = useMemo(() => included.filter((i) => !hasBlockingErrors(i)), [included])
@@ -307,6 +310,18 @@ function Plugin() {
     setTab('icons')
   }
 
+  const baselines = useMemo<Record<BaselineSource, PreviousCatalog | null>>(
+    () => ({ repo: repoCatalog, shared: sharedSnap ? snapshotToCatalog(sharedSnap) : null, local: localSnap ? snapshotToCatalog(localSnap) : null, file: fileCatalog }),
+    [repoCatalog, sharedSnap, localSnap, fileCatalog]
+  )
+  const baselineSource: BaselineSource | null = baselineChoice === 'none' ? null : baselineChoice && baselines[baselineChoice] ? baselineChoice : pickBaseline({ repo: repoCatalog && catalogToSnapshot(repoCatalog), shared: sharedSnap, local: localSnap, file: fileCatalog && catalogToSnapshot(fileCatalog) })
+  const prevCatalog = baselineSource ? baselines[baselineSource] : null
+  const baselineMeta = (src: BaselineSource) => {
+    const sn = src === 'local' ? localSnap : src === 'shared' ? sharedSnap : null
+    const c = baselines[src]
+    return [c ? `${c.icons.length} icons` : '', c?.libraryVersion ? `v${c.libraryVersion}` : '', sn?.at ? sn.at.slice(0, 10) : ''].filter(Boolean).join(' · ')
+  }
+
   const release = useMemo(() => {
     const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey, layerName: i.layerName } }))
     const diff = prevCatalog ? diffCatalogs(prevCatalog, catalog) : null
@@ -315,14 +330,61 @@ function Plugin() {
     return { version, deprecated, diff }
   }, [exportable, prevCatalog])
 
+  const changeMap = useMemo(() => changesByName(release.diff), [release.diff])
+  const changeCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const set of changeMap.values()) for (const k of set) c[k] = (c[k] ?? 0) + 1
+    return c
+  }, [changeMap])
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return icons.filter((i) => {
+      if (status === 'blocked' && !blockedIcons.includes(i)) return false
+      if (status === 'alerts' && !alertIcons.includes(i)) return false
+      if (status === 'excluded' && !off.has(i.key)) return false
+      if (ruleFilter && !i.findings.some((f) => f.ruleId === ruleFilter)) return false
+      if (catFilter && i.category.join('/') !== catFilter) return false
+      if (changeFilter && !changeMap.get(i.name)?.has(changeFilter)) return false
+      if (!q) return true
+      return (i.name + ' ' + i.layerName + ' ' + i.categoryLabel + ' ' + i.tags.join(' ')).toLowerCase().includes(q)
+    })
+  }, [icons, query, status, ruleFilter, catFilter, changeFilter, changeMap, off, blockedIcons, alertIcons])
+
+  /** local snapshot is automatic and never touches the file; the shared one is an explicit Labs action */
+  const snapshotNow = (target: 'local' | 'shared') => {
+    const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey ?? null, layerName: i.layerName } }))
+    const snap = makeSnapshot(catalog, { at: new Date().toISOString(), version: release.version, namespace: settings.namespace })
+    emit<SaveBaselineHandler>('SAVE_BASELINE', encodeSnapshot(snap), target)
+  }
+  const saveSharedBaseline = () => {
+    setBaselineMsg('Saving…')
+    snapshotNow('shared')
+  }
+  const loadRepoBaseline = async () => {
+    try {
+      const out = await syncFetch(`/catalog?subdir=${encodeURIComponent(settings.sync.subdir)}`)
+      if (!out.found) {
+        setBaselineMsg(`No icons.json in “${settings.sync.subdir}” of the project folder yet.`)
+        return
+      }
+      setRepoCatalog(parseCatalog(out.catalog))
+      setBaselineChoice('repo')
+      setBaselineMsg('')
+    } catch (e) {
+      setBaselineMsg(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const makeFiles = () => buildFiles({ allIcons: included, settings, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10), release })
 
   const loadPrevious = async (file: File) => {
     try {
-      setPrevCatalog(parseCatalog(await file.text()))
+      setFileCatalog(parseCatalog(await file.text()))
+      setBaselineChoice('file')
       setPrevError('')
     } catch (e) {
-      setPrevCatalog(null)
+      setFileCatalog(null)
       setPrevError(e instanceof Error ? e.message : 'Could not read the file')
     }
   }
@@ -394,6 +456,7 @@ function Plugin() {
     try {
       const out = await syncFetch('/export', { files: makeFiles(), subdir: settings.sync.subdir, dryRun: false, commit: settings.sync.commit, message: settings.sync.message, branch: settings.sync.branch || undefined })
       setSyncResult({ committed: out.committed })
+      snapshotNow('local')
       notify('Written to your project folder')
     } catch (e) {
       setSyncError(e instanceof Error ? e.message : String(e))
@@ -411,6 +474,7 @@ function Plugin() {
       const files = makeFiles()
       const name = `${settings.zipName.trim() ? cleanNamespace(settings.zipName) : `${cleanNamespace(settings.namespace)}-icons`}.zip`
       download(name, zipFiles(files), 'application/zip')
+      snapshotNow('local')
       notify(`Exported ${exportable.length} icons (${Object.keys(files).length} files)`)
     } catch (e) {
       notify(`Export failed: ${e instanceof Error ? e.message : String(e)}`, true)
@@ -607,6 +671,11 @@ function Plugin() {
             {off.size > 0 && (
               <Chip active={status === 'excluded'} onClick={() => showInList({ status: 'excluded' })}>Excluded <span class={styles.muted}>{off.size}</span></Chip>
             )}
+            {release.diff && CHANGE_KINDS.filter((k) => changeCounts[k]).map((k) => (
+              <Chip key={k} active={changeFilter === k} onClick={() => { setChangeFilter(changeFilter === k ? null : k); setLimit(PAGE_SIZE) }} title={`Changed since the baseline: ${BASELINE_LABEL[baselineSource!]}`}>
+                {CHANGE_LABEL[k]} <span>{changeCounts[k]}</span>
+              </Chip>
+            ))}
             <InfoTip title="Blocked vs alerts">
               <span>
                 <strong>Blocked</strong>: has an error (text or image layer, invalid or duplicate name…). Blocked icons are <em>not exported</em> until you fix them in Figma and rescan, rename them here, or exclude them.
@@ -801,7 +870,17 @@ function Plugin() {
           prevCatalog={prevCatalog}
           prevError={prevError}
           onLoadPrevious={loadPrevious}
-          onClearPrevious={() => setPrevCatalog(null)}
+          onClearPrevious={() => setBaselineChoice('none')}
+          baseline={{
+            source: baselineSource,
+            options: (['repo', 'shared', 'local', 'file'] as BaselineSource[]).filter((k) => baselines[k]).map((k) => ({ value: k, text: `${BASELINE_LABEL[k]} · ${baselineMeta(k)}` })),
+            message: baselineMsg,
+            canRepo: settings.labs && settings.sync.enabled,
+            canShare: settings.labs,
+            onPick: (v) => setBaselineChoice(v),
+            onLoadRepo: loadRepoBaseline,
+            onSaveShared: saveSharedBaseline
+          }}
           onDownload={doExport}
           onSend={settings.labs && settings.sync.enabled ? startSync : null}
           onShowBlocked={() => { setExportOpen(false); showInList({ status: 'blocked' }) }}

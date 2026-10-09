@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { safeRel, startServer } from './icon-sync.mjs'
+import { readCatalog, safeRel, startServer } from './icon-sync.mjs'
 
 const post = (s, body, token = s.token) =>
   fetch(`http://127.0.0.1:${s.port}/export`, { method: 'POST', headers: { 'x-toolkit-token': token, 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, json: await r.json() }))
@@ -66,4 +66,14 @@ test('git: commit on a new branch, refuses dirty repo outside the folder, push d
   } finally {
     s.server.close()
   }
+})
+
+test('readCatalog reads <subdir>/icons.json and refuses escaping paths', async () => {
+  const { mkdirSync } = await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'cat-'))
+  mkdirSync(join(root, 'icons'))
+  writeFileSync(join(root, 'icons', 'icons.json'), '{"icons":[]}')
+  assert.equal(readCatalog(root, 'icons'), '{"icons":[]}')
+  assert.equal(readCatalog(root, 'nope'), null)
+  assert.throws(() => readCatalog(root, '../x'))
 })

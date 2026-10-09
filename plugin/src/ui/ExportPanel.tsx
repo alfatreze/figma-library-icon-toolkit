@@ -1,6 +1,7 @@
-import { Button, Checkbox, Toggle } from '@create-figma-plugin/ui'
+import { Button, Checkbox, Dropdown, Toggle } from '@create-figma-plugin/ui'
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
+import { BASELINE_LABEL, BaselineSource } from '../core/baseline'
 import { CategorySummary } from '../core/categories'
 import { Diff, PreviousCatalog } from '../core/changelog'
 import styles from '../styles.css'
@@ -26,6 +27,16 @@ export interface ExportPanelProps {
   prevError: string
   onLoadPrevious: (file: File) => void
   onClearPrevious: () => void
+  baseline: {
+    source: BaselineSource | null
+    options: { value: BaselineSource; text: string }[]
+    message: string
+    canRepo: boolean
+    canShare: boolean
+    onPick: (v: BaselineSource | 'none') => void
+    onLoadRepo: () => void
+    onSaveShared: () => void
+  }
   onDownload: () => void
   onSend: (() => void) | null
   onShowBlocked: () => void
@@ -152,7 +163,24 @@ export function ExportPanel(p: ExportPanelProps) {
             )
           }}
         >
-          {!p.prevCatalog && <div class={styles.muted}>Load your last <code>icons.json</code> to get a changelog, a suggested version and deprecated aliases for renamed icons. Without it, this is version <strong>1.0.0</strong>.</div>}
+          {p.baseline.options.length > 0 && (
+            <div class={styles.fieldRow}>
+              <div class={styles.grow}>
+                <Dropdown
+                  value={p.baseline.source ?? 'none'}
+                  onValueChange={(v) => p.baseline.onPick(v as BaselineSource | 'none')}
+                  options={[{ value: 'none', text: 'Compare with: nothing (version 1.0.0)' }, ...p.baseline.options.map((o) => ({ value: o.value, text: 'Compare with: ' + o.text }))]}
+                />
+              </div>
+            </div>
+          )}
+          {p.baseline.source && <div class={styles.muted}>Baseline: {BASELINE_LABEL[p.baseline.source]}. Priority is repo, then shared in this file, then this computer, then a loaded file.</div>}
+          <div class={styles.fieldRow}>
+            {p.baseline.canRepo && <button class={styles.linkBtn} onClick={p.baseline.onLoadRepo}>Read from project repo</button>}
+            {p.baseline.canShare && <button class={styles.linkBtn} onClick={p.baseline.onSaveShared} title="Writes one small entry into this Figma file (visible to everyone with access, including Dev Mode)">Save as shared baseline (writes to file)</button>}
+          </div>
+          {p.baseline.message && <div class={styles.muted}>{p.baseline.message}</div>}
+          {!p.prevCatalog && <div class={styles.muted}>Export once and this computer remembers it, so the next scan shows what changed. You can also load an <code>icons.json</code> to get a changelog, a suggested version and deprecated aliases for renamed icons. Without it, this is version <strong>1.0.0</strong>.</div>}
           {p.prevCatalog && d && (
             <div class={styles.release}>
               <div class={styles.releaseChips}>

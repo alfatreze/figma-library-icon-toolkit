@@ -454,3 +454,18 @@ export interface SharedConfigHandler extends EventHandler {
   name: 'SHARED_CONFIG'
   handler: (publishedAt: string | null, publishedBy: string | null, config: string | null) => void
 }
+
+// ---- change-detection baseline (see docs/CHANGE-DETECTION.md) ----
+export interface SaveBaselineHandler extends EventHandler {
+  name: 'SAVE_BASELINE'
+  /** encoded snapshot; target 'shared' writes into the file (Labs only) */
+  handler: (text: string, target: 'local' | 'shared') => void
+}
+export interface BaselinesHandler extends EventHandler {
+  name: 'BASELINES'
+  handler: (local: string | null, shared: string | null, fileId: string) => void
+}
+export interface BaselineSavedHandler extends EventHandler {
+  name: 'BASELINE_SAVED'
+  handler: (target: 'local' | 'shared', ok: boolean, message: string) => void
+}

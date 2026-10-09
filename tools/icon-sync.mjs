@@ -69,6 +69,18 @@ function pruneEmptyDirs(dir, stop) {
   }
 }
 
+/** Reads <subdir>/icons.json (the catalogue developers actually ship) as the change-detection baseline. */
+export function readCatalog(root, subdir) {
+  const sub = safeRel(subdir || '.') ?? null
+  if (sub === null) throw httpError(400, 'Invalid folder name')
+  const target = resolve(root, sub)
+  if (target !== root && !target.startsWith(root + sep)) throw httpError(400, 'Folder is outside the project')
+  const file = join(target, 'icons.json')
+  if (!existsSync(file)) return null
+  if (statSync(file).size > MAX_BODY) throw httpError(413, 'icons.json is too large')
+  return readFileSync(file, 'utf8')
+}
+
 export function planSync(root, subdir, files) {
   const sub = safeRel(subdir || '.') ?? null
   if (sub === null) throw httpError(400, 'Invalid folder name')
@@ -154,6 +166,12 @@ export function startServer(opts) {
       if (req.method === 'GET' && req.url === '/status') {
         const info = opts.git ? await gitInfo(root) : { repo: false, disabled: true }
         send(200, { ok: true, dir: root, git: info, allowGit: !!opts.git, allowPush: !!opts.allowPush })
+        return
+      }
+      if (req.method === 'GET' && req.url.startsWith('/catalog')) {
+        const subdir = new URL(req.url, 'http://x').searchParams.get('subdir') ?? 'icons'
+        const text = readCatalog(root, subdir)
+        send(200, { ok: true, found: text !== null, catalog: text })
         return
       }
       if (req.method === 'POST' && req.url === '/export') {
