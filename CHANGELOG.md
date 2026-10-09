@@ -7,6 +7,7 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
 ### Added
 - **Publish to a repository, self-contained.** Settings → Output → *Publish to a repository* (host, repository, folder, optional branch, access token) and Export → *Publish to repository…*. The plugin compares the export with the repository's default branch, shows what would be added, changed or removed, then creates a new branch, commits everything as one change and opens a **pull request (GitHub)** or **merge request (GitLab)** with a generated title and description (added, renamed, removed and changed icons, breaking-change note, version, changelog, formats, remaining warnings). Only files this tool published before (`<folder>/.icon-toolkit.json`) are ever deleted; the default branch is never changed; large exports are uploaded in several requests. If only the pull / merge request fails, the branch is kept and you get a link to open it by hand.
 - The token is the user's own (GitHub fine-grained: Contents and Pull requests; GitLab: `api` scope), stored on this computer only (never in the team config, exports or diagnostics) and sent only to api.github.com or gitlab.com. The plugin makes network requests only when you press Test connection or Publish.
@@ -96,7 +97,8 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.0...v0.2.1
