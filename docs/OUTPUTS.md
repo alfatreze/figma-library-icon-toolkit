@@ -28,4 +28,6 @@ Things an outputs model must handle:
 - Outputs on the same repository are planned per folder and published as one branch, one commit and one pull / merge request (`core/outputs.ts`: `groupOutputs`, `mergePlans`). Different repositories get their own branch and request.
 - Validation blocks Publish when a folder is missing or unsafe, two folders of one repository overlap, a host has no token, or no package is selected.
 - The local ZIP always has every package; it is not an output.
-- Not done: a per-output baseline choice, sprite path across repositories, per-output PR text for one shared request.
+- Baseline: with two or more outputs, Settings → Output has a "Baseline" choice (`baselineOutput`); empty or unknown falls back to the first output that is ready.
+- Sprite across repositories: the Angular sprite strategy reads the sprite URL at runtime (`provide…Sprite({ url })`), so it needs no path to another repository. An Angular output without the sprite package still gets the strategy when the sprite package is on in Packages (`BuildInput.spriteStrategy`).
+- Not done: per-output PR text for one shared request.

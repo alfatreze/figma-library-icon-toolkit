@@ -49,12 +49,12 @@ UI (v0.3): one stable skeleton (scan bar, fixed-height status row, tabs, toolbar
 See **`ROADMAP.md`** (Gate 0 = verify in Figma; v0.5 designer / system-manager workflow; v0.6 developer experience; later: drift check in CI, self-hosted git hosts). Immediate next steps:
 1. **Gate 0:** run `docs/verification.md` in Figma (V10, V14, V16-V18, V21-V33); publish to a throwaway GitHub and GitLab repo (V14, V32, V33); fix what breaks.
 2. Community submission (listing text drafted in the session; review `networkAccess` and the `inspect` capability).
-3. v0.4 polish: done (unreleased): auto-contrast preview tile, plural helper, `theme-contrast` audit rule, keyboard-reachable hints (`data-hint`) instead of `title`, `useFixes` hook, `ui.tsx` split (621 lines): row/issue components in `ui/components/`, the three tab panels in `ui/panels/`, tests for `diagnose`/`facts`/`codegen`, Actions pinned by SHA. Left: build provenance attestation, and a Figma/visual check of the hints (Gate 0).
+3. v0.4 polish: done (unreleased): auto-contrast preview tile, plural helper, `theme-contrast` audit rule, keyboard-reachable hints (`data-hint`) instead of `title`, `useFixes` hook, `ui.tsx` split (621 lines): row/issue components in `ui/components/`, the three tab panels in `ui/panels/`, tests for `diagnose`/`facts`/`codegen`, Actions pinned by SHA. Also done: tabpanel/aria-controls, `useFilters`, provenance attestation step (untested until a release), dead CSS removed and the `ui.js` budget raised to 380 KB (outputs UI). Left: a Figma and visual check of the hints and panels (Gate 0).
 
 Open owner decisions: audience of the first Community release (design-system teams vs developers), Org/Enterprise plan (Code Connect, CI drift check), which frameworks next (Vue / Svelte), brand colour (follow Figma's token or a darker blue for text contrast).
 
 ## 5b. Audit follow-up
-`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: filters reducer and tab-panel components in `ui.tsx`, Angular modern/classic template merge, release provenance attestation.
+`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: Angular modern/classic template merge, contrast of the warn chips in dark mode.
 
 ## 6. Lessons learned (avoid repeating)
 - **Manifest:** unknown keys are rejected (`editorAPI` broke loading). `@create-figma-plugin` spreads unknown `figma-plugin` keys into `manifest.json`. If Figma rejects the manifest, remove `codegenPreferences`, then `vscode`.
