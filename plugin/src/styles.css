@@ -319,3 +319,7 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .root [class*='_button_'] > button, .overlay [class*='_button_'] > button { min-height: 32px; height: 100%; padding: 0 16px; }
 .footer [class*='_button_'], .footer [class*='_button_'] > button { min-height: 36px; }
 .scanRow [class*='_button_'] { flex: none; }
+
+/* the UI kit renders dropdown menus in a portal on <body> with z-index 2; Settings, Export and the other full-window dialogs sit at 20,
+   so their menus opened behind them ("dropdowns do not open"). Keep menus above every dialog. */
+body > [class*='_menu_'] { z-index: 2600; }

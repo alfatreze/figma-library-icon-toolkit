@@ -45,3 +45,15 @@ describe('Dialog', () => {
     expect(document.activeElement).toBe(outside)
   })
 })
+
+import { readFileSync } from 'fs'
+describe('stacking (regression: dropdowns opened behind Settings)', () => {
+  it('kit dropdown menus (portaled to <body>) sit above every full-window dialog', () => {
+    const css = readFileSync('src/styles.css', 'utf8')
+    const z = (re: RegExp) => Number(re.exec(css)?.[1])
+    const overlay = z(/\.overlay \{[^}]*z-index: (\d+)/)
+    const menu = z(/body > \[class\*='_menu_'\] \{ z-index: (\d+)/)
+    expect(overlay).toBeGreaterThan(0)
+    expect(menu).toBeGreaterThan(overlay)
+  })
+})
