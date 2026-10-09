@@ -35,7 +35,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | **Library health report** as a shareable HTML or Markdown file (score by area, what changed, what blocks) | Lets a system manager show progress without opening Figma | M |
 | **Unused-icons report**: icons never placed as instances in the scanned files | Pruning decisions backed by data | M |
 | **Bulk rename with preview** and a naming-pattern check (kebab-case, verb-noun, category prefix) | The most common cleanup job; Labs for writes, report-only otherwise | M |
-| **Descriptions and tags helper** (find icons without a description; export `tags` for search) | Feeds the searchable preview page and AI guide | S |
+| ~~**Descriptions and tags helper**~~ done (unreleased, not yet run in Figma): Issues → Descriptions… downloads a CSV template (only without a description, or all), reads the filled one back, shows what would change with the parsed tags, and writes in Labs (checked in the main thread too, skips descriptions changed since the scan, one undo step) | Feeds the searchable preview page and AI guide | S |
 | Variable mapping by collection and mode (Light/Dark) with a visual table | Today it is per-variable lines and wildcards | M |
 | Dark/light preview of themeable colours in the detail panel and the HTML preview | Shows what developers will get | S |
 

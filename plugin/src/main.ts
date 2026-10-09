@@ -3,7 +3,7 @@ import {
   ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixCandidate, FixesAppliedHandler, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, LocateHandler, NotifyHandler, ResizeHandler, SaveSettingsHandler,
   ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanStartHandler, SelectionHandler,
-  Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler
+  Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler, ApplyDescriptionsHandler, DescriptionsAppliedHandler
 } from './types'
 import { registerCodegen } from './main/codegen'
 import { applyFix, resetApplyCaches } from './main/apply'
@@ -14,7 +14,8 @@ import { serializeShared } from './core/config'
 import { scan } from './main/scan'
 import { log, recentLog } from './log'
 import { RequestDiagnosticsHandler, DiagnosticsHandler, OpenExternalHandler } from './types'
-import { clampSize, validExternalUrl, validBaseline, validDevResources, validFixRequests, validSharedConfig } from './main/guards'
+import { clampSize, validExternalUrl, validBaseline, validDescriptions, validDevResources, validFixRequests, validSharedConfig } from './main/guards'
+import { applyDescriptions } from './main/descriptions'
 import { migrateSettings } from './core/settingsSchema'
 import { fileIdentity, readLocalBaseline, readSharedBaseline, writeLocalBaseline, writeSharedBaseline } from './main/baseline'
 
@@ -248,6 +249,29 @@ export default async function () {
     }
     figma.commitUndo()
     emit<DevResourcesAttachedHandler>('DEV_RESOURCES_ATTACHED', added, existing, failed, lastError)
+  }))
+
+  // Labs: write component descriptions (search tags in the export). Needs Labs on and the branch/copy confirmation, checked here too,
+  // not just in the UI; each description is skipped when the file no longer has the one that was scanned. One undo step.
+  on<ApplyDescriptionsHandler>('APPLY_DESCRIPTIONS', safe('Writing descriptions', async (rawItems) => {
+    const items = validDescriptions(rawItems)
+    if (inspect || !items.length) return
+    if (!latest.labs || !latest.labsBranchAck) {
+      emit<DescriptionsAppliedHandler>('DESCRIPTIONS_APPLIED', 0, 0, items.length, 'Turn on Labs and confirm you are working in a branch or a copy first.')
+      return
+    }
+    if (scanning || applying) {
+      emit<DescriptionsAppliedHandler>('DESCRIPTIONS_APPLIED', 0, 0, items.length, 'Wait for the scan or the fixes to finish.')
+      return
+    }
+    applying = true
+    try {
+      const r = await applyDescriptions(items)
+      figma.commitUndo()
+      emit<DescriptionsAppliedHandler>('DESCRIPTIONS_APPLIED', r.ok, r.skipped, r.failed, r.message)
+    } finally {
+      applying = false
+    }
   }))
 
   // Selecting + zooming changes the user's selection/viewport only; it never edits nodes.

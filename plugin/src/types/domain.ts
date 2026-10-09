@@ -188,3 +188,5 @@ export interface ScanOptions {
 
 // ---- dev resources (Labs: writes links onto icon components so they show in Dev Mode) ----
 export interface DevResourceItem { nodeId: string; url: string; name: string }
+/** one component description to write (Labs); `from` is what it was when scanned */
+export interface DescriptionItem { nodeId: string; from: string; to: string }

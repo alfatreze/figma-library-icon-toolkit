@@ -31,6 +31,7 @@ export interface IssuesPanelProps {
   onLocateRule: (group: IssueGroup) => void
   onToggleNotes: () => void
   onOpenSettings: () => void
+  onDescriptions: () => void
 }
 
 /** the Issues tab: what blocks the export, what is worth a look, and the automatic fixes for both */
@@ -55,7 +56,10 @@ export function IssuesPanel(p: IssuesPanelProps) {
       <div class={styles.list}>
         <div class={styles.listHead} style={{ justifyContent: 'space-between' }}>
           <span>{p.summary}</span>
+          <span class={styles.fieldRow}>
+          <Button secondary onClick={p.onDescriptions} disabled={p.iconCount === 0}>Descriptions…</Button>
           <Button secondary onClick={p.onReport} disabled={p.iconCount === 0}>Export report</Button>
+        </span>
         </div>
         {actionable.length > 0 && p.autoFixCount > 0 && (
           <IssueOverview

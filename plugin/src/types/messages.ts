@@ -3,7 +3,7 @@
 
 import type { EventHandler } from '@create-figma-plugin/utilities'
 import type { Settings } from './settings'
-import type { RawIcon, ScanSummary, ScanOptions, DevResourceItem } from './domain'
+import type { RawIcon, ScanSummary, ScanOptions, DevResourceItem, DescriptionItem } from './domain'
 import type { ApplyFixRequest, FixResult } from './fixes'
 
 export interface Messages {
@@ -32,6 +32,8 @@ export interface Messages {
   SHARED_CONFIG: [publishedAt: string | null, publishedBy: string | null, config: string | null]
   ATTACH_DEV_RESOURCES: [items: DevResourceItem[]]
   DEV_RESOURCES_ATTACHED: [added: number, existing: number, failed: number, message: string]
+  APPLY_DESCRIPTIONS: [items: DescriptionItem[]]
+  DESCRIPTIONS_APPLIED: [ok: number, skipped: number, failed: number, message: string]
   SAVE_BASELINE: [text: string, target: 'local' | 'shared']
   BASELINES: [local: string | null, shared: string | null, fileId: string]
   BASELINE_SAVED: [target: 'local' | 'shared', ok: boolean, message: string]
@@ -61,6 +63,8 @@ export type ConfigPublishedHandler = Handler<'CONFIG_PUBLISHED'>
 export type SharedConfigHandler = Handler<'SHARED_CONFIG'>
 export type AttachDevResourcesHandler = Handler<'ATTACH_DEV_RESOURCES'>
 export type DevResourcesAttachedHandler = Handler<'DEV_RESOURCES_ATTACHED'>
+export type ApplyDescriptionsHandler = Handler<'APPLY_DESCRIPTIONS'>
+export type DescriptionsAppliedHandler = Handler<'DESCRIPTIONS_APPLIED'>
 export type SaveBaselineHandler = Handler<'SAVE_BASELINE'>
 export type BaselinesHandler = Handler<'BASELINES'>
 export type BaselineSavedHandler = Handler<'BASELINE_SAVED'>

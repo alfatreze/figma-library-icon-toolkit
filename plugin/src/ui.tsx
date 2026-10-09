@@ -15,6 +15,8 @@ import { zipFiles } from './core/zip'
 import styles from './ui/styles'
 import { ConfirmApply, FixCard } from './ui/Fixes'
 import { useFilters } from './ui/hooks/useFilters'
+import { useDescriptions } from './ui/hooks/useDescriptions'
+import { DescriptionsDialog } from './ui/DescriptionsDialog'
 import { useFixes } from './ui/hooks/useFixes'
 import { groupOutputs, outputReady, settingsFor } from './core/outputs'
 import { IconsPanel, Status, View } from './ui/panels/IconsPanel'
@@ -238,6 +240,7 @@ function Plugin() {
       warnings: exportable.filter((i) => i.findings.some((f) => f.severity === 'warn')).length,
       date: new Date().toISOString().slice(0, 10)
     })
+  const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
   const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
   const scanVariables = useMemo(() => {
     const seen = new Map<string, { variable: string; collection?: string }>()
@@ -510,6 +513,7 @@ function Plugin() {
           }}
           onToggleNotes={() => setShowNotes(!showNotes)}
           onOpenSettings={() => setShowSettings(true)}
+          onDescriptions={descriptions.show}
         /></TabPanel>
       )}
 
@@ -576,6 +580,10 @@ function Plugin() {
           onApply={fixes.apply}
           applying={fixes.applying}
         />
+      )}
+
+      {descriptions.open && (
+        <DescriptionsDialog d={descriptions} labsReady={settings.labs && settings.labsBranchAck} labsOn={settings.labs} onOpenSettings={() => setShowSettings(true)} />
       )}
 
       {publish.open && (

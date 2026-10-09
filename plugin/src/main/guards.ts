@@ -1,5 +1,5 @@
 import { parseShared } from '../core/config'
-import { ApplyFixRequest, DevResourceItem, FixActionId } from '../types'
+import { ApplyFixRequest, DescriptionItem, DevResourceItem, FixActionId } from '../types'
 
 /**
  * The UI runs in an iframe and the main thread is the only code that can touch the file, so every message from the UI is
@@ -10,6 +10,7 @@ export const MAX_BASELINE_CHARS = 2_000_000
 export const MAX_CONFIG_CHARS = 200_000
 export const MAX_DEV_RESOURCES = 2000
 export const MAX_FIX_REQUESTS = 5000
+export const MAX_DESCRIPTIONS = 5000
 
 const NODE_ID = /^\d{1,10}:\d{1,10}$/
 const FIX_ACTIONS: FixActionId[] = ['replace-with-instance', 'convert-to-component', 'wrap-and-convert', 'rename-layers', 'apply-name']
@@ -55,6 +56,20 @@ export function validFixRequests(reqs: unknown): ApplyFixRequest[] {
       name: str(r.name, 200),
       renameLeaves: r.renameLeaves === true
     })
+  }
+  return out
+}
+
+/** component descriptions to write: bounded, no control characters other than a line break, never an empty one (an empty description would erase a real one) */
+export function validDescriptions(items: unknown): DescriptionItem[] {
+  if (!Array.isArray(items)) return []
+  const out: DescriptionItem[] = []
+  const clean = (s: string, max: number) => s.slice(0, max).replace(/[\u0000-\u0009\u000b-\u001f]/g, ' ')
+  for (const it of items.slice(0, MAX_DESCRIPTIONS) as Partial<DescriptionItem>[]) {
+    if (!it || !isNodeId(it.nodeId) || typeof it.from !== 'string' || typeof it.to !== 'string') continue
+    const to = clean(it.to, 1000).trim()
+    if (!to) continue
+    out.push({ nodeId: it.nodeId, from: it.from.slice(0, 5000), to })
   }
   return out
 }

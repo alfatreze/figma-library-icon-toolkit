@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 While the major version is `0` (initial development) minor versions may contain breaking changes; they are called out under **Changed** or **Removed**.
 
 ## [Unreleased]
+### Added
+- **Descriptions and tags helper** (Issues → *Descriptions…*): download a CSV template of the components without a description (or all), fill in comma-separated search words, load it back, review what would change with the tags it produces, and write the descriptions (Labs, one undo step). An empty cell never clears a description; a description changed in the file since the scan is left alone; spreadsheet formulas in the CSV are neutralised.
 
 ## [0.5.0] - 2026-10-10
 First release verified in Figma (scan, baseline, export, Dev Mode codegen and the inspect panel were run on a 410-icon library; publishing to a real repository, Labs fixes and shared config are still unverified).
