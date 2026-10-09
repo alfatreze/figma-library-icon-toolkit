@@ -1,7 +1,7 @@
 import { h, render } from 'preact'
 import { act } from 'preact/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lead, useResizeHandles } from '../src/ui/resize'
+import { useResizeHandles } from '../src/ui/resize'
 
 const LIMITS = { minWidth: 360, minHeight: 460, maxWidth: 1000, maxHeight: 1100 }
 let root: HTMLDivElement
@@ -13,11 +13,14 @@ function Probe() {
 }
 
 const handle = (dir: string) => document.querySelector(`[data-resize-handle="${dir}"]`) as HTMLElement
+/** a pointer event at (x, y) in the iframe's own coordinates; outside the iframe x / y simply exceed its size, as with pointer capture */
 const fire = (el: HTMLElement, type: string, x: number, y: number, buttons = 1) => {
-  const e = new MouseEvent(type, { screenX: x, screenY: y, buttons, button: 0, bubbles: true })
+  const e = new MouseEvent(type, { clientX: x, clientY: y, buttons, button: 0, bubbles: true })
   Object.defineProperty(e, 'pointerId', { value: 1 })
   el.dispatchEvent(e)
 }
+const frame = () => vi.advanceTimersByTime(20)
+const last = () => sizes[sizes.length - 1]
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -39,116 +42,89 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const last = () => sizes[sizes.length - 1]
-
-describe('window resize handles', () => {
-  it('shrinking follows the pointer exactly', () => {
+describe('window resize handles (size = pointer position in the iframe + the grab offset)', () => {
+  it('the window edge stays exactly under the pointer, outward and inward', () => {
     const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 940, 730)
-    vi.advanceTimersByTime(5)
-    expect(last()).toEqual([440, 530])
+    fire(el, 'pointerdown', 490, 590) // grabbed 10 px from the right and bottom edge
+    fire(el, 'pointermove', 590, 690) // outside the iframe: pointer capture keeps the events coming
+    frame()
+    expect(last()).toEqual([600, 700])
+    fire(el, 'pointermove', 440, 530)
+    frame()
+    expect(last()).toEqual([450, 540])
   })
 
-  it('a slow outward drag keeps the window only a few pixels ahead of the pointer', () => {
-    const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    let x = 1000
-    for (let i = 0; i < 20; i++) {
-      vi.advanceTimersByTime(100) // 100 ms per event, 5 px each: 50 px/s
-      x += 5
-      fire(el, 'pointermove', x, 800)
-      vi.advanceTimersByTime(5)
+  it('never runs ahead of the pointer: the same pointer position always gives the same size', () => {
+    const el = handle('x')
+    fire(el, 'pointerdown', 495, 300)
+    for (const x of [520, 700, 560, 700, 520]) {
+      fire(el, 'pointermove', x, 300)
+      frame()
+      expect(last()[0]).toBe(x + 5)
     }
-    const ahead = last()[0] - (500 + 100)
-    expect(ahead).toBeGreaterThanOrEqual(lead(0))
-    expect(ahead).toBeLessThan(lead(0) + 10)
   })
 
-  it('a fast outward drag gets a bigger lead, but never more than the cap', () => {
-    const el = handle('x')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 1100, 800) // 10 px/ms
-    vi.advanceTimersByTime(5)
-    const ahead = last()[0] - 600
-    expect(ahead).toBeGreaterThan(lead(0.1))
-    expect(ahead).toBeLessThanOrEqual(120)
-  })
-
-  it('settles on the exact size when the drag ends', () => {
+  it('does not depend on how long the drag takes or on pauses', () => {
     const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 1080, 850)
-    vi.advanceTimersByTime(5)
-    expect(last()[0]).toBeGreaterThan(580)
-    fire(el, 'pointerup', 1080, 850, 0)
-    expect(last()).toEqual([580, 650])
-  })
-
-  it('settles on the exact size when the pointer comes back over the iframe with no button down (released outside)', () => {
-    const el = handle('x')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 1100, 800)
-    vi.advanceTimersByTime(5)
-    const grown = last()[0]
-    expect(grown).toBeGreaterThan(600)
-    vi.advanceTimersByTime(5000) // a long pause must not change the window
-    expect(last()[0]).toBe(grown)
-    fire(document.body, 'pointermove', 700, 300, 0)
+    fire(el, 'pointerdown', 495, 595)
+    fire(el, 'pointermove', 595, 595)
+    frame()
+    vi.advanceTimersByTime(10_000)
     expect(last()).toEqual([600, 600])
+    fire(el, 'pointermove', 596, 595)
+    frame()
+    expect(last()).toEqual([601, 600])
   })
 
-  it('the lead follows speed: small and steady for a slow drag, larger for a fast one, capped', () => {
-    expect(lead(0)).toBe(12)
-    expect(lead(-1)).toBe(12)
-    expect(lead(0.05)).toBeLessThan(20)
-    expect(lead(1)).toBeGreaterThan(lead(0.05))
-    expect(lead(100)).toBe(120)
+  it('does not resend a size that has not changed', () => {
+    const el = handle('x')
+    fire(el, 'pointerdown', 495, 300)
+    fire(el, 'pointermove', 595, 300)
+    frame()
+    fire(el, 'pointermove', 595, 301)
+    frame()
+    expect(sizes).toHaveLength(1)
   })
 
-  it('a pause in the middle of a drag keeps the size, and moving on continues from it', () => {
+  it('stays within the limits', () => {
     const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 1060, 800)
-    vi.advanceTimersByTime(5)
-    const before = last()
-    vi.advanceTimersByTime(5000)
-    expect(last()).toEqual(before)
-    vi.advanceTimersByTime(100)
-    fire(el, 'pointermove', 1070, 800)
-    vi.advanceTimersByTime(5)
-    expect(last()[0]).toBeGreaterThanOrEqual(570)
-    expect(last()[0]).toBeLessThan(570 + 30)
-  })
-
-  it('never asks for more than the maximum, with or without the lead', () => {
-    const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(el, 'pointermove', 2000, 2000)
-    vi.advanceTimersByTime(5)
+    fire(el, 'pointerdown', 495, 595)
+    fire(el, 'pointermove', 5000, 5000)
+    frame()
     expect(last()).toEqual([1000, 1100])
+    fire(el, 'pointermove', -50, -50)
+    frame()
+    expect(last()).toEqual([360, 460])
   })
 
-  it('moves only the axis of an edge handle', () => {
+  it('an edge handle moves only its own axis', () => {
     const y = handle('y')
-    fire(y, 'pointerdown', 1000, 800)
-    vi.advanceTimersByTime(10)
-    fire(y, 'pointermove', 1300, 850)
-    vi.advanceTimersByTime(5)
-    expect(last()[0]).toBe(500)
-    expect(last()[1]).toBeGreaterThanOrEqual(650)
+    fire(y, 'pointerdown', 300, 595)
+    fire(y, 'pointermove', 900, 695)
+    frame()
+    expect(last()).toEqual([500, 700])
+    const x = handle('x')
+    sizes.length = 0
+    fire(x, 'pointerdown', 495, 300)
+    fire(x, 'pointermove', 645, 900)
+    frame()
+    expect(last()).toEqual([650, 600])
+  })
+
+  it('a released button ends the drag even when the release happened outside the iframe', () => {
+    const el = handle('x')
+    fire(el, 'pointerdown', 495, 300)
+    fire(el, 'pointermove', 595, 300)
+    frame()
+    fire(el, 'pointermove', 700, 300, 0) // back over the iframe with no button down
+    frame()
+    expect(last()).toEqual([600, 600])
   })
 
   it('a plain click without movement changes nothing', () => {
     const el = handle('both')
-    fire(el, 'pointerdown', 1000, 800)
-    fire(el, 'pointerup', 1000, 800, 0)
+    fire(el, 'pointerdown', 495, 595)
+    fire(el, 'pointerup', 495, 595, 0)
     expect(sizes).toEqual([])
   })
 })

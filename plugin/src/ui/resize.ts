@@ -11,28 +11,23 @@ type Dir = 'both' | 'x' | 'y'
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
+/** handle thickness in px (the corner is a square) */
+export const EDGE = 10
+export const CORNER = 20
+
 /**
  * Window resize handles (right edge, bottom edge, corner).
  *
- * Why not the stock `useWindowResize` hook: it recreates its handle elements whenever the component re-renders,
- * and the plugin re-rendered on every resize step, which destroyed the handle (and its pointer capture) mid-drag.
- * Here the handles are created once, size is never kept in React state, deltas use `screenX/Y` (the iframe itself
- * moves under the pointer while Figma resizes it, so client coordinates would feed back), and a drag ends cleanly
- * if the button is released outside the iframe.
+ * The window is sized from the pointer's ABSOLUTE position inside the iframe, the method of Figma's own resize example and of
+ * `useWindowResize` in @create-figma-plugin/ui: the iframe's top-left corner stays where it is while the window grows to the right
+ * and down, so `clientX / clientY` (plus how far from the handle's outer edge the grab happened) is the size the window should have.
+ * Pointer capture keeps the events coming when the pointer is outside the iframe, which is what lets the window grow. There are no
+ * deltas, no screen coordinates and no guessing ahead of the pointer, so the window cannot jump or run ahead of the cursor.
  *
- * Expanding: the pointer leaves the iframe on the first outward pixel, before Figma has grown the window, and the iframe receives
- * no pointer events outside itself. So while the drag grows the window it stays a little ahead of the pointer (the pointer is
- * still inside the iframe). The lead follows the pointer's speed (`lead`): a slow drag keeps the window only a few pixels ahead,
- * a fast one more, never beyond `LEAD_MAX`, so the window does not run visibly ahead of the cursor. The exact size is applied when the drag ends; when the button is released outside the
- * iframe no event arrives, so it is applied as soon as the pointer is back over the iframe without a button pressed.
- * Shrinking needs no lead: the pointer stays inside.
+ * Why not the stock hook itself: it rebuilds its handles (dropping the pointer capture mid-drag) whenever the callback it is given
+ * changes. Here the handles are created once. A drag ends on pointerup / pointercancel, or when a move arrives with no button down;
+ * `lostpointercapture` is deliberately not used, a capture that is dropped while the button is still down would end the drag early.
  */
-const LEAD_MIN = 12
-const LEAD_MAX = 120
-/** how long Figma takes to apply a resize (ms): the window must be ahead by the distance the pointer covers in that time */
-const LATENCY = 100
-/** the lead for a pointer growing the window at `speed` px per ms: small for a slow drag, larger only for a fast one (used only while growing) */
-export const lead = (speed: number): number => Math.min(LEAD_MAX, LEAD_MIN + Math.max(0, speed) * LATENCY)
 export function useResizeHandles(onSize: (width: number, height: number) => void, limits: Limits): void {
   useEffect(() => {
     const cleanups: (() => void)[] = []
@@ -43,39 +38,34 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
       const common = 'position:fixed;z-index:1000;touch-action:none;user-select:none;'
       el.style.cssText =
         dir === 'both'
-          ? `${common}right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;`
+          ? `${common}right:0;bottom:0;width:${CORNER}px;height:${CORNER}px;cursor:nwse-resize;`
           : dir === 'x'
-            ? `${common}right:0;top:0;bottom:20px;width:10px;cursor:ew-resize;`
-            : `${common}left:0;right:20px;bottom:0;height:10px;cursor:ns-resize;`
+            ? `${common}right:0;top:0;bottom:${CORNER}px;width:${EDGE}px;cursor:ew-resize;`
+            : `${common}left:0;right:${CORNER}px;bottom:0;height:${EDGE}px;cursor:ns-resize;`
       document.body.appendChild(el)
 
-      let start: { sx: number; sy: number; w: number; h: number } | null = null
+      /** how far the pointer was from the window's right / bottom edge when it grabbed the handle */
+      let toEdge: { x: number; y: number } | null = null
       let pending: { w: number; h: number } | null = null
-      /** the size the pointer is asking for (without the lead) */
-      let target: { w: number; h: number } | null = null
-      /** previous sample, for the pointer's speed (smoothed, px per ms, growing only) */
-      let prev = { t: 0, w: 0, h: 0, vw: 0, vh: 0 }
+      let last: { w: number; h: number } | null = null
       let raf = 0
 
       const flush = () => {
         raf = 0
-        if (pending) {
-          const p = pending
-          pending = null
-          onSize(p.w, p.h)
-        }
-      }
-      const settle = () => {
-        if (raf) cancelAnimationFrame(raf)
-        raf = 0
+        if (!pending) return
+        const p = pending
         pending = null
-        if (target) onSize(target.w, target.h)
+        // the same size twice in a row would only make Figma do the work again
+        if (last && last.w === p.w && last.h === p.h) return
+        last = p
+        onSize(p.w, p.h)
       }
       const end = (e?: PointerEvent) => {
-        if (!start) return
-        start = null
-        settle()
-        target = null
+        if (!toEdge) return
+        toEdge = null
+        if (raf) cancelAnimationFrame(raf)
+        flush()
+        last = null
         if (e) {
           try {
             el.releasePointerCapture(e.pointerId)
@@ -88,48 +78,26 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
       el.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return
         e.preventDefault()
-        start = { sx: e.screenX, sy: e.screenY, w: window.innerWidth, h: window.innerHeight }
-        prev = { t: Date.now(), w: start.w, h: start.h, vw: 0, vh: 0 }
+        // the handles sit on the window's right / bottom edge, so the distance to the outer edge is the viewport size minus the pointer position
+        toEdge = { x: Math.max(0, window.innerWidth - e.clientX), y: Math.max(0, window.innerHeight - e.clientY) }
         el.setPointerCapture(e.pointerId)
       })
       el.addEventListener('pointermove', (e) => {
-        if (!start) return
+        if (!toEdge) return
         if (e.buttons === 0) {
           end(e)
           return
         }
-        const dx = e.screenX - start.sx
-        const dy = e.screenY - start.sy
-        const w = dir === 'y' ? start.w : clamp(start.w + dx, limits.minWidth, limits.maxWidth)
-        const h = dir === 'x' ? start.h : clamp(start.h + dy, limits.minHeight, limits.maxHeight)
-        target = { w, h }
-        // growing: stay ahead of the pointer by what it covers while Figma applies the resize (never past the maximum)
-        const now = Date.now()
-        const dt = Math.max(1, now - prev.t)
-        // smoothed over consecutive events; after a pause the old speed no longer says anything about the pointer
-        const keep = dt > 120 ? 0 : 0.5
-        const vw = keep * prev.vw + (1 - keep) * Math.max(0, (w - prev.w) / dt)
-        const vh = keep * prev.vh + (1 - keep) * Math.max(0, (h - prev.h) / dt)
-        prev = { t: now, w, h, vw, vh }
-        pending = {
-          w: dir !== 'y' && dx > 0 ? Math.min(limits.maxWidth, w + lead(vw)) : w,
-          h: dir !== 'x' && dy > 0 ? Math.min(limits.maxHeight, h + lead(vh)) : h
-        }
+        const w = dir === 'y' ? window.innerWidth : clamp(Math.round(e.clientX + toEdge.x), limits.minWidth, limits.maxWidth)
+        const h = dir === 'x' ? window.innerHeight : clamp(Math.round(e.clientY + toEdge.y), limits.minHeight, limits.maxHeight)
+        pending = { w, h }
         if (!raf) raf = requestAnimationFrame(flush)
       })
       el.addEventListener('pointerup', end)
       el.addEventListener('pointercancel', end)
-      el.addEventListener('lostpointercapture', () => end())
-
-      // released outside the iframe: the next event over the iframe has no button down, and ends the drag
-      const back = (e: PointerEvent) => {
-        if (start && e.buttons === 0) end()
-      }
-      document.addEventListener('pointermove', back)
 
       cleanups.push(() => {
         if (raf) cancelAnimationFrame(raf)
-        document.removeEventListener('pointermove', back)
         el.remove()
       })
     }
