@@ -3,7 +3,7 @@ import { emit, on } from '@create-figma-plugin/utilities'
 import { h } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { buildFiles } from '../core/generators'
-import { processIcons } from '../core/process'
+import { processIcons, ThemeCache } from '../core/process'
 import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from '../core/snippets'
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
@@ -70,7 +70,8 @@ export function InspectPanel() {
     }
   }, [])
 
-  const processed = useMemo(() => processIcons(raws, settings, {}, {}), [raws, settings])
+  const themeCache = useRef<ThemeCache>(new Map())
+  const processed = useMemo(() => processIcons(raws, settings, {}, {}, themeCache.current), [raws, settings])
   const icons = processed.icons.filter((i) => i.svgOk)
 
   const makeZip = () => {

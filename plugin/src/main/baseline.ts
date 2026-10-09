@@ -1,5 +1,6 @@
 import { chunkText } from '../core/baseline'
 import { hash32 } from '../core/fixes'
+import { log } from '../log'
 
 const ID_KEY = 'ilt:fileid:v1'
 const SNAP_KEY = 'ilt:baseline:v1'
@@ -13,14 +14,14 @@ export function fileIdentity(): string {
   try {
     const k = (figma as unknown as { fileKey?: string }).fileKey
     if (k) return k
-  } catch {
-    /* public plugin */
+  } catch (e) {
+    log.debug('baseline', 'public plugin', e)
   }
   try {
     const stored = figma.root.getPluginData(ID_KEY)
     if (stored) return stored
-  } catch {
-    /* ignore */
+  } catch (e) {
+    log.debug('baseline', 'ignore', e)
   }
   // Page ids survive renaming the file and adding or removing other pages; the file name would not. A duplicated file keeps its page ids
   // and therefore shares the baseline of the original, which is the useful behaviour for "a copy of this library".
@@ -30,8 +31,9 @@ export function fileIdentity(): string {
 export async function readLocalBaseline(): Promise<string | null> {
   try {
     return ((await figma.clientStorage.getAsync(LOCAL_PREFIX + fileIdentity())) as string | undefined) ?? null
-  } catch {
-    return null
+  } catch (e) {
+    log.debug('baseline', 'ignored', e)
+return null
   }
 }
 
@@ -67,8 +69,8 @@ export async function readSharedBaseline(): Promise<string | null> {
   try {
     const r = readChunks(figma.root)
     if (r) return r
-  } catch {
-    /* fall through */
+  } catch (e) {
+    log.debug('baseline', 'fall through', e)
   }
   try {
     const first = figma.root.children[0]
@@ -76,8 +78,8 @@ export async function readSharedBaseline(): Promise<string | null> {
       await first.loadAsync()
       return readChunks(first)
     }
-  } catch {
-    /* unreadable here */
+  } catch (e) {
+    log.debug('baseline', 'unreadable here', e)
   }
   return null
 }
@@ -104,8 +106,8 @@ export async function writeSharedBaseline(text: string): Promise<{ ok: boolean; 
       await first.loadAsync()
       writeChunks(first, parts)
     }
-  } catch {
-    /* the root copy is enough */
+  } catch (e) {
+    log.debug('baseline', 'the root copy is enough', e)
   }
   return { ok: true, message: `Baseline saved in this file (${parts.length} entr${parts.length === 1 ? 'y' : 'ies'})` }
 }

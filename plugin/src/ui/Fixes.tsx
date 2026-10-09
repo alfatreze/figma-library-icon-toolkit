@@ -1,4 +1,5 @@
 import { Button, Checkbox, RadioButtons } from '@create-figma-plugin/ui'
+import { Dialog } from './Dialog'
 import { ComponentChildren, Fragment, h } from 'preact'
 import { useMemo } from 'preact/hooks'
 import { FIX_GROUPS, FIX_INFO } from '../core/fixes'
@@ -170,7 +171,7 @@ export function ConfirmApply(props: {
   }
   const converting = props.items.some((i) => i.action === 'convert-to-component' || i.action === 'wrap-and-convert')
   return (
-    <div class={styles.overlay} role="dialog" aria-modal="true" aria-label="Review fixes">
+    <Dialog label="Review fixes" onClose={props.onCancel} busy={props.applying}>
       <div class={styles.header}>
         <div class={styles.scanRow}>
           <strong class={styles.grow} style={{ fontSize: 13 }}>Review {plural(props.items.length, 'fix')}</strong>
@@ -214,7 +215,7 @@ export function ConfirmApply(props: {
       <div class={styles.footer}>
         <Button fullWidth onClick={props.onApply} loading={props.applying} disabled={props.applying}>Apply {plural(props.items.length, 'fix')}</Button>
       </div>
-    </div>
+    </Dialog>
   )
 }
 

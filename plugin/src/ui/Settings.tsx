@@ -1,4 +1,5 @@
 import { Button, Checkbox, Dropdown, SegmentedControl, Textbox, TextboxMultiline, Toggle } from '@create-figma-plugin/ui'
+import { Dialog } from './Dialog'
 import { ComponentChildren, h } from 'preact'
 import { cleanNamespace } from '../core/naming'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
@@ -38,6 +39,7 @@ export interface SettingsExtras {
   /** every distinct Figma variable bound in the last scan */
   scanVariables: { variable: string; collection?: string }[]
   onAttachDevResources: () => void
+  onCopyDiagnostics: () => void
   scannedComponents: number
   onExportConfig: () => void
   onImportConfig: (file: File) => void
@@ -54,7 +56,7 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
   const setFormat = (k: keyof Settings['formats'], v: boolean) => patch({ formats: { ...f, [k]: v } })
   const ns = cleanNamespace(settings.namespace)
   return (
-    <div class={styles.overlay}>
+    <Dialog label="Settings" onClose={onClose}>
       <div class={styles.header}>
         <div class={styles.scanRow}>
           <strong class={styles.grow} style={{ fontSize: 13 }}>Settings</strong>
@@ -401,6 +403,16 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
         </div>
 
         <div class={styles.section}>
+          <span class={styles.sectionTitle}>Support</span>
+          <div class={styles.fieldRow}>
+            <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics</Button>
+            <InfoTip title="Diagnostics">
+              <span>Copies a short report for bug reports: Figma mode and API version, your settings (the sync token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
+            </InfoTip>
+          </div>
+        </div>
+
+        <div class={styles.section}>
           <span class={styles.sectionTitle}>Team config</span>
           <div class={styles.fieldRow}>
             <Button secondary onClick={extras.onExportConfig}>Export config (.json)</Button>
@@ -555,6 +567,6 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
         </div>
         <div class={styles.muted}>Settings are saved on this computer. Nothing is ever written to your Figma file.</div>
       </div>
-    </div>
+    </Dialog>
   )
 }

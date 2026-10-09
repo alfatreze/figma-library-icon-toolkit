@@ -239,3 +239,6 @@
 .ovwRow { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--figma-color-border); }
 .ovwRow svg { width: 16px; height: 16px; }
 .ovwActions { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+
+/* visually hidden, still read by screen readers */
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

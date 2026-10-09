@@ -1,10 +1,11 @@
 import { GridInfo, Icon, RawIcon, Settings } from '../types'
 import { auditIcon } from './audit'
-import { hash32, normalisePath } from './fixes'
+import { normalisePath } from './fixes'
+import { hash32 } from './hash'
 import { detectGrid, iconTier, libraryTier, Tier } from './library'
 import { resolveCategory, pathSegments } from './categories'
 import { buildName, cleanNamespace, codeCompare, resolveDuplicates, slugify } from './naming'
-import { themeSvg } from './svg'
+import { ThemedSvg, themeSvg } from './svg'
 
 export interface Processed {
   icons: Icon[]
@@ -48,11 +49,20 @@ export function geometryHash(svg: string | null): string {
 
 const GEOMETRY_ATTRS = new Set(['points', 'x', 'y', 'width', 'height', 'rx', 'ry', 'cx', 'cy', 'r', 'x1', 'y1', 'x2', 'y2', 'transform', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray'])
 
+/**
+ * Theming parses and rewrites every icon's SVG, which is by far the most expensive step. It only depends on the SVG and on a few settings,
+ * so results are cached per icon: changing a name policy, a category source or the profile no longer re-themes thousands of icons.
+ */
+export type ThemeCache = Map<string, { source: string; sig: string; themed: ThemedSvg | null }>
+
+const themeSignature = (s: Settings) => JSON.stringify([cleanNamespace(s.namespace), s.colorMode, s.tokenNaming, s.strokePolicy, s.precision])
+
 export function processIcons(
   raws: RawIcon[],
   settings: Settings,
   overrides: Record<string, string>,
-  outlineOverrides: Record<string, boolean> = {}
+  outlineOverrides: Record<string, boolean> = {},
+  cache?: ThemeCache
 ): Processed {
   const grid = detectGrid(raws, settings)
 
@@ -92,17 +102,24 @@ export function processIcons(
     const hasStroke = raw.facts.paints.some((p) => p.role === 'stroke')
     const outlined = hasStroke && !!raw.svgOutlined && (outlineOverrides[raw.key] ?? settings.outlineStrokes)
     const source = outlined ? raw.svgOutlined! : raw.svg
-    const themed = source
-      ? themeSvg(source, {
-          ns: cleanNamespace(settings.namespace),
-          colorMode: settings.colorMode,
-          tokenNaming: settings.tokenNaming,
-          strokePolicy: settings.strokePolicy,
-          precision: settings.precision,
-          variableByHex: variableMap(raw),
-          paints: raw.facts.paints
-        })
-      : null
+    const sig = themeSignature(settings)
+    const hit = cache?.get(raw.key)
+    let themed: ThemedSvg | null
+    if (hit && hit.source === source && hit.sig === sig) themed = hit.themed
+    else {
+      themed = source
+        ? themeSvg(source, {
+            ns: cleanNamespace(settings.namespace),
+            colorMode: settings.colorMode,
+            tokenNaming: settings.tokenNaming,
+            strokePolicy: settings.strokePolicy,
+            precision: settings.precision,
+            variableByHex: variableMap(raw),
+            paints: raw.facts.paints
+          })
+        : null
+      if (cache && source) cache.set(raw.key, { source, sig, themed })
+    }
     const name = resolved.names[i]
     const cat = cats[i]
     const icon: Icon = {

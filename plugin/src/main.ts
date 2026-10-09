@@ -12,6 +12,8 @@ import { loadSettings, serializeSettings, SETTINGS_KEY } from './main/settings'
 import { readShared, writeShared } from './main/shared'
 import { serializeShared } from './core/config'
 import { scan } from './main/scan'
+import { log, recentLog } from './log'
+import { RequestDiagnosticsHandler, DiagnosticsHandler } from './types'
 import { clampSize, validBaseline, validDevResources, validFixRequests, validSharedConfig } from './main/guards'
 import { migrateSettings } from './core/settingsSchema'
 import { fileIdentity, readLocalBaseline, readSharedBaseline, writeLocalBaseline, writeSharedBaseline } from './main/baseline'
@@ -87,6 +89,20 @@ export default async function () {
       const shared = await readShared()
       emit<SharedConfigHandler>('SHARED_CONFIG', shared ? shared.publishedAt : null, shared ? shared.publishedBy ?? null : null, shared ? shared.config : null)
     }
+  }))
+
+  // Settings → Copy diagnostics: what a bug report needs, without the sync token or any layer content
+  on<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS', safe('Diagnostics', () => {
+    const redacted = { ...latest, sync: { ...latest.sync, token: latest.sync.token ? '(set)' : '' }, ignoredDuplicates: `${latest.ignoredDuplicates.length} groups` }
+    const text = [
+      'Icon Library Toolkit diagnostics',
+      `figma.mode: ${figma.mode} · editorType: ${figma.editorType} · apiVersion: ${figma.apiVersion}`,
+      `documentAccess pages: ${figma.root.children.length}`,
+      `settings: ${JSON.stringify(redacted)}`,
+      '--- recent log (main) ---',
+      ...recentLog()
+    ].join('\n')
+    emit<DiagnosticsHandler>('DIAGNOSTICS', text)
   }))
 
   figma.on('selectionchange', emitSelection)

@@ -1,4 +1,5 @@
 import { Button, Checkbox, Dropdown, Toggle } from '@create-figma-plugin/ui'
+import { Dialog } from './Dialog'
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import { BASELINE_LABEL, BaselineSource } from '../core/baseline'
@@ -76,7 +77,7 @@ export function ExportPanel(p: ExportPanelProps) {
     : []
 
   return (
-    <div class={styles.overlay} role="dialog" aria-modal="true" aria-label="Export">
+    <Dialog label="Export" onClose={p.onClose}>
       <div class={styles.header}>
         <div class={styles.scanRow}>
           <strong class={styles.grow} style={{ fontSize: 13 }}>Export</strong>
@@ -217,6 +218,6 @@ export function ExportPanel(p: ExportPanelProps) {
         </Button>
         {p.onSend && <Button fullWidth secondary onClick={p.onSend} disabled={p.ready === 0 || noFormat}>Send to project folder…</Button>}
       </div>
-    </div>
+    </Dialog>
   )
 }

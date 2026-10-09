@@ -4,6 +4,7 @@ import { emptyFacts, gatherFacts, isIconish, resetFactCaches, variableName, VECT
 import { Diagnoser } from './diagnose'
 import { outlinedSvg } from './outline'
 import { newAgg, recordInstance, toUsage, UsageAgg } from './overrides'
+import { log } from '../log'
 
 interface Candidate {
   node: SceneNode
@@ -119,8 +120,9 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext, in
         let main: ComponentNode | null = null
         try {
           main = await node.getMainComponentAsync()
-        } catch {
-          main = null
+        } catch (e) {
+          log.debug('scan', 'ignored', e)
+main = null
         }
         const key = main ? main.key || main.id : node.id
         if (!usageOnly && ctx.seenComponents.has(key)) return // the master component is already a candidate
@@ -179,8 +181,9 @@ async function load(c: Candidate): Promise<{ node: SceneNode; exportedFrom: 'mai
     void main.children.length
     const svg = await main.exportAsync(EXPORT)
     return { node: main, exportedFrom: 'main', svg }
-  } catch {
-    return { node: c.node, exportedFrom: 'instance' }
+  } catch (e) {
+    log.debug('scan', 'ignored', e)
+return { node: c.node, exportedFrom: 'instance' }
   }
 }
 
@@ -241,8 +244,9 @@ export async function scan(
     let svg: string | null = null
     try {
       svg = await n.exportAsync(EXPORT)
-    } catch {
-      svg = null
+    } catch (e) {
+      log.debug('scan', 'ignored', e)
+svg = null
     }
     svgCache.set(n.id, svg)
     return svg
@@ -306,8 +310,9 @@ async function readCandidate(
     let facts, padding
     try {
       ;({ facts, padding } = await gatherFacts(target.node))
-    } catch {
-      ;({ facts, padding } = await gatherFacts(c.node))
+    } catch (e) {
+      log.debug('scan', 'ignored', e)
+;({ facts, padding } = await gatherFacts(c.node))
     }
     let svg: string | null = target.svg ?? svgCache.get(target.node.id) ?? null
     let exportError: string | undefined
@@ -323,8 +328,8 @@ async function readCandidate(
       try {
         const f = await diag.diagnoseNode(c.node, svg)
         if (f) fixes.push(f)
-      } catch {
-        /* diagnosis is best effort; the icon is still exported */
+      } catch (e) {
+        log.debug('scan', 'diagnosis is best effort; the icon is still exported', e)
       }
     }
     return {

@@ -1,4 +1,5 @@
 import { Button } from '@create-figma-plugin/ui'
+import { Dialog } from './Dialog'
 import { h } from 'preact'
 import styles from '../styles.css'
 import { BlockIcon, CheckIcon, WarnIcon } from './icons'
@@ -37,7 +38,7 @@ export function SyncDialog(props: {
       </div>
     ) : null
   return (
-    <div class={styles.overlay} role="dialog" aria-modal="true" aria-label="Send to project">
+    <Dialog label="Send to project" onClose={props.onCancel} busy={props.sending}>
       <div class={styles.header}>
         <div class={styles.scanRow}>
           <strong class={styles.grow} style={{ fontSize: 13 }}>Send to project</strong>
@@ -76,6 +77,6 @@ export function SyncDialog(props: {
           </Button>
         </div>
       )}
-    </div>
+    </Dialog>
   )
 }

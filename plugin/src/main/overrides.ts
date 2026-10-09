@@ -1,5 +1,6 @@
 import { OverrideClass, UsageInfo } from '../types'
 import { toHex } from './facts'
+import { log } from '../log'
 
 export interface UsageAgg {
   instances: number
@@ -58,8 +59,9 @@ export async function recordInstance(
   let entries: ReadonlyArray<{ id: string; overriddenFields: ReadonlyArray<string> }> = []
   try {
     entries = inst.overrides as ReadonlyArray<{ id: string; overriddenFields: ReadonlyArray<string> }>
-  } catch {
-    entries = []
+  } catch (e) {
+    log.debug('overrides', 'ignored', e)
+entries = []
   }
   for (const entry of entries) {
     const isRoot = entry.id === inst.id
@@ -84,8 +86,8 @@ export async function recordInstance(
               }
             }
           }
-        } catch {
-          /* best effort */
+        } catch (e) {
+          log.debug('overrides', 'best effort', e)
         }
       }
     }

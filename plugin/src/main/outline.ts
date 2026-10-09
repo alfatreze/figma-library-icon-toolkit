@@ -1,5 +1,6 @@
 import { IDENTITY, Matrix, invert, multiply, transformPath } from '../core/pathTransform'
 import { toHex, VECTOR_TYPES } from './facts'
+import { log } from '../log'
 
 const f = (n: number) => String(Number(n.toFixed(3)))
 
@@ -75,7 +76,8 @@ export function outlinedSvg(root: SceneNode): string | null {
       h = rb.height
     }
     return `<svg width="${f(w)}" height="${f(h)}" viewBox="${f(x)} ${f(y)} ${f(w)} ${f(h)}" fill="none" xmlns="http://www.w3.org/2000/svg">${shapes.join('')}</svg>`
-  } catch {
-    return null
+  } catch (e) {
+    log.debug('outline', 'ignored', e)
+return null
   }
 }

@@ -1,4 +1,5 @@
 import { parseShared, SHARED_KEY, SharedConfig } from '../core/config'
+import { log } from '../log'
 
 /**
  * Library settings stored in the Figma file so every user (including developers in Dev Mode) sees the same config.
@@ -9,8 +10,8 @@ export async function readShared(): Promise<SharedConfig | null> {
   try {
     const fromRoot = parseShared(figma.root.getPluginData(SHARED_KEY))
     if (fromRoot) return fromRoot
-  } catch {
-    /* fall through */
+  } catch (e) {
+    log.debug('shared', 'fall through', e)
   }
   try {
     const first = figma.root.children[0]
@@ -18,8 +19,8 @@ export async function readShared(): Promise<SharedConfig | null> {
       await first.loadAsync()
       return parseShared(first.getPluginData(SHARED_KEY))
     }
-  } catch {
-    /* not readable here */
+  } catch (e) {
+    log.debug('shared', 'not readable here', e)
   }
   return null
 }
@@ -36,8 +37,8 @@ export async function writeShared(text: string): Promise<{ ok: boolean; message:
       await first.loadAsync()
       first.setPluginData(SHARED_KEY, text)
     }
-  } catch {
-    /* the root copy is enough */
+  } catch (e) {
+    log.debug('shared', 'the root copy is enough', e)
   }
   return { ok: true, message: 'Published to this file' }
 }

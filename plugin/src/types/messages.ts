@@ -7,6 +7,8 @@ import type { RawIcon, ScanSummary, ScanOptions, DevResourceItem } from './domai
 import type { ApplyFixRequest, FixResult } from './fixes'
 
 export interface Messages {
+  REQUEST_DIAGNOSTICS: []
+  DIAGNOSTICS: [text: string]
   SCAN: [options: ScanOptions]
   SCAN_PHASE: [text: string]
   CANCEL_SCAN: []
@@ -61,3 +63,5 @@ export type DevResourcesAttachedHandler = Handler<'DEV_RESOURCES_ATTACHED'>
 export type SaveBaselineHandler = Handler<'SAVE_BASELINE'>
 export type BaselinesHandler = Handler<'BASELINES'>
 export type BaselineSavedHandler = Handler<'BASELINE_SAVED'>
+export type RequestDiagnosticsHandler = Handler<'REQUEST_DIAGNOSTICS'>
+export type DiagnosticsHandler = Handler<'DIAGNOSTICS'>

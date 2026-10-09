@@ -1,4 +1,5 @@
 import { Facts, Padding, PaintFact } from '../types'
+import { log } from '../log'
 
 export const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'ELLIPSE', 'RECTANGLE', 'LINE'])
 
@@ -38,8 +39,9 @@ export async function variableInfo(id: string): Promise<{ name: string; collecti
       }
       info = { name: v.name, collection: collection || undefined }
     }
-  } catch {
-    info = null
+  } catch (e) {
+    log.debug('facts', 'ignored', e)
+info = null
   }
   variableInfos.set(id, info)
   return info

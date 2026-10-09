@@ -1,6 +1,7 @@
 import { planRenames } from '../core/fixes'
 import { ApplyFixRequest, FixActionId, FixCandidate, FixResult, LayerRename } from '../types'
 import { leavesOf } from './diagnose'
+import { log } from '../log'
 
 async function resolveComponent(target: { componentId?: string; componentKey?: string }): Promise<ComponentNode> {
   if (target.componentId) {
@@ -47,8 +48,8 @@ function carryLayout(from: SceneNode, to: SceneNode, parent: BaseNode & Children
       if (h && 'layoutSizingHorizontal' in t) t.layoutSizingHorizontal = h === 'HUG' ? 'FIXED' : h
       if (v && 'layoutSizingVertical' in t) t.layoutSizingVertical = v === 'HUG' ? 'FIXED' : v
     }
-  } catch {
-    /* best effort: the node is already in the right place in the tree */
+  } catch (e) {
+    log.debug('apply', 'best effort: the node is already in the right place in the tree', e)
   }
 }
 

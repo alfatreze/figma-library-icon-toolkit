@@ -11,7 +11,8 @@ import { exportConfig, parseConfig, serializeShared } from './core/config'
 import { TIER_LABEL } from './core/library'
 import { cleanNamespace } from './core/naming'
 import { describeUsage, FORMAT_LABEL } from './core/overrides'
-import { hasBlockingErrors, processIcons } from './core/process'
+import { hasBlockingErrors, processIcons, ThemeCache } from './core/process'
+import { SHARED_KEYS } from './core/settingsSchema'
 import { ruleInfo, STEPS } from './core/rules'
 import { zipFiles } from './core/zip'
 import styles from './styles.css'
@@ -24,7 +25,9 @@ import {
 import { computeOverview, kb } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
 import { InspectPanel } from './ui/Inspect'
-import { cx, download, notify, plural } from './ui/util'
+import { copyText, cx, download, notify, plural } from './ui/util'
+import { recentLog } from './log'
+import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
 import { SettingsPanel } from './ui/Settings'
 import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
 import {
@@ -120,6 +123,15 @@ function Plugin() {
   const [applying, setApplying] = useState(false)
   const [renameLeaves, setRenameLeaves] = useState(true)
   const defaultsFor = useRef<ScanSummary | null>(null)
+  // Batches arrive every few icons. Appending each to React state copies the whole list every time (quadratic on big libraries),
+  // so they are collected in a ref and published at most every 250 ms.
+  const rawBuf = useRef<RawIcon[]>([])
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flushRaws = () => {
+    if (flushTimer.current) clearTimeout(flushTimer.current)
+    flushTimer.current = null
+    setRaws(rawBuf.current.slice())
+  }
 
   useEffect(() => {
     const offs = [
@@ -130,6 +142,7 @@ function Plugin() {
       on<DevResourcesAttachedHandler>('DEV_RESOURCES_ATTACHED', (added, existing, failed, message) =>
         setConfigMessage(`Dev resources: ${added} added, ${existing} already there${failed ? `, ${failed} failed${message ? ` (${message})` : ''}` : ''}.`)
       ),
+      on<DiagnosticsHandler>('DIAGNOSTICS', (text) => notify(copyText(text + '\n--- recent log (ui) ---\n' + recentLog().join('\n')) ? 'Diagnostics copied' : 'Copy is blocked here', false)),
       on<BaselinesHandler>('BASELINES', (local, shared) => {
         setLocalSnap(decodeSnapshot(local))
         setSharedSnap(decodeSnapshot(shared))
@@ -145,6 +158,7 @@ function Plugin() {
         setProgress(0)
         setPhase('Starting…')
         setScanError(null)
+        rawBuf.current = []
         setRaws([])
         setSummary(null)
         setOff(new Set())
@@ -169,16 +183,20 @@ function Plugin() {
         notify(failed ? `${ok} fixed, ${failed} failed` : `${ok} fix${ok === 1 ? '' : 'es'} applied. Cmd/Ctrl+Z undoes them.`, failed > 0)
       }),
       on<ScanBatchHandler>('SCAN_BATCH', (icons, p) => {
-        setRaws((prev) => prev.concat(icons))
+        rawBuf.current.push(...icons)
+        if (!flushTimer.current) flushTimer.current = setTimeout(flushRaws, 250)
         setProgress(p)
       }),
       on<ScanDoneHandler>('SCAN_DONE', (s) => {
+        flushRaws()
         setSummary(s)
         setScanning(false)
         setProgress(1)
         setPhase('')
       }),
       on<ScanErrorHandler>('SCAN_ERROR', (m) => {
+        if (/already running|being applied/.test(m)) return notify(m, true) // a second request was refused; the running one is unaffected
+        flushRaws()
         setScanError(m)
         setScanning(false)
         setPhase('')
@@ -200,7 +218,11 @@ function Plugin() {
   const patch = (p: Partial<Settings>) => setSettings((s) => ({ ...s, ...p }))
 
   // ---- derived -------------------------------------------------------------
-  const processed = useMemo(() => processIcons(raws, settings, overrides, outlineOverrides), [raws, settings, overrides, outlineOverrides])
+  // Only settings that change the result re-run the pipeline: window size, Labs switches, sync fields and the like must not
+  // re-process thousands of icons. Theming is additionally cached per icon (see ThemeCache).
+  const processSettings = useMemo(() => settings, [JSON.stringify([SHARED_KEYS.map((k) => settings[k]), settings.ignoredDuplicates])]) // eslint-disable-line react-hooks/exhaustive-deps
+  const themeCache = useRef<ThemeCache>(new Map())
+  const processed = useMemo(() => processIcons(raws, processSettings, overrides, outlineOverrides, themeCache.current), [raws, processSettings, overrides, outlineOverrides])
   const icons = processed.icons
   const g = processed.grid
 
@@ -242,7 +264,9 @@ function Plugin() {
   const enabledFormats = fmtKeys.filter((k) => settings.formats[k])
   const overview = useMemo(
     () => (exportOpen && exportable.length ? computeOverview(exportable, settings, g, processed.tier) : null),
-    [exportOpen, exportable, settings, g, processed.tier]
+    // computeOverview builds every format regardless of the format toggles, so toggling a format must not rebuild it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [exportOpen, exportable, JSON.stringify(SHARED_KEYS.filter((k) => k !== 'formats').map((k) => settings[k])), g, processed.tier]
   )
 
   // ---- actions -------------------------------------------------------------
@@ -292,6 +316,16 @@ function Plugin() {
       else n[i.key] = value
       return n
     })
+  /** roving tabindex: arrow keys / Home / End move between tabs, as in the WAI-ARIA tabs pattern */
+  const onTabKey = (e: KeyboardEvent) => {
+    const order: Tab[] = ['icons', 'issues', 'skipped']
+    const i = order.indexOf(tab)
+    const next = e.key === 'ArrowRight' ? order[(i + 1) % 3] : e.key === 'ArrowLeft' ? order[(i + 2) % 3] : e.key === 'Home' ? order[0] : e.key === 'End' ? order[2] : null
+    if (!next) return
+    e.preventDefault()
+    setTab(next)
+    requestAnimationFrame(() => (document.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement | null)?.focus())
+  }
   const showInList = (next: { status?: Status; rule?: string | null }) => {
     setStatus(next.status ?? 'all')
     setRuleFilter(next.rule ?? null)
@@ -474,6 +508,11 @@ function Plugin() {
   }, [raws])
 
   const doExport = () => {
+    notify('Preparing the ZIP…')
+    // let the toast paint first: generating and zipping thousands of files blocks this thread for a moment
+    setTimeout(runExport, 30)
+  }
+  const runExport = () => {
     try {
       const files = makeFiles()
       const name = `${settings.zipName.trim() ? cleanNamespace(settings.zipName) : `${cleanNamespace(settings.namespace)}-icons`}.zip`
@@ -574,6 +613,10 @@ function Plugin() {
 
   return (
     <div class={styles.root}>
+      {/* announced by screen readers: scan progress, results and the status lines that otherwise only change on screen */}
+      <div class={styles.srOnly} role="status" aria-live="polite">
+        {scanning ? phase || 'Scanning' : summary ? `Scan finished: ${plural(icons.length, 'icon')} found` : ''} {configMessage} {baselineMsg} {syncStatus}
+      </div>
       <div class={styles.header}>
         <div class={styles.scanRow}>
           <div class={styles.scopeRow}>
@@ -621,7 +664,7 @@ function Plugin() {
       </div>
 
       {(hasResults || summary) && (
-        <div class={styles.tabs} role="tablist">
+        <div class={styles.tabs} role="tablist" aria-label="Results" onKeyDown={onTabKey}>
           <TabButton active={tab === 'icons'} onClick={() => setTab('icons')} count={icons.length}>Icons</TabButton>
           <TabButton
             active={tab === 'issues'}
@@ -921,7 +964,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
+          extras={{ onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
         />
       )}
       <div class={styles.grip} />
@@ -931,7 +974,7 @@ function Plugin() {
 
 function TabButton(props: { active: boolean; onClick: () => void; count: number; tone?: 'error' | 'warn'; children: ComponentChildren }) {
   return (
-    <button class={cx(styles.tab, props.active && styles.tabActive)} onClick={props.onClick} role="tab" aria-selected={props.active}>
+    <button class={cx(styles.tab, props.active && styles.tabActive)} onClick={props.onClick} role="tab" aria-selected={props.active} tabIndex={props.active ? 0 : -1}>
       {props.children}
       <span class={cx(styles.count, props.tone === 'error' && styles.countError, props.tone === 'warn' && styles.countWarn)}>{props.count}</span>
     </button>

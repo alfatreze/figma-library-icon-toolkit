@@ -3,6 +3,7 @@ import { hash32, hash64 } from '../core/hash'
 import { FixCandidate, FixKind, FixTarget, LeafNames } from '../types'
 import { IDENTITY, Matrix, invert, multiply, orientationKey } from '../core/pathTransform'
 import { toHex, VECTOR_TYPES } from './facts'
+import { log } from '../log'
 
 const round = (n: number, d = 2) => Number(n.toFixed(d))
 
@@ -55,8 +56,8 @@ function geometryOf(n: SceneNode): string {
     if (Array.isArray(g) && g.length) return g.map((p) => `${p.windingRule}:${normalisePath(p.data)}`).join('|')
     const s = (n as GeometryMixin).strokeGeometry
     if (Array.isArray(s) && s.length) return 'S' + s.map((p) => normalisePath(p.data)).join('|')
-  } catch {
-    /* unreadable geometry */
+  } catch (e) {
+    log.debug('diagnose', 'unreadable geometry', e)
   }
   return `${n.type}:${round(n.width)}x${round(n.height)}`
 }
@@ -92,8 +93,8 @@ export function signatureOf(root: SceneNode): Signature {
       const rt = (root as SceneNode & { absoluteTransform: Transform }).absoluteTransform as Matrix
       const lt = (l.node as SceneNode & { absoluteTransform: Transform }).absoluteTransform as Matrix
       orient = orientationKey(multiply(invert(rt ?? IDENTITY), lt ?? IDENTITY))
-    } catch {
-      /* keep the default */
+    } catch (e) {
+      log.debug('diagnose', 'keep the default', e)
     }
     const o = `@${orient}`
     // a Light / Regular / Bold family has the same outline and differs only in stroke weight: that is not a duplicate
@@ -187,8 +188,9 @@ export class Diagnoser {
         else {
           try {
             ref = await figma.importComponentByKeyAsync(detached.componentKey)
-          } catch {
-            unresolved = true
+          } catch (e) {
+            log.debug('diagnose', 'ignored', e)
+unresolved = true
           }
         }
       }
