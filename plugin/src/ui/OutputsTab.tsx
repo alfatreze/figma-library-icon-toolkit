@@ -44,7 +44,9 @@ export function OutputsTab(props: {
         </div>
         {settings.outputs.length === 0 && <div class={styles.muted}>No repository yet. The local ZIP above works without one.</div>}
         {settings.outputs.map((o, i) => {
-          const issues = props.problems[o.id] ?? []
+          // a brand-new card is not an error yet: problems show once a repository has been entered
+          const started = o.repo.trim() !== ''
+          const issues = started ? props.problems[o.id] ?? [] : []
           const own = o.packages !== null
           const shown = packagesOf(o, settings.formats)
           return (
@@ -93,6 +95,7 @@ export function OutputsTab(props: {
               <Field label="Branch" info={{ title: 'Branch', body: <span>The new branch to create. Leave empty for <code>icons/update-&lt;date&gt;-&lt;time&gt;</code>. It always branches from the default branch and the default branch is never changed directly. When several outputs share a repository, the first branch name entered is used for all of them.</span> }}>
                 <Textbox value={o.branch} onValueInput={(v) => setOutput(o.id, { branch: v })} placeholder="icons/update-<date>-<time>" />
               </Field>
+              {!started && <div class={styles.muted}>Enter the repository and add a token to publish here.</div>}
               {issues.map((m) => <div key={m} class={styles.sevWarn}>{m}</div>)}
               <div class={styles.fieldRow}>
                 <Button secondary onClick={() => props.onTest(o)} disabled={!settings.tokens[o.provider] || !o.repo}>Test connection</Button>

@@ -89,6 +89,9 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           >
             <Textbox value={settings.namespace} onValueInput={(v) => patch({ namespace: v })} placeholder="cmn" />
           </Field>
+          {settings.namespace.trim() && settings.namespace.trim() !== ns && (
+            <div class={styles.muted}>Used as “{ns}”: only lowercase letters, digits and hyphens are kept.</div>
+          )}
           <Row
             info={{
               title: 'Split output by category',

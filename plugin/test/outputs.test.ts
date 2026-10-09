@@ -45,6 +45,7 @@ describe('validation', () => {
   it('adds a new output that continues the previous one', () => {
     const n = newOutput([out({ repo: 'acme/mono', branch: 'icons/x' })])
     expect(n).toMatchObject({ id: 'output-2', repo: 'acme/mono', branch: 'icons/x', subdir: '', packages: null })
+    expect(newOutput([]).subdir).toBe('icons') // the first output starts with the usual folder; later ones need their own
   })
 })
 
@@ -123,5 +124,12 @@ describe('Angular without the sprite package in the same output', () => {
     const withStrategy = Object.keys(buildFiles({ ...base, settings: only(o), spriteStrategy: true }))
     expect(withStrategy.some((p) => p.startsWith('angular/') && p.endsWith('-sprite.ts'))).toBe(true)
     expect(withStrategy.some((p) => p.startsWith('sprite/'))).toBe(false) // the file itself stays in the other output
+  })
+})
+
+import { exportConfig } from '../src/core/config'
+describe('exported config', () => {
+  it('stores the namespace the files really use, not what was typed', () => {
+    expect(JSON.parse(exportConfig({ ...DEFAULT_SETTINGS, namespace: 'gitl:' })).namespace).toBe('gitl')
   })
 })

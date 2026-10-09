@@ -34,7 +34,7 @@ export function newOutput(existing: OutputSettings[], over: Partial<OutputSettin
   let n = existing.length + 1
   while (existing.some((o) => o.id === `output-${n}`)) n++
   const last = existing[existing.length - 1]
-  return { id: `output-${n}`, name: '', provider: last?.provider ?? 'github', repo: last?.repo ?? '', subdir: '', branch: last?.branch ?? '', packages: null, ...over }
+  return { id: `output-${n}`, name: '', provider: last?.provider ?? 'github', repo: last?.repo ?? '', subdir: last ? '' : 'icons', branch: last?.branch ?? '', packages: null, ...over }
 }
 
 const norm = (s: string) => (safeSubdir(s) ?? s.trim().replace(/^\/+|\/+$/g, '')).toLowerCase()

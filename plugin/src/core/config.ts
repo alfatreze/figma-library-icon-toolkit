@@ -1,10 +1,12 @@
 import { DEFAULT_SETTINGS, Settings } from '../types'
 
+import { cleanNamespace } from './naming'
 import { checkSetting, SHARED_KEYS } from './settingsSchema'
 
 export function exportConfig(settings: Settings): string {
   const out: Record<string, unknown> = { $schema: 'icon-library-toolkit/config@1' }
   for (const k of SHARED_KEYS) out[k] = checkSetting(k, settings[k]) ?? DEFAULT_SETTINGS[k] // never write a value that would be rejected on import
+  out.namespace = cleanNamespace(settings.namespace) // what the generated files really use, not what was typed
   return JSON.stringify(out, null, 2) + '\n'
 }
 

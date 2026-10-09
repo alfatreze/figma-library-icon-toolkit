@@ -2,6 +2,10 @@
 
 Create a test file with one page per case. Record results here (pass / fail / notes). Items marked **new** were added with Labs.
 
+## First run in Figma (2026-10-10, from screenshots, test file with 410 GitLab-style icons)
+Seen working inside Figma: the plugin loads and the six-tab Settings render; a scan of 410 components in about 5 s (library health shown, 36 warnings, 4 issue groups); the "changed since" baseline from this computer matched 408 icons by component key and suggested 2.1.0; the Export dialog lists 9 formats with file counts and sizes (1688 files, 7.4 MB); a ZIP export was produced and reviewed (see session notes). Not seen yet: Dev Mode codegen and inspect panel, Labs fixes, shared config, publishing to a real repository, the new Output tab with a configured repository.
+Found: empty Output card showed three red-looking warnings and an "icons" placeholder that was not a value (fixed: problems appear once a repository is entered, the first output starts with `icons`); a namespace typed as `gitl:` was kept raw in the config (fixed: stored cleaned, hint shown); every one of 410 rows carries the same "2 notes" pill (open: design decision).
+
 | # | Check | How | Result |
 |---|---|---|---|
 | V1 | `var()` in SVG presentation attributes works in Safari, Firefox, Chrome, Edge | open `html/index.html` from an export, change colours/stroke | |
