@@ -76,7 +76,7 @@ export function InspectPanel() {
 
   const makeZip = () => {
     try {
-      const files = buildFiles({ allIcons: processed.icons, settings, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10) })
+      const files = buildFiles({ allIcons: processed.icons, settings, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10), partial: true })
       download(`${cleanNamespace(settings.namespace)}-icons-used.zip`, zipFiles(files), 'application/zip')
       notify(`Downloaded ${icons.length} icons`)
     } catch (e) {
@@ -110,7 +110,7 @@ export function InspectPanel() {
               </div>
               {isOpen && (
                 <div class={styles.section}>
-                  <div class={styles.fieldRow}>
+                  <div class={styles.fieldRow} style={{ flexWrap: 'wrap' }}>
                     <Button secondary onClick={() => copy('Angular', angularSnippet(input))}>Copy Angular</Button>
                     <Button secondary onClick={() => copy('HTML', htmlSnippet(input))}>Copy HTML</Button>
                     <Button secondary onClick={() => copy('React', reactComponentSnippet(input))}>Copy React</Button>

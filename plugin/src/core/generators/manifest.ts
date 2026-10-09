@@ -12,6 +12,7 @@ export function manifestFile(b: BuildInput): string {
     namespace: n,
     version: 1,
     libraryVersion: b.release?.version ?? '1.0.0',
+    ...(b.partial ? { partial: true } : {}),
     generatedAt: b.generatedAt,
     deprecated: b.release?.deprecated ?? [],
     stroke: { policy: policyOf(b), table: strokeSteps(b), note: policyOf(b) === 'scale' ? 'strokes scale with the icon' : 'strokes use vector-effect: non-scaling-stroke (screen px)' },

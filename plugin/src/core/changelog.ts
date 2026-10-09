@@ -12,6 +12,8 @@ export interface CatalogIcon {
 export interface PreviousCatalog {
   namespace?: string
   libraryVersion?: string
+  /** a selection exported from Dev Mode: not a catalog of the whole library */
+  partial?: boolean
   icons: CatalogIcon[]
   deprecated?: { name: string; replacedBy: string; since: string }[]
 }
@@ -82,6 +84,7 @@ export function parseCatalog(input: string): PreviousCatalog {
   return {
     namespace: typeof data.namespace === 'string' && SLUG.test(data.namespace) ? data.namespace : undefined,
     libraryVersion: typeof data.libraryVersion === 'string' && SEMVER.test(data.libraryVersion) ? data.libraryVersion : undefined,
+    ...(data.partial === true ? { partial: true } : {}),
     icons,
     deprecated
   }

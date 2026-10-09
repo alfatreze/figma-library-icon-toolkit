@@ -19,6 +19,8 @@ export interface BuildInput {
    * Default: whether the sprite package is part of this build.
    */
   spriteStrategy?: boolean
+  /** a selection exported from Dev Mode, not the whole library: marked in icons.json and the README so it is never mistaken for the catalog */
+  partial?: boolean
   /** library version + identity history (from comparing with a previous icons.json) */
   release?: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null }
 }

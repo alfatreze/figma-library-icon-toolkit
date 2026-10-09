@@ -30,7 +30,7 @@ export function readmeFile(b: BuildInput): string {
   const parts: string[] = []
   parts.push(`# ${n} icons
 
-${b.icons.length} icons · v${ver} · generated ${b.generatedAt} from Figma. Icons are **themeable SVG**: recolour and resize them from CSS. No dependencies.
+${b.partial ? `> **Partial export:** ${b.icons.length} icons selected in Dev Mode, not the whole library. Do not replace your package's files or \`icons.json\` with this, and do not use it as a baseline for "changed since".\n\n` : ''}${b.icons.length} icons · v${ver} · generated ${b.generatedAt} from Figma. Icons are **themeable SVG**: recolour and resize them from CSS. No dependencies.
 
 \`\`\`
 ${tree.join('\n')}

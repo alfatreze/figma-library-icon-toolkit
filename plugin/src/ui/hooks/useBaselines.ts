@@ -88,7 +88,9 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
         setMessage(`No icons.json in “${out.subdir}” on ${info.defaultBranch} yet.`)
         return
       }
-      setRepoCatalog(parseCatalog(text))
+      const loaded = parseCatalog(text)
+      if (loaded.partial) throw new Error(`The icons.json in “${out.subdir}” is a partial export (a Dev Mode selection): it cannot be the baseline.`)
+      setRepoCatalog(loaded)
       setChoice('repo')
       setMessage('')
     } catch (e) {
@@ -97,7 +99,9 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
   }
   const loadFile = async (file: File) => {
     try {
-      setFileCatalog(parseCatalog(await file.text()))
+      const loaded = parseCatalog(await file.text())
+      if (loaded.partial) throw new Error('This icons.json is a partial export (a selection from Dev Mode). Choose the icons.json of the whole library.')
+      setFileCatalog(loaded)
       setChoice('file')
       setLoadError('')
     } catch (e) {
