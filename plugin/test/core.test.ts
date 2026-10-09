@@ -125,8 +125,9 @@ describe('library build', () => {
     ]) expect(Object.keys(files), p).toContain(p)
   })
   it('does not HTML-escape generated markup', () => {
-    expect(files['angular/icons.ts']).not.toContain('&lt;')
-    expect(files['angular/icons.ts']).toContain('<path')
+    const oneIcon = Object.entries(files).find(([k]) => /^angular\/icons\/[^/]+\.ts$/.test(k) && !k.endsWith('index.ts'))![1]
+    expect(oneIcon).not.toContain('&lt;')
+    expect(oneIcon).toContain('<path')
   })
   it('manifest is valid JSON with usage + slots', () => {
     const m = JSON.parse(files['icons.json'])
@@ -344,22 +345,61 @@ describe('path transform (outlined strokes)', () => {
 
 import ts from 'typescript'
 
-describe('generated Angular data type-checks (regression: literal policy comparison)', () => {
+describe('generated icon data type-checks (regression: literal policy comparison)', () => {
+  /** type-checks the framework-free data files (no Angular/React needed); the full compile runs in scripts/compile-check.mjs */
+  const check = (files: Record<string, string>, dir: string, entries: string[]) => {
+    const sources = new Map(Object.entries(files).filter(([k]) => k.startsWith(dir + '/') && k.endsWith('.ts')).map(([k, v]) => ['/' + k, v]))
+    const host = ts.createCompilerHost({})
+    const original = host.getSourceFile.bind(host)
+    host.getSourceFile = (name, lang) => (sources.has(name) ? ts.createSourceFile(name, sources.get(name)!, lang) : original(name, lang))
+    host.fileExists = (n) => sources.has(n) || ts.sys.fileExists(n)
+    host.readFile = (n) => sources.get(n) ?? ts.sys.readFile(n)
+    host.directoryExists = (d) => [...sources.keys()].some((k) => k.startsWith(d.replace(/\/$/, '') + '/')) || ts.sys.directoryExists(d)
+    host.realpath = (n) => n
+    const program = ts.createProgram(entries.map((e) => '/' + dir + '/' + e), { strict: true, noEmit: true, target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, lib: ['lib.es2020.d.ts'] }, host)
+    return ts.getPreEmitDiagnostics(program).filter((d) => d.file && sources.has(d.file.fileName)).map((d) => `${d.file!.fileName}: ${ts.flattenDiagnosticMessageText(d.messageText, '\n')}`)
+  }
   for (const policy of ['constant', 'scale', 'table'] as const) {
-    it(`icons.ts compiles with stroke policy "${policy}"`, () => {
+    it(`data files compile with stroke policy "${policy}"`, () => {
       const settings = { ...DEFAULT_SETTINGS, strokePolicy: policy }
-      const p = processIcons([raw('icon/Home', fx('stroked.svg'))], settings, {})
+      const p = processIcons([raw('icon/Home', fx('stroked.svg')), raw('nav/Search', fx('stroked.svg'))], settings, {})
       const files = buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' })
-      const src = files['angular/icons.ts']
-      const host = ts.createCompilerHost({})
-      const original = host.getSourceFile.bind(host)
-      host.getSourceFile = (name, lang) => (name === 'icons.ts' ? ts.createSourceFile(name, src, lang) : original(name, lang))
-      host.fileExists = (n) => n === 'icons.ts' || ts.sys.fileExists(n)
-      const program = ts.createProgram(['icons.ts'], { strict: true, noEmit: true, target: ts.ScriptTarget.ES2020, lib: ['lib.es2020.d.ts'] }, host)
-      const diags = ts.getPreEmitDiagnostics(program).filter((d) => d.file?.fileName === 'icons.ts')
-      expect(diags.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([])
+      expect(check(files, 'angular', ['icons.ts', 'loaders.ts', 'icons/index.ts', 'categories/_uncategorised.ts'].filter((e) => `angular/${e}` in files))).toEqual([])
     })
   }
+  it('one file per icon, a category chunk per category, and a loader for each', () => {
+    const p = processIcons([raw('icon/Home', fx('stroked.svg')), raw('icon/Plus', fx('stroked.svg'))], DEFAULT_SETTINGS, {})
+    const files = buildFiles({ allIcons: p.icons, settings: DEFAULT_SETTINGS, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+    const perIcon = Object.keys(files).filter((k) => /^angular\/icons\/[^/]+\.ts$/.test(k) && !k.endsWith('index.ts'))
+    expect(perIcon).toHaveLength(2)
+    const cats = Object.keys(files).filter((k) => k.startsWith('angular/categories/'))
+    expect(cats.length).toBeGreaterThan(0)
+    for (const c of cats) expect(files['angular/loaders.ts']).toContain(`./categories/${c.split('/').pop()!.replace('.ts', '')}`)
+    expect(files['angular/index.ts']).not.toContain("./icons'")
+    expect(files['angular/index.ts']).not.toContain('all-icons')
+  })
+  it('web component is only built when enabled and registers once', () => {
+    const settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats, webComponent: true } }
+    const p = processIcons([raw('icon/Home', fx('stroked.svg'))], settings, {})
+    const files = buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+    const js = Object.entries(files).find(([k]) => k.startsWith('web-component/') && k.endsWith('.js'))![1]
+    expect(js).toContain('customElements.define')
+    expect(js).toContain('<path')
+    // run it for real (happy-dom provides custom elements)
+    const tag = Object.keys(files).find((k) => k.endsWith('-icon.js'))!.split('/')[1].replace('.js', '')
+    // eslint-disable-next-line no-new-func
+    new Function(js.replace(/^export /gm, ''))()
+    const el = document.createElement(tag)
+    el.setAttribute('name', p.icons[0].name)
+    el.setAttribute('size', '32')
+    el.setAttribute('label', 'Home')
+    document.body.appendChild(el)
+    expect(el.shadowRoot!.innerHTML).toContain('<svg')
+    expect(el.style.getPropertyValue(`--${tag}-size`) || el.getAttribute('style')).toContain('32px')
+    expect(el.getAttribute('role')).toBe('img')
+    const off = buildFiles({ allIcons: p.icons, settings: DEFAULT_SETTINGS, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+    expect(Object.keys(off).some((k) => k.startsWith('web-component/'))).toBe(false)
+  })
 })
 
 describe('changelog: the cases that look like "nothing happened"', () => {
@@ -463,7 +503,8 @@ describe('react format', () => {
     for (const f of ['react/icons.ts', 'react/cmn-icon.tsx', 'react/index.ts']) expect(Object.keys(files)).toContain(f)
     expect(files['react/cmn-icon.tsx']).toContain('export const CmnIcon = memo(')
     expect(files['README.md']).toContain('### React')
-    expect(files['README.md']).toContain('<CmnIcon name="home" size={24}')
+    expect(files['README.md']).toContain('<CmnIcon icon={cmnHome} size={24}')
+    expect(files['README.md']).toContain('<CmnIcon name="home" />')
   })
   it('is off by default', () => {
     const p = processIcons([raw('icon/Home', fx('bars-multipath.svg'))], DEFAULT_SETTINGS, {})

@@ -23,7 +23,7 @@ describe.skipIf(!process.env.DUMP_DIR)('dump', () => {
         facts, categoryCtx: {}, svg: readFileSync(join('test/fixtures', f), 'utf8')
       }))
     const p = processIcons(raws, DEFAULT_SETTINGS, {})
-    const files = buildFiles({ allIcons: p.icons, settings: { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats, mask: true, react: true } }, grid: p.grid, tier: p.tier, generatedAt: '2026-10-09' })
+    const files = buildFiles({ allIcons: p.icons, settings: { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats, mask: true, react: true, webComponent: true } }, grid: p.grid, tier: p.tier, generatedAt: '2026-10-09' })
     for (const [path, content] of Object.entries(files)) {
       mkdirSync(dirname(join(dir, path)), { recursive: true })
       writeFileSync(join(dir, path), content)

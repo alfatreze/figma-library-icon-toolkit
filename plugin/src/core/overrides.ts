@@ -9,7 +9,7 @@ export interface OverrideInfo {
   note: string
 }
 
-const ALL_NO: Record<FormatId, Support> = { svg: 'no', sprite: 'no', html: 'no', mask: 'no', angular: 'no', react: 'no' }
+const ALL_NO: Record<FormatId, Support> = { svg: 'no', sprite: 'no', html: 'no', mask: 'no', angular: 'no', react: 'no', webComponent: 'no' }
 
 /**
  * What can be reproduced in code, per export type.
@@ -20,17 +20,17 @@ const ALL_NO: Record<FormatId, Support> = { svg: 'no', sprite: 'no', html: 'no',
 export const OVERRIDES: Record<OverrideClass, OverrideInfo> = {
   color: {
     label: 'Colour (fill/stroke)',
-    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'partial', angular: 'ok', react: 'ok' },
+    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'partial', angular: 'ok', react: 'ok', webComponent: 'ok' },
     note: 'Use --{ns}-icon-color(-N). Standalone SVG only when inlined; mask classes are single-colour.'
   },
   strokeWeight: {
     label: 'Stroke weight',
-    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'no', angular: 'ok', react: 'ok' },
+    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'no', angular: 'ok', react: 'ok', webComponent: 'ok' },
     note: 'Use --{ns}-icon-stroke-width. Not possible with mask classes.'
   },
   size: {
     label: 'Size (instance resized)',
-    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'ok', angular: 'ok', react: 'ok' },
+    support: { svg: 'partial', sprite: 'ok', html: 'ok', mask: 'ok', angular: 'ok', react: 'ok', webComponent: 'ok' },
     note: 'Use --{ns}-icon-size. Standalone SVG has a fixed width/height.'
   },
   strokeStyle: { label: 'Stroke alignment / cap / join / dash', support: ALL_NO, note: 'Not reproducible: SVG strokes are centred and use the exported style.' },
@@ -50,7 +50,8 @@ export const FORMAT_LABEL: Record<FormatId, string> = {
   html: 'HTML',
   mask: 'CSS mask',
   angular: 'Angular',
-  react: 'React'
+  react: 'React',
+  webComponent: 'Web Component'
 }
 
 export function enabledFormats(settings: Settings): FormatId[] {
@@ -62,6 +63,7 @@ export function enabledFormats(settings: Settings): FormatId[] {
   if (f.mask) out.push('mask')
   if (f.angularModern || f.angularClassic) out.push('angular')
   if (f.react) out.push('react')
+  if (f.webComponent) out.push('webComponent')
   return out
 }
 

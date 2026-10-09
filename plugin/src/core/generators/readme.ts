@@ -1,4 +1,4 @@
-import { BuildInput, componentName, ns } from './common'
+import { BuildInput, componentName, constName, ns } from './common'
 import { strokeSteps } from './common'
 
 /** README.md shipped inside every export: how it works, the formats, and how to add it to a project. Only enabled formats are documented. */
@@ -23,6 +23,7 @@ export function readmeFile(b: BuildInput): string {
   if (f.angularModern) tree.push('angular/   Angular 17.1+ component (signals)')
   if (f.angularClassic) tree.push('angular-classic/   Angular 14+ component (@Input)')
   if (f.react) tree.push('react/   React component + typed icon data')
+  if (f.webComponent) tree.push('web-component/   framework-free custom element')
   tree.push('icons.json   catalogue for tools/AI', 'toolkit.config.json   settings used (re-export identically)', 'AGENTS.md   guide for AI agents')
 
   const parts: string[] = []
@@ -71,40 +72,59 @@ No multi-colour, no stroke-weight control, and the file is large. Prefer the spr
   }
   if (angular) {
     const dir = f.angularModern ? 'angular' : 'angular-classic'
+    const P = n.charAt(0).toUpperCase() + n.slice(1).replace(/-([a-z0-9])/g, (_m, c) => c.toUpperCase())
+    const constant = sample ? constName(b, sample) : 'icon'
     parts.push(`### Angular${f.angularModern && f.angularClassic ? ' (two flavours: pick one folder)' : ''}
 1. Copy \`${dir}/\` into your app, e.g. \`src/app/icons/\`.
-2. Import the standalone component:
+2. Use the standalone component. **Import the icons you use** (synchronous, only these end up in your bundle):
 \`\`\`ts
-import { ${C} } from './icons';          // path to the copied folder
+import { ${C}, ${constant} } from './icons';          // path to the copied folder
 
 @Component({
   standalone: true,
   imports: [${C}],
-  template: \`<${n}-icon name="${name}" [size]="24" color="#0a7d3b" />\`
+  template: \`<${n}-icon [icon]="home" [size]="24" color="#0a7d3b" />\`
 })
-export class Demo {}
+export class Demo { home = ${constant}; }
 \`\`\`
+Or **by name**: \`<${n}-icon name="${name}" />\`. Icons registered with \`provide${P}Icons(…)\` render at once; any other icon loads its category as a lazy chunk the first time it is used. \`provide${P}AllIcons()\` (from \`all-icons.ts\`) registers everything synchronously at the cost of a large bundle.
+${f.sprite ? `
+Sprite strategy: \`<${n}-sprite-icon name="${name}" />\` draws from \`sprite/${n}-sprite.svg\` with \`provide${P}Sprite({ url: '/assets/${n}-sprite.svg', inline: true })\`.
+` : ''}
 | Input | Meaning |
 |---|---|
-| \`name\` | typed icon name (autocomplete from \`icons.ts\`) |
+| \`name\` | typed icon name (autocomplete from \`icon-data.ts\`) |
+| \`icon\` | icon object imported from \`icons/\` (wins over \`name\`) |
 | \`size\` | number (px) or any CSS length |
 | \`color\` | any CSS colour (primary colour) |
 | \`strokeWidth\` | px, stroked icons only |
 | \`label\` | accessible name; omit for decorative icons |
 
-${f.angularModern ? '`angular/` needs Angular **17.1+**' : ''}${f.angularModern && f.angularClassic ? ', ' : ''}${f.angularClassic ? '`angular-classic/` needs Angular **14+**' : ''}. Icon data lives in \`icons.ts\`.`)
+${f.angularModern ? '`angular/` needs Angular **17.1+**' : ''}${f.angularModern && f.angularClassic ? ', ' : ''}${f.angularClassic ? '`angular-classic/` needs Angular **14+**' : ''}. Icon data: one file per icon in \`icons/\`, category chunks in \`categories/\`, every icon in \`icons.ts\`.`)
   }
 
   if (react) {
+    const P = n.charAt(0).toUpperCase() + n.slice(1).replace(/-([a-z0-9])/g, (_m, c) => c.toUpperCase())
+    const constant = sample ? constName(b, sample) : 'icon'
     parts.push(`### React
 1. Copy \`react/\` into your app, e.g. \`src/icons/\`.
-2. Use the typed component (React 17+, no dependencies):
+2. Use the typed component (React 17+, no dependencies). Import the icons you use (synchronous, tree-shakable):
 \`\`\`tsx
-import { ${C} } from './icons';
+import { ${C}, ${constant} } from './icons';
 
-export const Demo = () => <${C} name="${name}" size={24} color="#0a7d3b" />;
+export const Demo = () => <${C} icon={${constant}} size={24} color="#0a7d3b" />;
 \`\`\`
-Props: \`name\` (typed), \`size\` (number = px, or CSS length), \`color\`, \`strokeWidth\` (line icons), \`label\` (accessible name; omit for decorative). Extra props go to the wrapping \`<span>\`.`)
+By name (\`<${C} name="${name}" />\`): registered icons (\`register${P}Icons(…)\`) render at once, others load their category as a lazy chunk on first use. \`register${P}AllIcons()\` (from \`all-icons.ts\`) registers everything synchronously.
+Props: \`icon\` or \`name\` (typed), \`size\` (number = px, or CSS length), \`color\`, \`strokeWidth\` (line icons), \`label\` (accessible name; omit for decorative). Extra props go to the wrapping \`<span>\`.`)
+  }
+
+  if (f.webComponent) {
+    parts.push(`### Web Component (any framework or none)
+\`\`\`html
+<script type="module" src="/icons/web-component/${n}-icon.js"></script>
+<${n}-icon name="${name}" size="24" color="#0a7d3b" label="${name}"></${n}-icon>
+\`\`\`
+Attributes: \`name\`, \`size\`, \`color\`, \`stroke-width\`, \`label\`. The CSS variables below cross the shadow boundary.`)
   }
 
   parts.push(`## Style it (CSS variables)

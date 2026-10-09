@@ -18,6 +18,7 @@ const ROWS: { id: OverviewRow['id']; label: string; detail: string }[] = [
   { id: 'angularModern', label: 'Angular 17.1+', detail: 'Standalone <icon> component with signal inputs, typed icon names and data.' },
   { id: 'angularClassic', label: 'Angular 14+', detail: 'Standalone component with @Input, for older Angular versions.' },
   { id: 'react', label: 'React', detail: 'Typed <Icon name="…"/> component (React 17+), no dependencies. Same data file as Angular; props: size, color, strokeWidth, label.' },
+  { id: 'webComponent', label: 'Web Component', detail: 'Framework-free <icon> custom element (plain ES module + typings). Works in any framework or none.' },
   { id: 'meta', label: 'Manifest & guide', detail: 'README.md (how to use it), icons.json (catalogue), toolkit.config.json, AGENTS.md (for AI agents), CHANGELOG.md / FIX-PLAN.md when applicable. Always included.' }
 ]
 
@@ -25,7 +26,7 @@ const bytes = (s: string) => new TextEncoder().encode(s).length
 
 /** Builds every format once (all enabled) so each row can show its real file count and size. */
 export function computeOverview(icons: Icon[], settings: Settings, grid: GridInfo, tier: Tier): OverviewRow[] {
-  const all = { svg: true, sprite: true, html: true, mask: true, angularModern: true, angularClassic: true, react: true }
+  const all = { svg: true, sprite: true, html: true, mask: true, angularModern: true, angularClassic: true, react: true, webComponent: true }
   const files = buildFiles({ allIcons: icons, settings: { ...settings, formats: all }, grid, tier, generatedAt: 'preview' })
   const rows = new Map<OverviewRow['id'], OverviewRow>(ROWS.map((r) => [r.id, { ...r, files: 0, bytes: 0 }]))
   for (const [path, content] of Object.entries(files)) {
@@ -35,6 +36,7 @@ export function computeOverview(icons: Icon[], settings: Settings, grid: GridInf
     else if (path.includes('-icons-mask.css')) id = 'mask'
     else if (path.startsWith('html/')) id = 'html'
     else if (path.startsWith('react/')) id = 'react'
+    else if (path.startsWith('web-component/')) id = 'webComponent'
     else if (path.startsWith('angular-classic/')) id = 'angularClassic'
     else if (path.startsWith('angular/')) id = 'angularModern'
     const r = rows.get(id)!

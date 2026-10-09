@@ -26,7 +26,7 @@ export interface SyncSettings {
   message: string
   branch: string
 }
-export type FormatId = 'svg' | 'sprite' | 'html' | 'mask' | 'angular' | 'react'
+export type FormatId = 'svg' | 'sprite' | 'html' | 'mask' | 'angular' | 'react' | 'webComponent'
 export type Profile = 'lenient' | 'standard' | 'strict'
 export type Severity = 'error' | 'warn' | 'info'
 export type IconKind = 'filled' | 'stroked' | 'multicolor' | 'mixed'
@@ -75,6 +75,7 @@ export interface Settings {
     angularModern: boolean
     angularClassic: boolean
     react: boolean
+    webComponent: boolean
   }
   zipName: string
   windowWidth: number
@@ -115,7 +116,8 @@ export const DEFAULT_SETTINGS: Settings = {
     mask: false,
     angularModern: true,
     angularClassic: true,
-    react: false
+    react: false,
+    webComponent: false
   },
   zipName: '',
   windowWidth: 460,

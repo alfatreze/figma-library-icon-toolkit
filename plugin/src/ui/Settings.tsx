@@ -502,6 +502,9 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
           <Row info={{ title: 'React', body: <span>A typed <code>&lt;{`${ns[0].toUpperCase()}${ns.slice(1)}`}Icon name="…" /&gt;</code> component (React 17+, no dependencies) using the same data file as Angular. Props: size, color, strokeWidth, label.</span> }}>
             <Checkbox value={f.react} onValueChange={(v) => setFormat('react', v)}>React component</Checkbox>
           </Row>
+          <Row info={{ title: 'Web Component', body: <span>A framework-free custom element (<code>&lt;{ns}-icon name="…"&gt;</code>) as a plain ES module with typings. Use it in plain HTML, Vue, Svelte, Lit or anywhere else. It contains every icon in one file.</span> }}>
+            <Checkbox value={f.webComponent} onValueChange={(v) => setFormat('webComponent', v)}>Web Component (framework-free)</Checkbox>
+          </Row>
         </div>
         <div class={styles.muted}>Settings are saved on this computer. Nothing is ever written to your Figma file.</div>
       </div>
