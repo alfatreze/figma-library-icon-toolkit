@@ -1,4 +1,6 @@
-# Roadmap (from v0.3.1)
+# Roadmap (from v0.5.0)
+
+> The "polish and confidence" milestone shipped as **v0.5.0** (new features make a minor release, see `RELEASING.md`), so the designer workflow milestone below is now **v0.6** and the developer experience milestone **v0.7**.
 
 Principles that decide what goes in and what stays out:
 1. **Read-only by default.** Anything that edits a Figma file stays in Labs, previewed and undoable.
@@ -16,7 +18,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | Community submission: cover image, description, review of `devAllowedDomains` and the `inspect` capability | The listing text is drafted; the manifest questions need an answer from Figma's review |
 | Collect 3 to 5 real libraries as private fixtures (never committed) | Real files find bugs fixtures do not |
 
-## Now: v0.4 "polish and confidence" (about 2 to 3 weeks)
+## Done: v0.5.0 "polish and confidence"
 | Feature | Value | Size |
 |---|---|---|
 | ~~Auto-contrast preview tile~~ done | Fixes a real legibility gap | S |
@@ -26,7 +28,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | ~~Fix hardening~~ done (unreleased, not yet run in Figma): prototype links from other layers are repointed to the new instance (all or nothing), colour-variable bindings are kept on carried fills, a show/hide component property is carried. Not covered: reactions pointing at a node inside the replaced layer, converting a plain frame (the API's new id behaviour is unverified) | The remaining ways a fix can lose design intent | M |
 | ~~Merge the Angular modern / classic templates~~ done (snapshot-pinned) | Removes copy-paste before more targets are added | M |
 
-## Next: v0.5 "designer and system-manager workflow" (about 4 to 6 weeks)
+## Next: v0.6 "designer and system-manager workflow" (about 4 to 6 weeks)
 | Feature | Value | Size |
 |---|---|---|
 | **Icon detail panel** (replaces the inline expander): all sizes, colour slots, usage and overrides, findings, history | One place to understand an icon | M |
@@ -37,7 +39,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | Variable mapping by collection and mode (Light/Dark) with a visual table | Today it is per-variable lines and wildcards | M |
 | Dark/light preview of themeable colours in the detail panel and the HTML preview | Shows what developers will get | S |
 
-## Next: v0.6 "developer experience" (about 4 to 6 weeks, can overlap)
+## Next: v0.7 "developer experience" (about 4 to 6 weeks, can overlap)
 | Feature | Value | Size |
 |---|---|---|
 | **npm-ready package**: `package.json`, ESM + types, `sideEffects: false`, README, optional Storybook stories | Turns the ZIP into something you can publish as is | M |

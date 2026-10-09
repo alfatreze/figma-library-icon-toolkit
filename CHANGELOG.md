@@ -7,6 +7,30 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-10
+First release verified in Figma (scan, baseline, export, Dev Mode codegen and the inspect panel were run on a 410-icon library; publishing to a real repository, Labs fixes and shared config are still unverified).
+
+### Added
+- **Packages and Output tabs** in Settings: *Packages* is what is generated (formats, name prefix, split by category), *Output* is where it goes.
+- **Several publish outputs.** Each output is a repository, a folder and the packages it receives (all that are on, or a chosen subset). Outputs on one repository are published together as one branch, one commit and one pull / merge request; different repositories get their own. One access token per host. Publish is blocked when a folder is missing, unsafe or overlaps another output of the same repository, or a token is missing. Choose which output is the *changed since* baseline. An Angular-only output keeps the sprite loader when another output ships the sprite file.
+- **Import path** setting (Settings → Packages): where the Angular and React snippets import from in Dev Mode and the Inspect panel (default `./icons`); part of the team config. The HTML snippet now says to load the base CSS.
+- **Partial exports.** A ZIP made from the Dev Mode selection carries `partial: true` in `icons.json` and a README banner, and is refused as a *changed since* baseline.
+- **Theme-contrast audit rule** for fixed colours (secondary colours, gradients) below 3:1 on a light or dark page; an automatic dark tile for white icons in the previews.
+- **Fix hardening** for *replace with instance*: prototype links from other layers are repointed to the new instance (all or nothing), colour-variable bindings are kept on carried colours, a show/hide component property is carried.
+- Hints (keyboard reachable) instead of tooltips, `tabpanel` / `aria-controls` on every tab, release provenance attestation for the zip.
+
+### Changed
+- Settings version 3: the single repository of 0.4 becomes one output named *Icon library*, and its token becomes the token of its host. Migration is automatic. Outputs and tokens stay on this computer (never in the team config, exports or diagnostics).
+- The window is resized from the pointer's absolute position (the method of Figma's own example), so expanding follows the cursor.
+- The generated Angular, React and Web Component output is unchanged (pinned by snapshot tests); internally the two Angular flavours now share their templates.
+
+### Fixed
+- A bare `group` or `star` layer name was treated as a Figma default name and blocked the icon.
+- Applying fixes never reported its result: the confirmation stayed on "applying" (the UI listeners for fix results were lost in an earlier refactor).
+- Warning pills, counts and badges were unreadable in dark mode (2.2:1); a new test measures every colour pair in the stylesheet.
+- A new Output card showed errors before anything was entered; a namespace typed as `gitl:` was kept raw in the exported config.
+- The copy buttons in the Dev Mode panel overflowed; footer hints were cut off by the window edge.
+
 ## [0.4.0] - 2026-10-09
 ### Added
 - **Publish to a repository, self-contained.** Settings → Output → *Publish to a repository* (host, repository, folder, optional branch, access token) and Export → *Publish to repository…*. The plugin compares the export with the repository's default branch, shows what would be added, changed or removed, then creates a new branch, commits everything as one change and opens a **pull request (GitHub)** or **merge request (GitLab)** with a generated title and description (added, renamed, removed and changed icons, breaking-change note, version, changelog, formats, remaining warnings). Only files this tool published before (`<folder>/.icon-toolkit.json`) are ever deleted; the default branch is never changed; large exports are uploaded in several requests. If only the pull / merge request fails, the branch is kept and you get a link to open it by hand.
@@ -97,7 +121,8 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.1...v0.3.0
