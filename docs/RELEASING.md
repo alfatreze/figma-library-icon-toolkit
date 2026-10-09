@@ -26,6 +26,13 @@ What counts as the public API: the **generated output** (file names, CSS variabl
    ```
 5. The **Release** workflow verifies tag = `package.json` version, runs the tests, builds, and publishes a GitHub Release with `figma-library-icon-toolkit-vX.Y.Z.zip` (the files Figma needs: `manifest.json` + `build/`) and the notes from `CHANGELOG.md`.
 
+## Verifying a release
+Each release zip has a SHA-256 file and a signed build provenance attestation (which workflow, commit and tag built it):
+```bash
+gh attestation verify figma-library-icon-toolkit-vX.Y.Z.zip --repo alfatreze/figma-library-icon-toolkit
+shasum -a 256 -c figma-library-icon-toolkit-vX.Y.Z.zip.sha256
+```
+
 ## Installing a release
 Download the zip, unzip it, and in Figma use **Plugins → Development → Import plugin from manifest…** and choose `manifest.json`.
 

@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # only this job publishes the release
+      id-token: write # signs the provenance attestation
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -37,6 +39,10 @@ jobs:
           (cd dist && zip -r $NAME.zip $NAME && sha256sum $NAME.zip > $NAME.zip.sha256)
           echo "ASSET=dist/$NAME.zip" >> "$GITHUB_ENV"
           echo "ASSET_SUM=dist/$NAME.zip.sha256" >> "$GITHUB_ENV"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: ${{ env.ASSET }}
       - name: Release notes from CHANGELOG
         run: |
           V="${GITHUB_REF_NAME#v}"
