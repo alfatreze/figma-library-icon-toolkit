@@ -297,3 +297,11 @@ body > [class*='_menu_'] { z-index: 2600; }
   padding: 4px 8px; border-radius: 6px; background: var(--figma-color-bg-inverse); color: var(--figma-color-text-oninverse);
   font-size: 11px; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; pointer-events: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
+
+/* dark mode: the kit's warning tint (#c58011) leaves yellow text at 2.2:1, and the selected-tab tint gives the brand count 3.8:1.
+   Warnings sit on the neutral secondary background (8:1) and the active count on the brand tint (5:1). test/contrast-css.test.ts guards every pair. */
+:global(.figma-dark) .pillWarn,
+:global(.figma-dark) .countWarn,
+:global(.figma-dark) .tabActive .countWarn,
+:global(.figma-dark) .conf_medium { background: var(--figma-color-bg-secondary); }
+:global(.figma-dark) .tabActive .count { background: var(--figma-color-bg-brand-tertiary); }
