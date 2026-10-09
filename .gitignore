@@ -1,0 +1,7 @@
+node_modules/
+plugin/build/
+plugin/manifest.json
+plugin/src/**/*.css.d.ts
+*.log
+.DS_Store
+docs/archive/

@@ -1,0 +1,9 @@
+{
+  "extends": "@create-figma-plugin/tsconfig",
+  "compilerOptions": {
+    "typeRoots": ["node_modules/@figma", "node_modules/@types"],
+    "skipLibCheck": true,
+    "target": "ES2020"
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

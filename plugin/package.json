@@ -1,0 +1,166 @@
+{
+  "name": "figma-library-icon-toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Figma plugin: scan icon libraries, audit and fix them, and export themeable SVG / sprite / HTML / Angular / React packages with a developer README.",
+  "license": "MIT",
+  "author": "Abel Santos",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alfatreze/figma-library-icon-toolkit.git",
+    "directory": "plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/alfatreze/figma-library-icon-toolkit/issues"
+  },
+  "homepage": "https://github.com/alfatreze/figma-library-icon-toolkit#readme",
+  "keywords": [
+    "figma",
+    "figma-plugin",
+    "icons",
+    "design-system",
+    "svg",
+    "angular",
+    "react",
+    "dev-mode"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "build-figma-plugin --typecheck --minify",
+    "watch": "build-figma-plugin --typecheck --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@create-figma-plugin/ui": "^4.0.0",
+    "@create-figma-plugin/utilities": "^4.0.0",
+    "fflate": "^0.8.2",
+    "preact": "^10.24.0"
+  },
+  "devDependencies": {
+    "@create-figma-plugin/build": "^4.0.0",
+    "@create-figma-plugin/tsconfig": "^4.0.0",
+    "@figma/plugin-typings": "^1.100.0",
+    "happy-dom": "^20.14.6",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "figma-plugin": {
+    "id": "icon-library-toolkit-dev",
+    "name": "Icon Library Toolkit",
+    "main": "src/main.ts",
+    "ui": "src/ui.tsx",
+    "editorType": [
+      "figma",
+      "dev"
+    ],
+    "documentAccess": "dynamic-page",
+    "networkAccess": {
+      "allowedDomains": [
+        "none"
+      ],
+      "devAllowedDomains": [
+        "http://localhost:5199"
+      ],
+      "reasoning": "Optional Labs feature: send exported files to a companion program running on your own computer (localhost). No other network access."
+    },
+    "capabilities": [
+      "codegen",
+      "vscode"
+    ],
+    "codegenLanguages": [
+      {
+        "label": "Icon: Angular",
+        "value": "angular"
+      },
+      {
+        "label": "Icon: HTML (sprite)",
+        "value": "html"
+      },
+      {
+        "label": "Icon: React",
+        "value": "react"
+      },
+      {
+        "label": "Icon: CSS variables",
+        "value": "css"
+      }
+    ],
+    "codegenPreferences": [
+      {
+        "itemType": "select",
+        "propertyName": "spritePath",
+        "label": "Sprite location",
+        "options": [
+          {
+            "label": "./icons/sprite/",
+            "value": "./icons/sprite/",
+            "isDefault": true
+          },
+          {
+            "label": "/assets/icons/sprite/",
+            "value": "/assets/icons/sprite/"
+          },
+          {
+            "label": "/icons/sprite/",
+            "value": "/icons/sprite/"
+          },
+          {
+            "label": "/sprite/",
+            "value": "/sprite/"
+          }
+        ]
+      },
+      {
+        "itemType": "select",
+        "propertyName": "sizeUnit",
+        "label": "Icon size unit",
+        "options": [
+          {
+            "label": "px",
+            "value": "px",
+            "isDefault": true
+          },
+          {
+            "label": "rem",
+            "value": "rem"
+          }
+        ]
+      },
+      {
+        "itemType": "select",
+        "propertyName": "a11y",
+        "label": "Accessibility",
+        "options": [
+          {
+            "label": "Decorative (aria-hidden)",
+            "value": "decorative",
+            "isDefault": true
+          },
+          {
+            "label": "Labelled (role=img)",
+            "value": "labelled"
+          }
+        ]
+      },
+      {
+        "itemType": "select",
+        "propertyName": "tokens",
+        "label": "Override colours",
+        "options": [
+          {
+            "label": "Design token variables",
+            "value": "names",
+            "isDefault": true
+          },
+          {
+            "label": "Hex values",
+            "value": "hex"
+          }
+        ]
+      }
+    ]
+  }
+}

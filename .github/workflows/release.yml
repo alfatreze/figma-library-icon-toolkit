@@ -1,0 +1,53 @@
+name: release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+      - name: Tag must match plugin/package.json
+        run: |
+          V=$(node -p "require('./plugin/package.json').version")
+          if [ "v$V" != "${GITHUB_REF_NAME}" ]; then echo "Tag ${GITHUB_REF_NAME} != package.json v$V"; exit 1; fi
+      - name: Build and test
+        working-directory: plugin
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Companion tests
+        run: |
+          git config --global user.email ci@example.com && git config --global user.name ci
+          node --test tools/icon-sync.test.mjs
+      - name: Package
+        run: |
+          NAME="figma-library-icon-toolkit-${GITHUB_REF_NAME}"
+          mkdir -p dist/$NAME
+          cp plugin/manifest.json dist/$NAME/
+          cp -R plugin/build dist/$NAME/build
+          cp LICENSE THIRD_PARTY_NOTICES.md dist/$NAME/
+          cp -R tools dist/$NAME/tools
+          (cd dist && zip -r $NAME.zip $NAME)
+          echo "ASSET=dist/$NAME.zip" >> "$GITHUB_ENV"
+      - name: Release notes from CHANGELOG
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          awk -v v="$V" '$0 ~ "^## \\["v"\\]"{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""
+          case "${GITHUB_REF_NAME}" in *-*) PRE="--prerelease";; esac
+          gh release create "${GITHUB_REF_NAME}" "$ASSET" --title "${GITHUB_REF_NAME}" --notes-file notes.md $PRE
