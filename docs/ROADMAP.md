@@ -19,12 +19,12 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 ## Now: v0.4 "polish and confidence" (about 2 to 3 weeks)
 | Feature | Value | Size |
 |---|---|---|
-| Auto-contrast preview tile (white icons on a light tile are invisible today) | Fixes a real legibility gap | S |
-| Plural / translation helper, dark-mode contrast pass, replace most remaining ⓘ tooltips with hints | Finishes the UX review | S |
-| `useFixes` hook, split the three tab panels out of `ui.tsx`, tests for `diagnose.ts`, `facts.ts`, `codegen.ts` | Maintainability; these are the most Figma-API-sensitive files | M |
-| Pin GitHub Actions by SHA, release provenance attestation | Supply-chain hygiene from the audit | S |
-| Fix hardening: reactions that point *to* a replaced node, instance-swap properties, variable bindings on carried fills | The remaining ways a fix can lose design intent | M |
-| Merge the Angular modern / classic templates | Removes copy-paste before more targets are added | M |
+| ~~Auto-contrast preview tile~~ done | Fixes a real legibility gap | S |
+| ~~Plural helper, dark-mode contrast pass, hints instead of tooltips~~ done | Finishes the UX review | S |
+| ~~`useFixes`, panel split, tests for `diagnose.ts`, `facts.ts`, `codegen.ts`~~ done | Maintainability; these are the most Figma-API-sensitive files | M |
+| ~~Pin GitHub Actions by SHA, release provenance attestation~~ done (attestation untested until a release) | Supply-chain hygiene from the audit | S |
+| ~~Fix hardening~~ done (unreleased, not yet run in Figma): prototype links from other layers are repointed to the new instance (all or nothing), colour-variable bindings are kept on carried fills, a show/hide component property is carried. Not covered: reactions pointing at a node inside the replaced layer, converting a plain frame (the API's new id behaviour is unverified) | The remaining ways a fix can lose design intent | M |
+| ~~Merge the Angular modern / classic templates~~ done (snapshot-pinned) | Removes copy-paste before more targets are added | M |
 
 ## Next: v0.5 "designer and system-manager workflow" (about 4 to 6 weeks)
 | Feature | Value | Size |

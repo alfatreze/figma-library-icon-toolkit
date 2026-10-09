@@ -41,6 +41,7 @@ export class FakeNode {
   overrides: unknown[] = []
   detachedInfo: unknown = null
   selection: FakeNode[] = []
+  componentPropertyReferences: Record<string, string> | null = null
   absoluteBoundingBox: { x: number; y: number; width: number; height: number } | null = null
   absoluteRenderBounds: { x: number; y: number; width: number; height: number } | null = null
 
@@ -62,6 +63,18 @@ export class FakeNode {
   resize(w: number, h: number) {
     this.width = w
     this.height = h
+  }
+  /** every descendant (not the node itself) that the callback accepts, in tree order */
+  findAll(cb: (n: FakeNode) => boolean): FakeNode[] {
+    const out: FakeNode[] = []
+    const walk = (n: FakeNode) => {
+      for (const c of n.children) {
+        if (cb(c)) out.push(c)
+        walk(c)
+      }
+    }
+    walk(this)
+    return out
   }
   appendChild(c: FakeNode) {
     this.insertChild(this.children.length, c)
@@ -122,6 +135,7 @@ export interface FakeFigma {
   nodes: Map<string, FakeNode>
   storage: Map<string, unknown>
   notify: (m: string) => void
+  variables: { store: Map<string, { id: string; name: string }> }
   [k: string]: unknown
 }
 
@@ -157,6 +171,11 @@ export function installFigma(opts: { fileKey?: string } = {}): FakeFigma {
       throw new Error('sync getNodeById is not allowed with dynamic-page access')
     },
     commitUndo: () => {},
+    variables: {
+      store: new Map<string, { id: string; name: string }>(),
+      getVariableByIdAsync: async (id: string) => api.variables.store.get(id) ?? null,
+      setBoundVariableForPaint: (paint: Record<string, unknown>, field: string, v: { id: string }) => ({ ...paint, boundVariables: { [field]: { type: 'VARIABLE_ALIAS', id: v.id } } })
+    },
     clientStorage: {
       getAsync: async (k: string) => storage.get(k),
       setAsync: async (k: string, v: unknown) => void storage.set(k, v),

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { applyFix } from '../src/main/apply'
+import { applyFix, resetApplyCaches } from '../src/main/apply'
 import { fileIdentity, readLocalBaseline, readSharedBaseline, writeLocalBaseline, writeSharedBaseline } from '../src/main/baseline'
 import { effectiveSettings } from '../src/main/effective'
 import { serializeShared } from '../src/core/config'
@@ -107,6 +107,92 @@ describe('apply: replace with instance', () => {
     expect((await applyFix(req(), fix)).message).toMatch(/changed since the scan/)
     detached.remove()
     expect((await applyFix(req(), fix)).message).toMatch(/no longer exists/)
+  })
+})
+
+describe('apply: what other layers and the design system hold on to', () => {
+  const nodeAction = (id: string) => ({ type: 'NODE', destinationId: id, navigation: 'NAVIGATE' })
+
+  it('repoints prototype links from other layers to the new instance (actions and the legacy action field)', async () => {
+    const comp = makeComponent(fig, 'icon/Home')
+    const target = makeFrame(fig, fig.page, 'screen 2 icon')
+    const a = makeFrame(fig, fig.page, 'button a', [])
+    const b = makeFrame(fig, fig.page, 'button b', [])
+    const other = makeFrame(fig, fig.page, 'button c', [])
+    a.reactions = [{ trigger: { type: 'ON_CLICK' }, actions: [nodeAction(target.id)] }]
+    b.reactions = [{ trigger: { type: 'ON_CLICK' }, action: nodeAction(target.id) }]
+    other.reactions = [{ trigger: { type: 'ON_CLICK' }, actions: [nodeAction('9:9')] }]
+    const res = await applyFix(req(), fixFor(target, comp))
+    expect(res.ok).toBe(true)
+    const inst = fig.page.children.find((c) => c.type === 'INSTANCE')!
+    expect((a.reactions[0] as { actions: { destinationId: string }[] }).actions[0].destinationId).toBe(inst.id)
+    expect((b.reactions[0] as { action: { destinationId: string } }).action.destinationId).toBe(inst.id)
+    expect((other.reactions[0] as { actions: { destinationId: string }[] }).actions[0].destinationId).toBe('9:9')
+    expect(res.message).toContain('2 prototype links repointed')
+  })
+
+  it('is all or nothing: when one link cannot be moved the earlier ones are restored and the original stays', async () => {
+    const comp = makeComponent(fig, 'icon/Home')
+    const target = makeFrame(fig, fig.page, 'icon')
+    const a = makeFrame(fig, fig.page, 'a', [])
+    const b = makeFrame(fig, fig.page, 'b', [])
+    const original = [{ trigger: { type: 'ON_CLICK' }, actions: [nodeAction(target.id)] }]
+    a.reactions = JSON.parse(JSON.stringify(original))
+    b.reactions = JSON.parse(JSON.stringify(original))
+    b.failOn = 'reactions'
+    const res = await applyFix(req(), fixFor(target, comp))
+    expect(res.ok).toBe(false)
+    expect(a.reactions).toEqual(original)
+    expect(fig.page.children.some((c) => c.type === 'INSTANCE')).toBe(false)
+    expect(target.removed).toBe(false)
+  })
+
+  it('keeps colour-variable bindings on carried fills and says so', async () => {
+    fig.variables.store.set('VariableID:1', { id: 'VariableID:1', name: 'color/icon/primary' })
+    const comp = makeComponent(fig, 'icon/Home', ['#111111'])
+    const detached = makeFrame(fig, fig.page, 'icon', ['#ff0000'])
+    detached.children[0].fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:1' } } }]
+    const res = await applyFix(req(), fixFor(detached, comp))
+    expect(res.ok).toBe(true)
+    const inst = fig.page.children.find((c) => c.type === 'INSTANCE')!
+    expect((inst.children[0].fills[0] as { boundVariables: { color: { id: string } } }).boundVariables.color.id).toBe('VariableID:1')
+    expect(res.message).toContain('1 colour variable binding kept')
+  })
+
+  it('copies the plain colour and reports it when the variable is not available in this file', async () => {
+    const comp = makeComponent(fig, 'icon/Home', ['#111111'])
+    const detached = makeFrame(fig, fig.page, 'icon', ['#ff0000'])
+    detached.children[0].fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:remote' } } }]
+    const res = await applyFix(req(), fixFor(detached, comp))
+    expect(res.ok).toBe(true)
+    expect(res.message).toContain('1 variable binding could not be kept')
+    const inst = fig.page.children.find((c) => c.type === 'INSTANCE')!
+    expect((inst.children[0].fills[0] as { color: { r: number } }).color.r).toBe(1)
+  })
+
+  it('carries a show/hide component property to the instance', async () => {
+    const comp = makeComponent(fig, 'icon/Home')
+    const detached = makeFrame(fig, fig.page, 'icon')
+    detached.componentPropertyReferences = { visible: 'Show icon#1:0' }
+    const res = await applyFix(req(), fixFor(detached, comp))
+    expect(res.ok).toBe(true)
+    expect(fig.page.children.find((c) => c.type === 'INSTANCE')!.componentPropertyReferences).toEqual({ visible: 'Show icon#1:0' })
+  })
+
+  it('walks the page once per batch, not once per fix', async () => {
+    const comp = makeComponent(fig, 'icon/Home')
+    const x = makeFrame(fig, fig.page, 'x')
+    const y = makeFrame(fig, fig.page, 'y')
+    let walks = 0
+    const findAll = fig.page.findAll.bind(fig.page)
+    fig.page.findAll = (cb) => {
+      walks++
+      return findAll(cb)
+    }
+    resetApplyCaches()
+    await applyFix(req({ id: 'f1' }), fixFor(x, comp))
+    await applyFix(req({ id: 'f1' }), fixFor(y, comp))
+    expect(walks).toBe(1)
   })
 })
 

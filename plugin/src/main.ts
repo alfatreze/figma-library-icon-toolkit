@@ -6,7 +6,7 @@ import {
   Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler
 } from './types'
 import { registerCodegen } from './main/codegen'
-import { applyFix } from './main/apply'
+import { applyFix, resetApplyCaches } from './main/apply'
 import { effectiveSettings } from './main/effective'
 import { loadSettings, serializeSettings, SETTINGS_KEY } from './main/settings'
 import { readShared, writeShared } from './main/shared'
@@ -196,6 +196,7 @@ export default async function () {
       return
     }
     applying = true
+    resetApplyCaches()
     let ok = 0
     let failed = 0
     try {
