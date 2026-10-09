@@ -11,14 +11,67 @@ function names(b: BuildInput) {
 const HOST_STYLE = (n: string) => `    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
     '.${n}-icon__inner{display:block;width:100%;height:100%}'`
 
-// ---------------------------------------------------------------- registry
-function registryModern(b: BuildInput): string {
-  const { n, C, k, reg, tok, provide } = names(b)
-  return `import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
-import { ${k}_CATEGORY_OF, ${k}_DEPRECATED, ${C}Data } from './icon-data';
-import { ${k}_LOADERS } from './loaders';
+// ------------------------------------------------------- shared pieces
+// The two flavours differ in the Angular API they use (signals vs @Input), not in what they do. Everything that is the same text in both
+// lives here; test/angular.test.ts pins the generated files, so a change to any piece shows up in both flavours on purpose.
 
-type IconInput = ${C}Data | readonly ${C}Data[];
+type Flavour = 'modern' | 'classic'
+
+/** @Component({ … }) with the options both flavours share; `host` only exists in the signals flavour */
+function decorator(o: { selector: string; host?: string; template: string; styles: string }): string {
+  return `@Component({
+  selector: '${o.selector}',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,${o.host ? '\n' + o.host : ''}
+  template: '${o.template}',
+  styles: [
+${o.styles}
+  ]
+})`
+}
+
+/** the icon component's host element: aria and the CSS variables, bound from signals */
+const MODERN_HOST = (n: string) => `  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--${n}-icon-size]': 'sizeCss()',
+    '[style.--${n}-icon-color]': 'color() || null',
+    '[style.--${n}-icon-stroke-width]': 'strokeCss()'
+  },`
+
+/** the same bindings for the classic flavour, as @HostBinding getters */
+const CLASSIC_HOST_BINDINGS = (n: string, c: string) => `  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--${n}-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--${n}-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--${n}-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : ${c}StrokeFor(this.size);
+  }`
+
+/** the inputs both flavours expose besides name and icon */
+const MODERN_PLAIN_INPUTS = `  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);`
+const CLASSIC_PLAIN_INPUTS = `  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;`
+
+const MODERN_SIZE_CSS = `  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });`
+
+// ---------------------------------------------------------------- registry
+/** the part of the registry file that is identical in both flavours: the icon input type, the token and the provider function */
+function registryPreamble(b: BuildInput): string {
+  const { n, C, reg, tok, provide } = names(b)
+  return `type IconInput = ${C}Data | readonly ${C}Data[];
 
 export const ${tok} = new InjectionToken<readonly (readonly IconInput[])[]>('${n} icons');
 
@@ -32,7 +85,32 @@ export function ${provide}(...icons: IconInput[]): Provider {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ${reg} {
+export class ${reg} {`
+}
+
+/** resolve a deprecated name, look it up and start loading its category when it is missing; `store` reads the map in the flavour's way */
+function registryGet(b: BuildInput, store: string, doc = ''): string {
+  const { C, k } = names(b)
+  return `${doc}  get(requested: string): ${C}Data | undefined {
+    const name = (${k}_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = ${store}.get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }`
+}
+
+const registryLoad = (b: BuildInput) => `  private load(name: string): void {
+    const category = ${names(b).k}_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }`
+
+function registryModern(b: BuildInput): string {
+  const { C, k, tok } = names(b)
+  return `import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
+import { ${k}_CATEGORY_OF, ${k}_DEPRECATED, ${C}Data } from './icon-data';
+import { ${k}_LOADERS } from './loaders';
+
+${registryPreamble(b)}
   private readonly store = signal<ReadonlyMap<string, ${C}Data>>(new Map());
   private readonly requested = new Set<string>();
 
@@ -50,23 +128,14 @@ export class ${reg} {
     });
   }
 
-  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */
-  get(requested: string): ${C}Data | undefined {
-    const name = (${k}_DEPRECATED as Record<string, string>)[requested] ?? requested;
-    const hit = this.store().get(name);
-    if (!hit) this.load(name);
-    return hit;
-  }
+${registryGet(b, 'this.store()', '  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */\n')}
 
   /** Warm categories ahead of use, e.g. preload('arrows'). */
   async preload(...categories: string[]): Promise<void> {
     await Promise.all(categories.map((c) => this.loadCategory(c)));
   }
 
-  private load(name: string): void {
-    const category = ${k}_CATEGORY_OF[name];
-    if (category !== undefined) void this.loadCategory(category);
-  }
+${registryLoad(b)}
 
   private async loadCategory(category: string): Promise<void> {
     const loader = ${k}_LOADERS[category];
@@ -83,27 +152,13 @@ export class ${reg} {
 }
 
 function registryClassic(b: BuildInput): string {
-  const { n, C, k, reg, tok, provide } = names(b)
+  const { C, k, tok } = names(b)
   return `import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
 import { Subject } from 'rxjs';
 import { ${k}_CATEGORY_OF, ${k}_DEPRECATED, ${C}Data } from './icon-data';
 import { ${k}_LOADERS } from './loaders';
 
-type IconInput = ${C}Data | readonly ${C}Data[];
-
-export const ${tok} = new InjectionToken<readonly (readonly IconInput[])[]>('${n} icons');
-
-/**
- * Register icons up front (synchronous, tree-shakable):
- *   providers: [${provide}(${camelNs(b)}Home, ${camelNs(b)}Search)]
- * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
- */
-export function ${provide}(...icons: IconInput[]): Provider {
-  return { provide: ${tok}, multi: true, useValue: icons };
-}
-
-@Injectable({ providedIn: 'root' })
-export class ${reg} {
+${registryPreamble(b)}
   private readonly store = new Map<string, ${C}Data>();
   private readonly requested = new Set<string>();
   /** emits when icons were added (a lazy category arrived) */
@@ -119,22 +174,14 @@ export class ${reg} {
     this.changes.next();
   }
 
-  get(requested: string): ${C}Data | undefined {
-    const name = (${k}_DEPRECATED as Record<string, string>)[requested] ?? requested;
-    const hit = this.store.get(name);
-    if (!hit) this.load(name);
-    return hit;
-  }
+${registryGet(b, 'this.store')}
 
   /** Warm categories ahead of use, e.g. preload('arrows'). */
   preload(...categories: string[]): Promise<void[]> {
     return Promise.all(categories.map((c) => this.loadCategory(c)));
   }
 
-  private load(name: string): void {
-    const category = ${k}_CATEGORY_OF[name];
-    if (category !== undefined) void this.loadCategory(category);
-  }
+${registryLoad(b)}
 
   private loadCategory(category: string): Promise<void> {
     const loader = ${k}_LOADERS[category];
@@ -164,7 +211,7 @@ export function provide${P}AllIcons(): Provider {
 
 // --------------------------------------------------------------- components
 function modern(b: BuildInput): string {
-  const { n, C, k, c, reg } = names(b)
+  const { n, C, c, reg } = names(b)
   return `import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ${C}Data, ${C}DeprecatedName, ${C}Name, ${c}StrokeFor, ${c}Svg } from './icon-data';
@@ -177,23 +224,7 @@ import { ${reg} } from './${n}-icon-registry';
  * Customise via inputs or CSS variables: --${n}-icon-size, --${n}-icon-color, --${n}-icon-color-2, --${n}-icon-stroke-width.
  * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
  */
-@Component({
-  selector: '${n}-icon',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '[attr.role]': 'label() ? "img" : null',
-    '[attr.aria-label]': 'label() || null',
-    '[attr.aria-hidden]': 'label() ? null : "true"',
-    '[style.--${n}-icon-size]': 'sizeCss()',
-    '[style.--${n}-icon-color]': 'color() || null',
-    '[style.--${n}-icon-stroke-width]': 'strokeCss()'
-  },
-  template: '<span class="${n}-icon__inner" [innerHTML]="html()"></span>',
-  styles: [
-${HOST_STYLE(n)}
-  ]
-})
+${decorator({ selector: `${n}-icon`, host: MODERN_HOST(n), template: `<span class="${n}-icon__inner" [innerHTML]="html()"></span>`, styles: HOST_STYLE(n) })}
 export class ${C} {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly registry = inject(${reg});
@@ -201,15 +232,9 @@ export class ${C} {
   readonly name = input<${C}Name | ${C}DeprecatedName | undefined>(undefined);
   /** icon object imported from './icons' (wins over name) */
   readonly icon = input<${C}Data | undefined>(undefined);
-  readonly size = input<string | number | undefined>(undefined);
-  readonly color = input<string | undefined>(undefined);
-  readonly strokeWidth = input<number | string | undefined>(undefined);
-  readonly label = input<string | undefined>(undefined);
+${MODERN_PLAIN_INPUTS}
 
-  protected readonly sizeCss = computed(() => {
-    const s = this.size();
-    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
-  });
+${MODERN_SIZE_CSS}
 
   /** explicit strokeWidth wins; otherwise the plugin's weight-by-size table (when that policy is used) */
   protected readonly strokeCss = computed(() => this.strokeWidth() ?? ${c}StrokeFor(this.size()));
@@ -240,23 +265,12 @@ import { ${reg} } from './${n}-icon-registry';
  * Customise via inputs or CSS variables: --${n}-icon-size, --${n}-icon-color, --${n}-icon-color-2, --${n}-icon-stroke-width.
  * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
  */
-@Component({
-  selector: '${n}-icon',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '<span class="${n}-icon__inner" [innerHTML]="html"></span>',
-  styles: [
-${HOST_STYLE(n)}
-  ]
-})
+${decorator({ selector: `${n}-icon`, template: `<span class="${n}-icon__inner" [innerHTML]="html"></span>`, styles: HOST_STYLE(n) })}
 export class ${C} implements OnChanges, OnInit, OnDestroy {
   @Input() name?: ${C}Name | ${C}DeprecatedName;
   /** icon object imported from './icons' (wins over name) */
   @Input() icon?: ${C}Data;
-  @Input() size?: string | number;
-  @Input() color?: string;
-  @Input() strokeWidth?: number | string;
-  @Input() label?: string;
+${CLASSIC_PLAIN_INPUTS}
 
   html: SafeHtml = '';
   private sub?: Subscription;
@@ -267,16 +281,7 @@ export class ${C} implements OnChanges, OnInit, OnDestroy {
     private readonly cdr: ChangeDetectorRef
   ) {}
 
-  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
-  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
-  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
-  @HostBinding('style.--${n}-icon-size') get sizeVar(): string | null {
-    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
-  }
-  @HostBinding('style.--${n}-icon-color') get colorVar(): string | null { return this.color || null; }
-  @HostBinding('style.--${n}-icon-stroke-width') get strokeVar(): string | number | null {
-    return this.strokeWidth !== undefined ? this.strokeWidth : ${c}StrokeFor(this.size);
-  }
+${CLASSIC_HOST_BINDINGS(n, c)}
 
   ngOnInit(): void {
     // a lazily loaded category arrived
@@ -360,6 +365,10 @@ export class ${P}SpriteLoader {
 `
 }
 
+const SPRITE_STYLES = (n: string) => `    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'`
+const spriteTemplate = (href: string) => `<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="${href}"/></svg>`
+
 function spriteIconModern(b: BuildInput): string {
   const { n, P, C, k, c } = names(b)
   return `import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
@@ -370,37 +379,14 @@ import { ${P}SpriteLoader } from './${n}-sprite';
  * <${n}-sprite-icon name="…" />   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
  * Configure with provide${P}Sprite({ url, inline }). Same inputs and CSS variables as <${n}-icon>.
  */
-@Component({
-  selector: '${n}-sprite-icon',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    '[attr.role]': 'label() ? "img" : null',
-    '[attr.aria-label]': 'label() || null',
-    '[attr.aria-hidden]': 'label() ? null : "true"',
-    '[style.--${n}-icon-size]': 'sizeCss()',
-    '[style.--${n}-icon-color]': 'color() || null',
-    '[style.--${n}-icon-stroke-width]': 'strokeCss()'
-  },
-  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href()"/></svg>',
-  styles: [
-    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
-    'svg{display:block}'
-  ]
-})
+${decorator({ selector: `${n}-sprite-icon`, host: MODERN_HOST(n), template: spriteTemplate('href()'), styles: SPRITE_STYLES(n) })}
 export class ${P}SpriteIcon {
   private readonly sprite = inject(${P}SpriteLoader);
 
   readonly name = input.required<${C}Name | ${C}DeprecatedName>();
-  readonly size = input<string | number | undefined>(undefined);
-  readonly color = input<string | undefined>(undefined);
-  readonly strokeWidth = input<number | string | undefined>(undefined);
-  readonly label = input<string | undefined>(undefined);
+${MODERN_PLAIN_INPUTS}
 
-  protected readonly sizeCss = computed(() => {
-    const s = this.size();
-    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
-  });
+${MODERN_SIZE_CSS}
   protected readonly strokeCss = computed(() => this.strokeWidth() ?? ${c}StrokeFor(this.size()));
   protected readonly href = computed(() => {
     this.sprite.ensure();
@@ -421,22 +407,10 @@ import { ${P}SpriteLoader } from './${n}-sprite';
  * <${n}-sprite-icon name="…"></${n}-sprite-icon>   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
  * Configure with provide${P}Sprite({ url, inline }). Same inputs and CSS variables as <${n}-icon>.
  */
-@Component({
-  selector: '${n}-sprite-icon',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href"/></svg>',
-  styles: [
-    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
-    'svg{display:block}'
-  ]
-})
+${decorator({ selector: `${n}-sprite-icon`, template: spriteTemplate('href'), styles: SPRITE_STYLES(n) })}
 export class ${P}SpriteIcon {
   @Input() name!: ${C}Name | ${C}DeprecatedName;
-  @Input() size?: string | number;
-  @Input() color?: string;
-  @Input() strokeWidth?: number | string;
-  @Input() label?: string;
+${CLASSIC_PLAIN_INPUTS}
 
   constructor(private readonly sprite: ${P}SpriteLoader) {}
 
@@ -444,22 +418,13 @@ export class ${P}SpriteIcon {
     this.sprite.ensure();
     return this.sprite.href((${k}_DEPRECATED as Record<string, string>)[this.name] ?? this.name);
   }
-  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
-  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
-  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
-  @HostBinding('style.--${n}-icon-size') get sizeVar(): string | null {
-    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
-  }
-  @HostBinding('style.--${n}-icon-color') get colorVar(): string | null { return this.color || null; }
-  @HostBinding('style.--${n}-icon-stroke-width') get strokeVar(): string | number | null {
-    return this.strokeWidth !== undefined ? this.strokeWidth : ${c}StrokeFor(this.size);
-  }
+${CLASSIC_HOST_BINDINGS(n, c)}
 }
 `
 }
 
 // ------------------------------------------------------------------ readme
-function readme(b: BuildInput, flavour: 'modern' | 'classic', withSprite: boolean): string {
+function readme(b: BuildInput, flavour: Flavour, withSprite: boolean): string {
   const { n, C, P, c, provide } = names(b)
   const first = b.icons[0]
   const range = flavour === 'modern' ? 'Angular 17.1 or newer (signal inputs)' : 'Angular 14 or newer (standalone + @Input)'
@@ -494,14 +459,26 @@ Icons: ${b.icons.length}. \`icon-data.ts\` has the typed name list (\`${C}Name\`
 `
 }
 
-export function angularFiles(b: BuildInput, flavour: 'modern' | 'classic'): Files {
-  const dir = flavour === 'modern' ? 'angular' : 'angular-classic'
+interface FlavourDef {
+  dir: string
+  registry: (b: BuildInput) => string
+  component: (b: BuildInput) => string
+  spriteIcon: (b: BuildInput) => string
+}
+const FLAVOURS: Record<Flavour, FlavourDef> = {
+  modern: { dir: 'angular', registry: registryModern, component: modern, spriteIcon: spriteIconModern },
+  classic: { dir: 'angular-classic', registry: registryClassic, component: classic, spriteIcon: spriteIconClassic }
+}
+
+export function angularFiles(b: BuildInput, flavour: Flavour): Files {
+  const f = FLAVOURS[flavour]
+  const dir = f.dir
   const { n, C, P, reg, provide } = names(b)
   const sprite = b.spriteStrategy ?? b.settings.formats.sprite
   const out: Files = {
     ...iconDataFiles(b, dir),
-    [`${dir}/${n}-icon-registry.ts`]: flavour === 'modern' ? registryModern(b) : registryClassic(b),
-    [`${dir}/${n}-icon.component.ts`]: flavour === 'modern' ? modern(b) : classic(b),
+    [`${dir}/${n}-icon-registry.ts`]: f.registry(b),
+    [`${dir}/${n}-icon.component.ts`]: f.component(b),
     [`${dir}/all-icons.ts`]: allIcons(b),
     [`${dir}/README.md`]: readme(b, flavour, sprite)
   }
@@ -513,7 +490,7 @@ export function angularFiles(b: BuildInput, flavour: 'modern' | 'classic'): File
   ]
   if (sprite) {
     out[`${dir}/${n}-sprite.ts`] = spriteService(b)
-    out[`${dir}/${n}-sprite-icon.component.ts`] = flavour === 'modern' ? spriteIconModern(b) : spriteIconClassic(b)
+    out[`${dir}/${n}-sprite-icon.component.ts`] = f.spriteIcon(b)
     lines.push(`export { ${P}SpriteLoader, provide${P}Sprite } from './${n}-sprite';`, `export type { ${P}SpriteConfig } from './${n}-sprite';`, `export { ${P}SpriteIcon } from './${n}-sprite-icon.component';`)
   }
   out[`${dir}/index.ts`] = lines.join('\n') + '\n'
