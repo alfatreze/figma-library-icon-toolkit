@@ -1,7 +1,7 @@
 import { h, render } from 'preact'
 import { act } from 'preact/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useResizeHandles } from '../src/ui/resize'
+import { lead, useResizeHandles } from '../src/ui/resize'
 
 const LIMITS = { minWidth: 360, minHeight: 460, maxWidth: 1000, maxHeight: 1100 }
 let root: HTMLDivElement
@@ -55,19 +55,42 @@ describe('window resize handles', () => {
     fire(el, 'pointerdown', 1000, 800)
     fire(el, 'pointermove', 1080, 850)
     vi.advanceTimersByTime(5)
-    expect(last()).toEqual([580 + 160, 650 + 160])
+    expect(last()).toEqual([580 + lead(80), 650 + lead(50)])
     fire(el, 'pointerup', 1080, 850, 0)
     expect(last()).toEqual([580, 650])
   })
 
-  it('settles on the exact size when the button is released outside the iframe (no events arrive)', () => {
+  it('settles on the exact size when the pointer comes back over the iframe with no button down (released outside)', () => {
     const el = handle('x')
     fire(el, 'pointerdown', 1000, 800)
     fire(el, 'pointermove', 1100, 800)
     vi.advanceTimersByTime(5)
-    expect(last()[0]).toBe(600 + 160)
-    vi.advanceTimersByTime(800)
+    expect(last()[0]).toBe(600 + lead(100))
+    vi.advanceTimersByTime(5000) // a long pause must not change the window
+    expect(last()[0]).toBe(600 + lead(100))
+    fire(document.body, 'pointermove', 700, 300, 0)
     expect(last()).toEqual([600, 600])
+  })
+
+  it('the lead ramps up instead of jumping: a 1 px move adds a few pixels, never more than the cap', () => {
+    expect(lead(-5)).toBe(0)
+    expect(lead(0)).toBe(0)
+    expect(lead(1)).toBeLessThan(25)
+    expect(lead(10)).toBeGreaterThan(lead(1))
+    expect(lead(500)).toBe(96)
+  })
+
+  it('a pause in the middle of a drag keeps the size, and moving on continues from it', () => {
+    const el = handle('both')
+    fire(el, 'pointerdown', 1000, 800)
+    fire(el, 'pointermove', 1060, 800)
+    vi.advanceTimersByTime(5)
+    const before = last()
+    vi.advanceTimersByTime(5000)
+    expect(last()).toEqual(before)
+    fire(el, 'pointermove', 1070, 800)
+    vi.advanceTimersByTime(5)
+    expect(last()[0]).toBe(570 + lead(70))
   })
 
   it('never asks for more than the maximum, with or without the lead', () => {
@@ -84,7 +107,7 @@ describe('window resize handles', () => {
     fire(y, 'pointermove', 1300, 850)
     vi.advanceTimersByTime(5)
     expect(last()[0]).toBe(500)
-    expect(last()[1]).toBe(650 + 160)
+    expect(last()[1]).toBe(650 + lead(50))
   })
 
   it('a plain click without movement changes nothing', () => {

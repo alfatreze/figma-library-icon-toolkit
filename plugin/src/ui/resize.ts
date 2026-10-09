@@ -21,12 +21,15 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * if the button is released outside the iframe.
  *
  * Expanding: the pointer leaves the iframe on the first outward pixel, before Figma has grown the window, and the iframe receives
- * no pointer events outside itself. So while the drag grows the window it stays `LEAD` px ahead of the pointer (the pointer is
- * still inside the iframe), and the exact size is applied when the drag ends, or after `IDLE` ms without events (the button was
- * released outside the iframe). Shrinking needs no lead: the pointer stays inside.
+ * no pointer events outside itself. So while the drag grows the window it stays a little ahead of the pointer (the pointer is
+ * still inside the iframe). The lead ramps up with the distance dragged (`lead`), so the window never jumps: a 1 px move adds
+ * about 18 px, never more than `LEAD_MAX`. The exact size is applied when the drag ends; when the button is released outside the
+ * iframe no event arrives, so it is applied as soon as the pointer is back over the iframe without a button pressed.
+ * Shrinking needs no lead: the pointer stays inside.
  */
-const LEAD = 160
-const IDLE = 700
+const LEAD_MAX = 96
+const LEAD_BASE = 16
+export const lead = (delta: number): number => (delta > 0 ? Math.min(LEAD_MAX, LEAD_BASE + 2 * delta) : 0)
 export function useResizeHandles(onSize: (width: number, height: number) => void, limits: Limits): void {
   useEffect(() => {
     const cleanups: (() => void)[] = []
@@ -47,7 +50,6 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
       let pending: { w: number; h: number } | null = null
       /** the size the pointer is asking for (without the lead) */
       let target: { w: number; h: number } | null = null
-      let idle = 0
       let raf = 0
 
       const flush = () => {
@@ -67,8 +69,6 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
       const end = (e?: PointerEvent) => {
         if (!start) return
         start = null
-        if (idle) clearTimeout(idle)
-        idle = 0
         settle()
         target = null
         if (e) {
@@ -99,21 +99,24 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
         target = { w, h }
         // growing: stay ahead of the pointer (never past the maximum)
         pending = {
-          w: dir !== 'y' && dx > 0 ? Math.min(limits.maxWidth, w + LEAD) : w,
-          h: dir !== 'x' && dy > 0 ? Math.min(limits.maxHeight, h + LEAD) : h
+          w: dir !== 'y' ? Math.min(limits.maxWidth, w + lead(dx)) : w,
+          h: dir !== 'x' ? Math.min(limits.maxHeight, h + lead(dy)) : h
         }
         if (!raf) raf = requestAnimationFrame(flush)
-        // no events for a moment: the button was probably released outside the iframe, so settle on the exact size
-        if (idle) clearTimeout(idle)
-        idle = window.setTimeout(settle, IDLE)
       })
       el.addEventListener('pointerup', end)
       el.addEventListener('pointercancel', end)
       el.addEventListener('lostpointercapture', () => end())
 
+      // released outside the iframe: the next event over the iframe has no button down, and ends the drag
+      const back = (e: PointerEvent) => {
+        if (start && e.buttons === 0) end()
+      }
+      document.addEventListener('pointermove', back)
+
       cleanups.push(() => {
         if (raf) cancelAnimationFrame(raf)
-        if (idle) clearTimeout(idle)
+        document.removeEventListener('pointermove', back)
         el.remove()
       })
     }
