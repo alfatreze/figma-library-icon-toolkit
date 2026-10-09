@@ -1,6 +1,11 @@
-import { Button, Checkbox, Dropdown, SegmentedControl, Textbox, TextboxMultiline, Toggle } from '@create-figma-plugin/ui'
+import { Button, Checkbox, Dropdown, Textbox, TextboxMultiline, Toggle } from '@create-figma-plugin/ui'
+import { FormatCards } from './components/FormatCards'
+import { Segmented } from './components/Segmented'
+import { TabBar } from './components/TabBar'
+import { OverviewRow } from './overview'
 import { Dialog } from './Dialog'
-import { ComponentChildren, h } from 'preact'
+import { ComponentChildren, Fragment, h } from 'preact'
+import { useState } from 'preact/hooks'
 import { cleanNamespace } from '../core/naming'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
 import { suggestMapping, TOKEN_MODES, tokenPreview } from '../core/tokens'
@@ -34,7 +39,18 @@ const num = (v: string, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
+export type SettingsTab = 'output' | 'style' | 'scan' | 'team' | 'labs'
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'output', label: 'Output' },
+  { id: 'style', label: 'Style' },
+  { id: 'scan', label: 'Scan' },
+  { id: 'team', label: 'Team' },
+  { id: 'labs', label: 'Labs' }
+]
+
 export interface SettingsExtras {
+  /** per-format file counts and sizes (computed while Settings or Export is open) */
+  overview: OverviewRow[] | null
   exampleVariable: { variable: string; collection?: string }
   /** every distinct Figma variable bound in the last scan */
   scanVariables: { variable: string; collection?: string }[]
@@ -51,7 +67,8 @@ export interface SettingsExtras {
   onTestSync: () => void
 }
 
-export function SettingsPanel({ settings, patch, onClose, extras }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras }) {
+export function SettingsPanel({ settings, patch, onClose, extras, initialTab = 'output' }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras; initialTab?: SettingsTab }) {
+  const [tab, setTab] = useState<SettingsTab>(initialTab)
   const f = settings.formats
   const setFormat = (k: keyof Settings['formats'], v: boolean) => patch({ formats: { ...f, [k]: v } })
   const ns = cleanNamespace(settings.namespace)
@@ -63,9 +80,16 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
           <Button onClick={onClose}>Done</Button>
         </div>
       </div>
+      <TabBar label="Settings sections" tabs={SETTINGS_TABS} value={tab} onChange={setTab} />
       <div class={styles.overlayBody}>
+        {tab === 'output' && (
+          <Fragment>
+            <div class={styles.section}>
+              <span class={styles.sectionTitle}>What to export</span>
+              <FormatCards formats={f} onToggle={(k, on) => setFormat(k, on)} rows={extras.overview} />
+            </div>
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Library</span>
+          <span class={styles.sectionTitle}>Package</span>
           <Field
             label="Namespace"
             info={{
@@ -82,66 +106,6 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
           <Field label="ZIP name" info={{ title: 'ZIP name', body: <span>File name of the downloaded ZIP. Leave empty to use <code>{ns}-icons.zip</code>.</span> }}>
             <Textbox value={settings.zipName} onValueInput={(v) => patch({ zipName: v })} placeholder={`${ns}-icons`} />
           </Field>
-          <Field
-            label="Library size"
-            info={{
-              title: 'Library size (grid)',
-              body: (
-                <span>
-                  The icon box size used to judge consistency. <strong>Auto-detect</strong> uses the most common frame size in the scan (e.g. 24×24) and flags icons that differ. Choose <strong>Manual</strong> to enforce a size such as 20×20.
-                </span>
-              )
-            }}
-          >
-            <SegmentedControl
-              value={settings.libSizeMode}
-              onValueChange={(v) => patch({ libSizeMode: v as 'auto' | 'manual' })}
-              options={[{ value: 'auto', children: 'Auto-detect' }, { value: 'manual', children: 'Manual' }]}
-            />
-          </Field>
-          {settings.libSizeMode === 'manual' && (
-            <Field label="Width × Height">
-              <div class={styles.fieldRow}>
-                <Textbox value={String(settings.libWidth)} onValueInput={(v) => patch({ libWidth: num(v, 24) })} />
-                <Textbox value={String(settings.libHeight)} onValueInput={(v) => patch({ libHeight: num(v, 24) })} />
-              </div>
-            </Field>
-          )}
-        </div>
-
-        <div class={styles.section}>
-          <span class={styles.sectionTitle}>Categories</span>
-          <Field
-            label="Category from"
-            info={{
-              title: 'Where categories come from',
-              body: (
-                <span>
-                  Groups icons using how your Figma file is organised.
-                  <ul class={styles.tipList}>
-                    <li><strong>Auto</strong>: layer-name path (<code>Accessibility/Libras</code>), else the Section, else the parent frame, else the page.</li>
-                    <li><strong>Name path</strong>: only the folders in the layer name.</li>
-                    <li><strong>Section / Frame / Page</strong>: only that level.</li>
-                    <li><strong>None</strong>: no categories.</li>
-                  </ul>
-                  Default frame names like “Frame 12” are ignored. Categories appear in the list, the test page filter, <code>icons.json</code> and (optionally) split the export folders.
-                </span>
-              )
-            }}
-          >
-            <Dropdown
-              value={settings.categorySource}
-              onValueChange={(v) => patch({ categorySource: v as CategorySource })}
-              options={[
-                { value: 'auto', text: 'Auto (name → section → frame → page)' },
-                { value: 'path', text: 'Layer-name path (category/name)' },
-                { value: 'section', text: 'Section' },
-                { value: 'frame', text: 'Parent frame' },
-                { value: 'page', text: 'Page' },
-                { value: 'none', text: 'None' }
-              ]}
-            />
-          </Field>
           <Row
             info={{
               title: 'Split output by category',
@@ -157,123 +121,11 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             </Toggle>
           </Row>
         </div>
+          </Fragment>
+        )}
 
-        <div class={styles.section}>
-          <span class={styles.sectionTitle}>Scanning & audit</span>
-          <Field
-            label="Scan mode"
-            info={{
-              title: 'Scan mode',
-              body: (
-                <span>
-                  What counts as an icon. <strong>Auto</strong>: components, instances and small frames made of vectors. <strong>Components only</strong>: ignore plain frames. <strong>Frames only</strong>: treat frames (and instances) as icons. <strong>Include loose layers</strong>: also lone vectors/shapes (names are usually unreliable).
-                </span>
-              )
-            }}
-          >
-            <Dropdown
-              value={settings.scanMode}
-              onValueChange={(v) => patch({ scanMode: v as ScanMode })}
-              options={[
-                { value: 'auto', text: 'Auto (components, instances, frames)' },
-                { value: 'components', text: 'Components only' },
-                { value: 'frames', text: 'Frames only' },
-                { value: 'loose', text: 'Include loose layers' }
-              ]}
-            />
-          </Field>
-          <Field label="Max icon size" info={{ title: 'Max icon size', body: <span>Layers larger than this (in px, either side) are not treated as icons and show up under <em>Skipped</em>. Raise it for big illustrations.</span> }}>
-            <Textbox value={String(settings.maxIconSize)} onValueInput={(v) => patch({ maxIconSize: num(v, 128) })} />
-          </Field>
-          <Field
-            label="Strictness"
-            info={{
-              title: 'Strictness',
-              body: (
-                <span>
-                  How hard the audit judges structure. <strong>Lenient</strong>: only unexportable things (text, images, empty) block export. <strong>Standard</strong>: default Figma names also block. <strong>Strict</strong>: design-system grade; loose frames, unbound colours and missing tags escalate to warnings or errors. Blocked icons are skipped on export.
-                </span>
-              )
-            }}
-          >
-            <SegmentedControl
-              value={settings.profile}
-              onValueChange={(v) => patch({ profile: v as Settings['profile'] })}
-              options={[{ value: 'lenient', children: 'Lenient' }, { value: 'standard', children: 'Standard' }, { value: 'strict', children: 'Strict' }]}
-            />
-          </Field>
-          <Field
-            label="Vector layer name"
-            info={{
-              title: 'Standard vector layer name',
-              body: (
-                <span>
-                  Figma keeps fill/stroke overrides when you swap an instance to another icon only if the layers inside have <strong>matching names</strong>, so every icon should name its vector layer the same.
-                  <ul class={styles.tipList}>
-                    <li><strong>Detect from file (recommended)</strong>: uses the name most of your icons already use (e.g. <code>Vector</code>) and flags the exceptions (<code>vector</code>, <code>Union</code>, <code>Path 3</code>…). The scan shows what it found.</li>
-                    <li><strong>Fixed</strong>: always use the name below.</li>
-                  </ul>
-                  Icons with several vector layers get <code>Name</code>, <code>Name 2</code>… ordered by colour then z-order. Whether Figma compares names case-sensitively is not documented, so case-only differences are flagged and labelled as such.
-                </span>
-              )
-            }}
-          >
-            <SegmentedControl
-              value={settings.leafNameMode}
-              onValueChange={(v) => patch({ leafNameMode: v as 'auto' | 'fixed' })}
-              options={[{ value: 'auto', children: 'Detect from file' }, { value: 'fixed', children: 'Fixed' }]}
-            />
-          </Field>
-          <Field label={settings.leafNameMode === 'auto' ? 'Fallback name' : 'Name'}>
-            <Textbox value={settings.leafName} onValueInput={(v) => patch({ leafName: v })} placeholder="Vector" />
-          </Field>
-          <Field
-            label="Duplicate names"
-            info={{
-              title: 'Duplicate names',
-              body: (
-                <span>
-                  What happens when two icons resolve to the same name (for example <code>home</code> in two folders).
-                  <ul class={styles.tipList}>
-                    <li><strong>Block</strong> (default): both are blocked until you rename one. Safest: names stay under your control.</li>
-                    <li><strong>Prefix with category</strong>: <code>arrows/home</code> and <code>nav/home</code> become <code>arrows-home</code> and <code>nav-home</code>. Still-identical names stay blocked.</li>
-                    <li><strong>Number them</strong>: <code>home</code>, <code>home-2</code>, <code>home-3</code>, ordered by component key. The numbers can change when icons are added or removed, so each affected icon gets a note.</li>
-                  </ul>
-                </span>
-              )
-            }}
-          >
-            <SegmentedControl
-              value={settings.duplicateNames}
-              onValueChange={(v) => patch({ duplicateNames: v as Settings['duplicateNames'] })}
-              options={[{ value: 'block', children: 'Block' }, { value: 'category', children: 'Category' }, { value: 'suffix', children: 'Number' }]}
-            />
-          </Field>
-          <Row info={{ title: 'Share artwork for intentional duplicates', body: <span>In <em>Issues</em> you can mark a group of components with identical artwork as <strong>intentional</strong> (two names for one drawing, like <code>close</code> and <code>dismiss</code>). With this on, the export stores the drawing once: the shortest name owns it, the others become aliases (<code>aliasOf</code> in <code>icons.json</code>, a <code>&lt;use&gt;</code> in the sprite, a shared object in the Angular/React data). Names keep working. Only icons whose drawing <em>and</em> colours are identical are shared.</span> }}>
-            <Toggle value={settings.aliasDuplicates} onValueChange={(v) => patch({ aliasDuplicates: v })}>Share artwork for intentional duplicates</Toggle>
-          </Row>
-          <Field
-            label="Ignore folders"
-            info={{ title: 'Ignore folders', body: <span>Comma-separated name segments dropped from icon names and categories. With <code>icon</code> ignored, <code>icon/Audio descricao</code> becomes <code>audio-descricao</code> instead of <code>icon-audio-descricao</code>.</span> }}
-          >
-            <Textbox
-              value={settings.ignoreSegments.join(', ')}
-              onValueInput={(v) => patch({ ignoreSegments: v.split(',').map((s) => s.trim()).filter(Boolean) })}
-              placeholder="icon, icons"
-            />
-          </Field>
-          <Field
-            label="Ignore variant values"
-            info={{ title: 'Ignore variant values', body: <span>Variants become separate icons named <code>&lt;set&gt;-&lt;values&gt;</code> (e.g. <code>home-filled</code>). Values listed here (like <code>default</code>) are left out so the default variant is just <code>home</code>.</span> }}
-          >
-            <Textbox
-              value={settings.ignoreVariantValues.join(', ')}
-              onValueInput={(v) => patch({ ignoreVariantValues: v.split(',').map((s) => s.trim()).filter(Boolean) })}
-              placeholder="default"
-            />
-          </Field>
-        </div>
-
+        {tab === 'style' && (
+          <Fragment>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Colour & paths</span>
           <Row
@@ -301,7 +153,6 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             />
           </Field>
         </div>
-
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Design tokens (CSS variable names)</span>
           <Field
@@ -351,7 +202,6 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             Preview: <code>{extras.exampleVariable.variable}</code> → <code>{tokenPreview(extras.exampleVariable, settings.tokenNaming)}</code>
           </div>
         </div>
-
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Strokes</span>
           <Field
@@ -401,17 +251,196 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             </Toggle>
           </Row>
         </div>
+          </Fragment>
+        )}
 
+        {tab === 'scan' && (
+          <Fragment>
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Support</span>
-          <div class={styles.fieldRow}>
-            <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics</Button>
-            <InfoTip title="Diagnostics">
-              <span>Copies a short report for bug reports: Figma mode and API version, your settings (the sync token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
-            </InfoTip>
-          </div>
+          <span class={styles.sectionTitle}>What counts as an icon</span>
+          <Row info={{ title: 'Only icons used in designs', body: <span>Finds the icons that are actually <em>placed</em> as instances in your designs, including components from a linked library, instead of every icon that exists. Each icon is listed once with how often it is used, which sizes are used and which overrides designers applied. Use it on an app file to export just the subset in use.</span> }}>
+            <Toggle value={settings.usageOnly} onValueChange={(v) => patch({ usageOnly: v })}>Only icons used in designs (instances)</Toggle>
+          </Row>
+          <Field
+            label="Scan mode"
+            info={{
+              title: 'Scan mode',
+              body: (
+                <span>
+                  What counts as an icon. <strong>Auto</strong>: components, instances and small frames made of vectors. <strong>Components only</strong>: ignore plain frames. <strong>Frames only</strong>: treat frames (and instances) as icons. <strong>Include loose layers</strong>: also lone vectors/shapes (names are usually unreliable).
+                </span>
+              )
+            }}
+          >
+            <Dropdown
+              value={settings.scanMode}
+              onValueChange={(v) => patch({ scanMode: v as ScanMode })}
+              options={[
+                { value: 'auto', text: 'Auto (components, instances, frames)' },
+                { value: 'components', text: 'Components only' },
+                { value: 'frames', text: 'Frames only' },
+                { value: 'loose', text: 'Include loose layers' }
+              ]}
+            />
+          </Field>
+          <Field label="Max icon size" info={{ title: 'Max icon size', body: <span>Layers larger than this (in px, either side) are not treated as icons and show up under <em>Skipped</em>. Raise it for big illustrations.</span> }}>
+            <Textbox value={String(settings.maxIconSize)} onValueInput={(v) => patch({ maxIconSize: num(v, 128) })} />
+          </Field>
+          <Field
+            label="Strictness"
+            info={{
+              title: 'Strictness',
+              body: (
+                <span>
+                  How hard the audit judges structure. <strong>Lenient</strong>: only unexportable things (text, images, empty) block export. <strong>Standard</strong>: default Figma names also block. <strong>Strict</strong>: design-system grade; loose frames, unbound colours and missing tags escalate to warnings or errors. Blocked icons are skipped on export.
+                </span>
+              )
+            }}
+          >
+            <Segmented
+              value={settings.profile}
+              onValueChange={(v) => patch({ profile: v as Settings['profile'] })}
+              options={[{ value: 'lenient', children: 'Lenient' }, { value: 'standard', children: 'Standard' }, { value: 'strict', children: 'Strict' }]}
+            />
+          </Field>
+          <Field
+            label="Vector layer name"
+            info={{
+              title: 'Standard vector layer name',
+              body: (
+                <span>
+                  Figma keeps fill/stroke overrides when you swap an instance to another icon only if the layers inside have <strong>matching names</strong>, so every icon should name its vector layer the same.
+                  <ul class={styles.tipList}>
+                    <li><strong>Detect from file (recommended)</strong>: uses the name most of your icons already use (e.g. <code>Vector</code>) and flags the exceptions (<code>vector</code>, <code>Union</code>, <code>Path 3</code>…). The scan shows what it found.</li>
+                    <li><strong>Fixed</strong>: always use the name below.</li>
+                  </ul>
+                  Icons with several vector layers get <code>Name</code>, <code>Name 2</code>… ordered by colour then z-order. Whether Figma compares names case-sensitively is not documented, so case-only differences are flagged and labelled as such.
+                </span>
+              )
+            }}
+          >
+            <Segmented
+              value={settings.leafNameMode}
+              onValueChange={(v) => patch({ leafNameMode: v as 'auto' | 'fixed' })}
+              options={[{ value: 'auto', children: 'Detect from file' }, { value: 'fixed', children: 'Fixed' }]}
+            />
+          </Field>
+          <Field label={settings.leafNameMode === 'auto' ? 'Fallback name' : 'Name'}>
+            <Textbox value={settings.leafName} onValueInput={(v) => patch({ leafName: v })} placeholder="Vector" />
+          </Field>
+          <Field
+            label="Duplicate names"
+            info={{
+              title: 'Duplicate names',
+              body: (
+                <span>
+                  What happens when two icons resolve to the same name (for example <code>home</code> in two folders).
+                  <ul class={styles.tipList}>
+                    <li><strong>Block</strong> (default): both are blocked until you rename one. Safest: names stay under your control.</li>
+                    <li><strong>Prefix with category</strong>: <code>arrows/home</code> and <code>nav/home</code> become <code>arrows-home</code> and <code>nav-home</code>. Still-identical names stay blocked.</li>
+                    <li><strong>Number them</strong>: <code>home</code>, <code>home-2</code>, <code>home-3</code>, ordered by component key. The numbers can change when icons are added or removed, so each affected icon gets a note.</li>
+                  </ul>
+                </span>
+              )
+            }}
+          >
+            <Segmented
+              value={settings.duplicateNames}
+              onValueChange={(v) => patch({ duplicateNames: v as Settings['duplicateNames'] })}
+              options={[{ value: 'block', children: 'Block' }, { value: 'category', children: 'Category' }, { value: 'suffix', children: 'Number' }]}
+            />
+          </Field>
+          <Row info={{ title: 'Share artwork for intentional duplicates', body: <span>In <em>Issues</em> you can mark a group of components with identical artwork as <strong>intentional</strong> (two names for one drawing, like <code>close</code> and <code>dismiss</code>). With this on, the export stores the drawing once: the shortest name owns it, the others become aliases (<code>aliasOf</code> in <code>icons.json</code>, a <code>&lt;use&gt;</code> in the sprite, a shared object in the Angular/React data). Names keep working. Only icons whose drawing <em>and</em> colours are identical are shared.</span> }}>
+            <Toggle value={settings.aliasDuplicates} onValueChange={(v) => patch({ aliasDuplicates: v })}>Share artwork for intentional duplicates</Toggle>
+          </Row>
+          <Field
+            label="Ignore folders"
+            info={{ title: 'Ignore folders', body: <span>Comma-separated name segments dropped from icon names and categories. With <code>icon</code> ignored, <code>icon/Audio descricao</code> becomes <code>audio-descricao</code> instead of <code>icon-audio-descricao</code>.</span> }}
+          >
+            <Textbox
+              value={settings.ignoreSegments.join(', ')}
+              onValueInput={(v) => patch({ ignoreSegments: v.split(',').map((s) => s.trim()).filter(Boolean) })}
+              placeholder="icon, icons"
+            />
+          </Field>
+          <Field
+            label="Ignore variant values"
+            info={{ title: 'Ignore variant values', body: <span>Variants become separate icons named <code>&lt;set&gt;-&lt;values&gt;</code> (e.g. <code>home-filled</code>). Values listed here (like <code>default</code>) are left out so the default variant is just <code>home</code>.</span> }}
+          >
+            <Textbox
+              value={settings.ignoreVariantValues.join(', ')}
+              onValueInput={(v) => patch({ ignoreVariantValues: v.split(',').map((s) => s.trim()).filter(Boolean) })}
+              placeholder="default"
+            />
+          </Field>
         </div>
+        <div class={styles.section}>
+          <span class={styles.sectionTitle}>Grid size</span>
+          <Field
+            label="Library size"
+            info={{
+              title: 'Library size (grid)',
+              body: (
+                <span>
+                  The icon box size used to judge consistency. <strong>Auto-detect</strong> uses the most common frame size in the scan (e.g. 24×24) and flags icons that differ. Choose <strong>Manual</strong> to enforce a size such as 20×20.
+                </span>
+              )
+            }}
+          >
+            <Segmented
+              value={settings.libSizeMode}
+              onValueChange={(v) => patch({ libSizeMode: v as 'auto' | 'manual' })}
+              options={[{ value: 'auto', children: 'Auto-detect' }, { value: 'manual', children: 'Manual' }]}
+            />
+          </Field>
+          {settings.libSizeMode === 'manual' && (
+            <Field label="Width × Height">
+              <div class={styles.fieldRow}>
+                <Textbox value={String(settings.libWidth)} onValueInput={(v) => patch({ libWidth: num(v, 24) })} />
+                <Textbox value={String(settings.libHeight)} onValueInput={(v) => patch({ libHeight: num(v, 24) })} />
+              </div>
+            </Field>
+          )}
+        </div>
+        <div class={styles.section}>
+          <span class={styles.sectionTitle}>Categories</span>
+          <Field
+            label="Category from"
+            info={{
+              title: 'Where categories come from',
+              body: (
+                <span>
+                  Groups icons using how your Figma file is organised.
+                  <ul class={styles.tipList}>
+                    <li><strong>Auto</strong>: layer-name path (<code>Accessibility/Libras</code>), else the Section, else the parent frame, else the page.</li>
+                    <li><strong>Name path</strong>: only the folders in the layer name.</li>
+                    <li><strong>Section / Frame / Page</strong>: only that level.</li>
+                    <li><strong>None</strong>: no categories.</li>
+                  </ul>
+                  Default frame names like “Frame 12” are ignored. Categories appear in the list, the test page filter, <code>icons.json</code> and (optionally) split the export folders.
+                </span>
+              )
+            }}
+          >
+            <Dropdown
+              value={settings.categorySource}
+              onValueChange={(v) => patch({ categorySource: v as CategorySource })}
+              options={[
+                { value: 'auto', text: 'Auto (name → section → frame → page)' },
+                { value: 'path', text: 'Layer-name path (category/name)' },
+                { value: 'section', text: 'Section' },
+                { value: 'frame', text: 'Parent frame' },
+                { value: 'page', text: 'Page' },
+                { value: 'none', text: 'None' }
+              ]}
+            />
+          </Field>
+        </div>
+          </Fragment>
+        )}
 
+        {tab === 'team' && (
+          <Fragment>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Team config</span>
           <div class={styles.fieldRow}>
@@ -444,7 +473,11 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
           )}
           {extras.configMessage && <div class={styles.muted}>{extras.configMessage}</div>}
         </div>
+          </Fragment>
+        )}
 
+        {tab === 'labs' && (
+          <Fragment>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Labs <span class={styles.labsTag}>experimental</span></span>
           <Row
@@ -534,38 +567,18 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             </div>
           )}
         </div>
-
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Export formats</span>
-          <Row info={{ title: 'SVG files', body: <span>One file per icon. CSS variables only work when the SVG is inlined in the page, not when used as an <code>&lt;img&gt;</code>.</span> }}>
-            <Checkbox value={f.svg} onValueChange={(v) => setFormat('svg', v)}>SVG files</Checkbox>
-          </Row>
-          <Row info={{ title: 'SVG sprite', body: <span>All icons in one file as <code>&lt;symbol&gt;</code>, used with <code>&lt;use href&gt;</code>. Supports multi-colour and live stroke width through CSS variables. Recommended for the web. Loading it from a separate file requires a server (not <code>file://</code>).</span> }}>
-            <Checkbox value={f.sprite} onValueChange={(v) => setFormat('sprite', v)}>SVG sprite (&lt;use&gt;)</Checkbox>
-          </Row>
-          <Row info={{ title: 'HTML', body: <span>Base CSS (sizes, <code>--{ns}-icon-*</code> variables) and a self-contained, searchable <code>index.html</code> preview with category grouping, colour/size/stroke playground and copy-able snippets.</span> }}>
-            <Checkbox value={f.html} onValueChange={(v) => setFormat('html', v)}>HTML: base CSS + searchable test page</Checkbox>
-          </Row>
-          <Row info={{ title: 'CSS mask classes', body: <span>An empty <code>&lt;i&gt;</code> is painted with <code>currentColor</code> and the icon is used as a stencil. Neat class-based markup, but single-colour only, no stroke width control, and invisible to assistive tech. Instance overrides of colour/stroke may be flagged for this format.</span> }}>
-            <Checkbox value={f.mask} onValueChange={(v) => setFormat('mask', v)}>HTML: CSS mask classes (single-colour only)</Checkbox>
-          </Row>
-          <Row info={{ title: 'Angular 17.1+', body: <span>Standalone component with signal inputs (<code>input()</code>), typed icon names and a data file. No FontAwesome or other dependency.</span> }}>
-            <Checkbox value={f.angularModern} onValueChange={(v) => setFormat('angularModern', v)}>Angular 17.1+ (signals)</Checkbox>
-          </Row>
-          <Row info={{ title: 'Angular 14+', body: <span>The same component written with <code>@Input()</code> for projects on Angular 14 to 16 (also fine on newer versions).</span> }}>
-            <Checkbox value={f.angularClassic} onValueChange={(v) => setFormat('angularClassic', v)}>Angular 14+ (classic)</Checkbox>
-          </Row>
-          <Row info={{ title: 'React', body: <span>A typed <code>&lt;{`${ns[0].toUpperCase()}${ns.slice(1)}`}Icon name="…" /&gt;</code> component (React 17+, no dependencies) using the same data file as Angular. Props: size, color, strokeWidth, label.</span> }}>
-            <Checkbox value={f.react} onValueChange={(v) => setFormat('react', v)}>React component</Checkbox>
-          </Row>
-          <Row info={{ title: 'Web Component', body: <span>A framework-free custom element (<code>&lt;{ns}-icon name="…"&gt;</code>) as a plain ES module with typings. Use it in plain HTML, Vue, Svelte, Lit or anywhere else. It contains every icon in one file.</span> }}>
-            <Checkbox value={f.webComponent} onValueChange={(v) => setFormat('webComponent', v)}>Web Component (framework-free)</Checkbox>
-          </Row>
-          <Row info={{ title: 'Code Connect', body: <span>Template files that tell Dev Mode and the Figma MCP server which code each icon component maps to. Needs the Figma file URL (Team config) and, to publish, an Organization or Enterprise plan. Only components get a mapping (instances, frames and loose layers have no component id).</span> }}>
-            <Checkbox value={f.codeConnect} onValueChange={(v) => setFormat('codeConnect', v)}>Code Connect templates</Checkbox>
-          </Row>
+          <span class={styles.sectionTitle}>Support</span>
+          <div class={styles.fieldRow}>
+            <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics</Button>
+            <InfoTip title="Diagnostics">
+              <span>Copies a short report for bug reports: Figma mode and API version, your settings (the sync token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
+            </InfoTip>
+          </div>
         </div>
-        <div class={styles.muted}>Settings are saved on this computer. Nothing is ever written to your Figma file.</div>
+          </Fragment>
+        )}
+        <div class={styles.muted}>Saved on this computer. Nothing is written to your Figma file.</div>
       </div>
     </Dialog>
   )

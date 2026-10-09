@@ -24,6 +24,9 @@ import {
 } from './ui/icons'
 import { computeOverview, kb } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
+import { IconPreview, PreviewBg, bgClass } from './ui/IconPreview'
+import { Segmented } from './ui/components/Segmented'
+import { TabBar } from './ui/components/TabBar'
 import { InspectPanel } from './ui/Inspect'
 import { countChanges, filterIcons, groupIssues, IssueGroup, isAlert, isBlocked, presentChangeKinds } from './ui/selectors'
 import { useBaselines } from './ui/hooks/useBaselines'
@@ -32,7 +35,7 @@ import { useSync } from './ui/hooks/useSync'
 import { copyText, cx, download, notify, plural } from './ui/util'
 import { recentLog } from './log'
 import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
-import { SettingsPanel } from './ui/Settings'
+import { SettingsPanel, SettingsTab } from './ui/Settings'
 import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
 import {
   ApplyFixRequest, ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixActionId, FixCandidate, FixesAppliedHandler, FixResult, FixResultHandler,
@@ -87,6 +90,13 @@ function Plugin() {
   const [cursor, setCursor] = useState<Record<string, number>>({})
   const [showNotes, setShowNotes] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('output')
+  const [previewSize, setPreviewSize] = useState<'S' | 'M' | 'L'>('M')
+  const [previewBg, setPreviewBg] = useState<PreviewBg>('auto')
+  const [hover, setHover] = useState<{ icon: Icon; rect: DOMRect } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverHide = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [scannedAt, setScannedAt] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOverrides, setOutlineOverrides] = useState<Record<string, boolean>>({})
   const [changeFilter, setChangeFilter] = useState<ChangeKind | null>(null)
@@ -118,6 +128,9 @@ function Plugin() {
     setLimit(PAGE_SIZE)
   }
   const { raws, summary, scanning, progress, phase, scanError } = useScan(resetForScan)
+  useEffect(() => {
+    if (summary && !scanning) setScannedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+  }, [summary, scanning])
 
   useEffect(() => {
     const offs = [
@@ -173,10 +186,10 @@ function Plugin() {
   const fmtKeys = Object.keys(settings.formats) as (keyof Settings['formats'])[]
   const enabledFormats = fmtKeys.filter((k) => settings.formats[k])
   const overview = useMemo(
-    () => (exportOpen && exportable.length ? computeOverview(exportable, settings, g, processed.tier) : null),
+    () => ((exportOpen || showSettings) && exportable.length ? computeOverview(exportable, settings, g, processed.tier) : null),
     // computeOverview builds every format regardless of the format toggles, so toggling a format must not rebuild it
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [exportOpen, exportable, JSON.stringify(SHARED_KEYS.filter((k) => k !== 'formats').map((k) => settings[k])), g, processed.tier]
+    [exportOpen, showSettings, exportable, JSON.stringify(SHARED_KEYS.filter((k) => k !== 'formats').map((k) => settings[k])), g, processed.tier]
   )
 
   // ---- actions -------------------------------------------------------------
@@ -226,16 +239,6 @@ function Plugin() {
       else n[i.key] = value
       return n
     })
-  /** roving tabindex: arrow keys / Home / End move between tabs, as in the WAI-ARIA tabs pattern */
-  const onTabKey = (e: KeyboardEvent) => {
-    const order: Tab[] = ['icons', 'issues', 'skipped']
-    const i = order.indexOf(tab)
-    const next = e.key === 'ArrowRight' ? order[(i + 1) % 3] : e.key === 'ArrowLeft' ? order[(i + 2) % 3] : e.key === 'Home' ? order[0] : e.key === 'End' ? order[2] : null
-    if (!next) return
-    e.preventDefault()
-    setTab(next)
-    requestAnimationFrame(() => (document.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement | null)?.focus())
-  }
   const showInList = (next: { status?: Status; rule?: string | null }) => {
     setStatus(next.status ?? 'all')
     setRuleFilter(next.rule ?? null)
@@ -328,21 +331,40 @@ function Plugin() {
   const scope = settings.scanScope
   const canScan = !scanning && !(scope === 'selection' && noSelection)
   const scopeWord = scope === 'selection' ? 'selection' : scope === 'page' ? 'page' : 'document'
-  const scanLabel = `${hasResults || summary ? 'Rescan' : 'Scan'} ${scopeWord}${settings.usageOnly ? ' (icons in use)' : ''}`
-  const scopeHint =
+  const scanLabel = hasResults || summary ? 'Scan again' : `Scan ${scopeWord}`
+  const interactive = hasResults && !scanning
+  // one line, one fact: what is selected before a scan; when and how healthy after it (counts live on the tabs and chips)
+  const firstRunStatus =
     scope === 'selection'
       ? noSelection
-        ? 'Select layers in Figma to scan, or choose Page / Document.'
-        : `${plural(selection.count, 'layer')} selected${selection.names.length ? `: ${selection.names.slice(0, 2).join(', ')}${selection.count > 2 ? '…' : ''}` : ''}`
+        ? 'Nothing selected'
+        : `${plural(selection.count, 'layer')} selected`
       : scope === 'page'
-        ? 'Scans everything on the current page.'
-        : 'Scans every page in this file. This can take a while.'
+        ? 'This page'
+        : 'All pages in this file'
   const tierLabel = `${processed.tier} ${TIER_LABEL[processed.tier]}`
+  const health = processed.tier === 'T5' || processed.tier === 'T4' ? 'good' : processed.tier === 'T3' ? 'fair' : 'needs work'
   const skippedCount = summary?.skipped.length ?? 0
   const catIds = new Set(categories.map((c) => c.id))
 
+  const hidePreview = (now = false) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    if (hoverHide.current) clearTimeout(hoverHide.current)
+    if (now) setHover(null)
+    else hoverHide.current = setTimeout(() => setHover(null), 120)
+  }
+  const showPreview = (icon: Icon, el: HTMLElement) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    if (hoverHide.current) clearTimeout(hoverHide.current)
+    hoverTimer.current = setTimeout(() => setHover({ icon, rect: el.getBoundingClientRect() }), 300)
+  }
+
   const rowProps = (i: Icon) => ({
     icon: i,
+    size: previewSize,
+    bg: previewBg,
+    onPreview: showPreview,
+    onPreviewEnd: () => hidePreview(),
     included: !off.has(i.key),
     expanded: open.has(i.key),
     onInclude: (v: boolean) => setIncluded([i.key], v),
@@ -415,117 +437,111 @@ function Plugin() {
       </div>
       <div class={styles.header}>
         <div class={styles.scanRow}>
-          <div class={styles.scopeRow}>
-            <SegmentedControl
-              value={scope}
-              onValueChange={(v) => patch({ scanScope: v as ScanScope })}
-              options={[{ value: 'selection', children: 'Selection' }, { value: 'page', children: 'Page' }, { value: 'document', children: 'Document' }]}
-            />
-            <InfoTip title="Scan scope">{SCOPE_INFO}</InfoTip>
-          </div>
-          <span class={styles.grow} />
-          <button class={styles.settingsBtn} onClick={() => setShowSettings(true)} aria-label="Open settings">
-            <CogIcon /> Settings
-          </button>
-        </div>
-        <div class={styles.checkRow}>
-          <Checkbox value={settings.usageOnly} onValueChange={(v) => patch({ usageOnly: v })}>
-            Only icons in use (instances)
-          </Checkbox>
-          <InfoTip title="Only icons in use">{USAGE_INFO}</InfoTip>
-        </div>
-        {scanning ? (
-          <Button fullWidth danger onClick={() => emit<CancelScanHandler>('CANCEL_SCAN')}>
-            Cancel scan
-          </Button>
-        ) : (
-          <Button fullWidth onClick={startScan} disabled={!canScan}>
-            {scanLabel}
-          </Button>
-        )}
-        <div class={styles.scope}>
-          <span>{scanning ? phase : scopeHint}</span>
-          {hasResults && !scanning && (
-            <span title="Highest tier reached by at least 80% of icons · most common icon size">
-              {tierLabel} · {g.width}×{g.height}
-            </span>
+          <Segmented<ScanScope>
+            label="Scan scope"
+            value={scope}
+            onValueChange={(v) => patch({ scanScope: v })}
+            disabled={scanning}
+            options={[
+              { value: 'selection', children: 'Selection', title: 'Only the layers you have selected' },
+              { value: 'page', children: 'Page', title: 'Everything on the current page' },
+              { value: 'document', children: 'Document', title: 'Every page in this file (can take a while)' }
+            ]}
+          />
+          {scanning ? (
+            <Button danger onClick={() => emit<CancelScanHandler>('CANCEL_SCAN')}>Cancel scan</Button>
+          ) : (
+            <Button onClick={startScan} disabled={!canScan} secondary={hasResults || !!summary} title={canScan ? '' : 'Select layers in Figma, or choose Page or Document'}>
+              {scanLabel}
+            </Button>
           )}
+          <button class={styles.iconBtn} onClick={() => { setSettingsTab('output'); setShowSettings(true) }} aria-label="Open settings" title="Settings"><CogIcon /></button>
         </div>
-        {scanning && (
-          <div class={styles.progress}>
-            <div class={styles.progressBar} style={{ width: `${Math.round(progress * 100)}%` }} />
+        {/* fixed height: progress or a long message is drawn inside this row, so nothing below it ever moves */}
+        {scanning ? (
+          <div class={cx(styles.statusRow, styles.statusProgress)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span class={cx(styles.statusDot, styles.statusBusy)} />
+              <span class={styles.statusText}>{phase || 'Reading…'}</span>
+            </div>
+            <div class={styles.progress}><div class={styles.progressBar} style={{ width: `${Math.round(progress * 100)}%` }} /></div>
+          </div>
+        ) : scanError ? (
+          <div class={styles.statusRow} role="alert">
+            <span class={cx(styles.statusDot, styles.statusErr)} />
+            <span class={cx(styles.statusText, styles.sevError)} title={scanError}>{scanError}</span>
+          </div>
+        ) : hasResults || summary ? (
+          <div class={styles.statusRow} title={`Library structure ${tierLabel} · most common icon size ${g.width}×${g.height}`}>
+            <span class={cx(styles.statusDot, actionable.some((x) => x.severity === 'error') ? styles.statusErr : actionable.length ? styles.statusWarn : styles.statusOk)} />
+            <span class={styles.statusText}>{hasResults ? `Scanned ${scannedAt} · Library health ${health}` : `Scanned ${scannedAt}`}{settings.usageOnly ? ' · icons in use only' : ''}</span>
+          </div>
+        ) : (
+          <div class={styles.statusRow}>
+            <span class={styles.statusDot} />
+            <span class={styles.statusText}>{firstRunStatus}</span>
           </div>
         )}
-        {scanError && <div class={cx(styles.pill, styles.pillError)}>{scanError}</div>}
       </div>
 
-      {(hasResults || summary) && (
-        <div class={styles.tabs} role="tablist" aria-label="Results" onKeyDown={onTabKey}>
-          <TabButton active={tab === 'icons'} onClick={() => setTab('icons')} count={icons.length}>Icons</TabButton>
-          <TabButton
-            active={tab === 'issues'}
-            onClick={() => setTab('issues')}
-            count={actionable.length}
-            tone={actionable.some((x) => x.severity === 'error') ? 'error' : actionable.length ? 'warn' : undefined}
-          >
-            Issues
-          </TabButton>
-          <TabButton active={tab === 'skipped'} onClick={() => setTab('skipped')} count={skippedCount}>Skipped</TabButton>
-        </div>
-      )}
+      <TabBar<Tab>
+        label="Results"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'icons', label: 'Icons', badge: icons.length },
+          { id: 'issues', label: 'Issues', badge: summary || hasResults ? actionable.length : '–', tone: actionable.some((x) => x.severity === 'error') ? 'error' : actionable.length ? 'warn' : undefined },
+          { id: 'skipped', label: 'Skipped', badge: summary ? skippedCount : '–' }
+        ]}
+      />
 
       {/* ---------------- Icons ---------------- */}
-      {tab === 'icons' && hasResults && (
+      {tab === 'icons' && (
         <div class={styles.toolbar}>
           <div class={styles.toolbarRow}>
             <div class={styles.grow}>
-              <SearchTextbox value={query} onValueInput={setQuery} placeholder="Search icons" />
+              <SearchTextbox value={query} onValueInput={setQuery} placeholder="Search" disabled={!interactive} />
             </div>
             <div class={styles.seg} role="group" aria-label="View">
-              <button class={cx(styles.iconBtn, view === 'list' && styles.iconBtnActive)} onClick={() => setView('list')} aria-label="List view" title="List"><ListIcon /></button>
-              <button class={cx(styles.iconBtn, view === 'grouped' && styles.iconBtnActive)} onClick={() => setView('grouped')} aria-label="Group by category" title="Group by category" disabled={categories.length === 0}><GroupedIcon /></button>
-              <button class={cx(styles.iconBtn, view === 'grid' && styles.iconBtnActive)} onClick={() => setView('grid')} aria-label="Grid view" title="Grid"><GridIcon /></button>
+              <button class={cx(styles.iconBtn, view === 'list' && styles.iconBtnActive)} onClick={() => setView('list')} aria-label="List view" aria-pressed={view === 'list'} title="List" disabled={!interactive}><ListIcon /></button>
+              <button class={cx(styles.iconBtn, view === 'grouped' && styles.iconBtnActive)} onClick={() => setView('grouped')} aria-label="Group by category" aria-pressed={view === 'grouped'} title="Group by category" disabled={!interactive || categories.length === 0}><GroupedIcon /></button>
+              <button class={cx(styles.iconBtn, view === 'grid' && styles.iconBtnActive)} onClick={() => setView('grid')} aria-label="Grid view" aria-pressed={view === 'grid'} title="Grid" disabled={!interactive}><GridIcon /></button>
+            </div>
+            <Segmented<'S' | 'M' | 'L'>
+              compact
+              label="Preview size"
+              value={previewSize}
+              onValueChange={setPreviewSize}
+              disabled={!interactive || view === 'grid'}
+              options={[{ value: 'S', children: 'S', title: 'Small previews' }, { value: 'M', children: 'M', title: 'Medium previews' }, { value: 'L', children: 'L', title: 'Large previews' }]}
+            />
+          </div>
+          <div class={styles.toolbarRow}>
+            <div class={styles.grow}>
+              <Dropdown
+                value={catFilter || '__all'}
+                disabled={!interactive || categories.length === 0}
+                onValueChange={(v) => setCatFilter(v === '__all' ? '' : v)}
+                options={[{ value: '__all', text: categories.length ? `All categories (${categories.length})` : 'All categories' }, ...categories.map((c) => ({ value: c.id, text: `${c.label} (${c.count})` }))]}
+              />
             </div>
           </div>
-          {categories.length > 0 && (
-            <div class={styles.toolbarRow}>
-              <div class={styles.grow}>
-                <Dropdown
-                  value={catFilter || '__all'}
-                  onValueChange={(v) => setCatFilter(v === '__all' ? '' : v)}
-                  options={[{ value: '__all', text: `All categories (${categories.length})` }, ...categories.map((c) => ({ value: c.id, text: `${c.label} (${c.count})` }))]}
-                />
-              </div>
-              <InfoTip title="Categories">
-                <span>
-                  Icons are grouped using your Figma organisation: layer-name path, section, parent frame or page (see Settings → Categories). Filter here, switch to the grouped view to include/exclude whole categories, and optionally split the export folders by category.
-                </span>
-              </InfoTip>
-            </div>
-          )}
           <div class={styles.chips}>
-            <Chip active={status === 'all' && !ruleFilter} onClick={() => showInList({})}>All <span class={styles.muted}>{icons.length}</span></Chip>
-            <Chip tone="error" active={status === 'blocked'} onClick={() => showInList({ status: 'blocked' })} disabled={blockedIcons.length === 0} title="Icons with errors; they are not exported until fixed or excluded">
-              <BlockIcon /> Blocked <span>{blockedIcons.length}</span>
+            <Chip active={status === 'all' && !ruleFilter} onClick={() => showInList({})} disabled={!interactive}>All</Chip>
+            <Chip tone="error" active={status === 'blocked'} onClick={() => showInList({ status: 'blocked' })} disabled={!interactive || blockedIcons.length === 0} title="Not exported until fixed or excluded">
+              <BlockIcon /> Blocked {blockedIcons.length}
             </Chip>
-            <Chip tone="warn" active={status === 'alerts'} onClick={() => showInList({ status: 'alerts' })} disabled={alertIcons.length === 0} title="Icons with warnings (exported, but worth a look)">
-              <WarnIcon /> Alerts <span>{alertIcons.length}</span>
+            <Chip tone="warn" active={status === 'alerts'} onClick={() => showInList({ status: 'alerts' })} disabled={!interactive || alertIcons.length === 0} title="Exported, but worth a look">
+              <WarnIcon /> Warnings {alertIcons.length}
             </Chip>
             {off.size > 0 && (
-              <Chip active={status === 'excluded'} onClick={() => showInList({ status: 'excluded' })}>Excluded <span class={styles.muted}>{off.size}</span></Chip>
+              <Chip active={status === 'excluded'} onClick={() => showInList({ status: 'excluded' })}>Excluded {off.size}</Chip>
             )}
             {release.diff && presentChangeKinds(changeCounts).map((k) => (
               <Chip key={k} active={changeFilter === k} onClick={() => { setChangeFilter(changeFilter === k ? null : k); setLimit(PAGE_SIZE) }} title={`Changed since the baseline: ${BASELINE_LABEL[baseline.source!]}`}>
-                {CHANGE_LABEL[k]} <span>{changeCounts[k]}</span>
+                {CHANGE_LABEL[k]} {changeCounts[k]}
               </Chip>
             ))}
-            <InfoTip title="Blocked vs alerts">
-              <span>
-                <strong>Blocked</strong>: has an error (text or image layer, invalid or duplicate name…). Blocked icons are <em>not exported</em> until you fix them in Figma and rescan, rename them here, or exclude them.
-                <br /><br />
-                <strong>Alerts</strong>: warnings such as effects, off-grid size, or instance overrides the export can’t reproduce. These icons are still exported.
-              </span>
-            </InfoTip>
           </div>
         </div>
       )}
@@ -540,23 +556,24 @@ function Plugin() {
       )}
 
       {tab === 'icons' && (
-        <div class={styles.list}>
-          {!hasResults && !scanning && <EmptyState summary={summary} />}
-          {hasResults && (
-            <div class={styles.listHead}>
-              <Checkbox value={off.size === 0} onValueChange={(v) => setOff(v ? new Set() : new Set(icons.map((i) => i.key)))}>
-                Include all
-              </Checkbox>
-              <span>{visible.length} shown</span>
-            </div>
-          )}
+        <div class={styles.list} onScroll={() => hidePreview(true)}>
+          <div class={styles.listHead}>
+            <Checkbox value={hasResults && off.size === 0} disabled={!interactive} onValueChange={(v) => setOff(v ? new Set() : new Set(icons.map((i) => i.key)))}>
+              Select all
+            </Checkbox>
+            {interactive && visible.length !== icons.length && <span>Showing {visible.length}</span>}
+          </div>
+          {!hasResults && !scanning && <EmptyState summary={summary} scope={scope} />}
+          {scanning && !hasResults && [0, 1, 2].map((n) => (
+            <div class={styles.skelRow} key={n} aria-hidden="true"><span /><span class={styles.skelBox} /><div><div class={styles.skelLine} style={{ width: 90 }} /><div class={styles.skelLine} style={{ width: 140 }} /></div></div>
+          ))}
           {hasResults && visible.length === 0 && <div class={styles.empty}>No icons match.</div>}
           {view === 'list' && renderRows(visible.slice(0, limit))}
           {view === 'grouped' && renderGrouped(visible.slice(0, limit))}
           {view === 'grid' && (
             <div class={styles.grid}>
               {visible.slice(0, limit).map((i) => (
-                <Card key={i.key} icon={i} included={!off.has(i.key)} onInclude={(v) => setIncluded([i.key], v)} onLocate={() => locate(i.nodeId)} onExpand={() => { setView('list'); setOpen((p) => new Set(p).add(i.key)); setQuery(i.name) }} />
+                <Card key={i.key} icon={i} bg={previewBg} included={!off.has(i.key)} onInclude={(v) => setIncluded([i.key], v)} onLocate={() => locate(i.nodeId)} onExpand={() => { setView('list'); setOpen((p) => new Set(p).add(i.key)); setQuery(i.name) }} />
               ))}
             </div>
           )}
@@ -681,24 +698,23 @@ function Plugin() {
         </div>
       )}
 
-      {/* ---------------- Footer ---------------- */}
+      {/* ---------------- Footer: the single primary action ---------------- */}
       <div class={styles.footer}>
-        {hasResults && (
-          <div class={styles.footerNote}>
-            <span>
-              {blocked > 0 ? (
-                <button class={cx(styles.iconBtn, styles.sevError)} style={{ height: 18, padding: '0 4px' }} onClick={() => showInList({ status: 'blocked' })}>{blocked} blocked, will be skipped</button>
-              ) : (
-                `${exportable.length} ready`
-              )}
-            </span>
-            <span>{plural(enabledFormats.length, 'format')}</span>
-          </div>
-        )}
-        <Button fullWidth onClick={() => setExportOpen(true)} disabled={!hasResults || scanning}>
-          {exportable.length ? `Export ${plural(exportable.length, 'icon')}…` : 'Export…'}
+        <div class={styles.footerNote}>
+          {interactive && blocked > 0 && (
+            <button class={cx(styles.linkBtn, styles.sevError)} onClick={() => showInList({ status: 'blocked' })}>{blocked} blocked, will be skipped</button>
+          )}
+          {interactive && (
+            <button class={styles.linkBtn} onClick={() => { setSettingsTab('output'); setShowSettings(true) }} title="Choose what to export">{plural(enabledFormats.length, 'format')} ▾</button>
+          )}
+        </div>
+        <Button onClick={() => setExportOpen(true)} disabled={!interactive || exportable.length === 0} title={interactive ? '' : scanning ? 'Available when the scan finishes' : 'Scan first'}>
+          {off.size > 0 && exportable.length ? `Export ${exportable.length} selected` : 'Export'}
         </Button>
       </div>
+      {hover && (
+        <IconPreview icon={hover.icon} anchor={hover.rect} bg={previewBg} onBg={setPreviewBg} onEnter={() => { if (hoverHide.current) clearTimeout(hoverHide.current) }} onLeave={() => hidePreview()} />
+      )}
       {exportOpen && (
         <ExportPanel
           settings={settings}
@@ -757,23 +773,15 @@ function Plugin() {
       )}
       {showSettings && (
         <SettingsPanel
+          initialTab={settingsTab}
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus: sync.status, onTestSync: sync.test }}
+          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus: sync.status, onTestSync: sync.test }}
         />
       )}
       <div class={styles.grip} />
     </div>
-  )
-}
-
-function TabButton(props: { active: boolean; onClick: () => void; count: number; tone?: 'error' | 'warn'; children: ComponentChildren }) {
-  return (
-    <button class={cx(styles.tab, props.active && styles.tabActive)} onClick={props.onClick} role="tab" aria-selected={props.active} tabIndex={props.active ? 0 : -1}>
-      {props.children}
-      <span class={cx(styles.count, props.tone === 'error' && styles.countError, props.tone === 'warn' && styles.countWarn)}>{props.count}</span>
-    </button>
   )
 }
 
@@ -785,31 +793,25 @@ function Chip(props: { active: boolean; onClick: () => void; children: Component
       disabled={props.disabled}
       aria-pressed={props.active}
       title={props.title}
-      style={props.disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
     >
       {props.children}
     </button>
   )
 }
 
-function EmptyState({ summary }: { summary: ScanSummary | null }) {
+function EmptyState({ summary, scope }: { summary: ScanSummary | null; scope: ScanScope }) {
   if (summary) {
     return (
-      <div class={styles.empty}>
-        <strong>No icons found.</strong>
-        <div>Try another scope, or check the Skipped tab and Settings → Scan mode.</div>
+      <div class={styles.emptyNote}>
+        <strong>No icons found</strong>
+        <p>Try Page or Document, or open Skipped to see layers that were left out.</p>
       </div>
     )
   }
   return (
-    <div class={styles.empty}>
-      <strong>Scan your icon frames</strong>
-      <ol class={styles.emptySteps}>
-        <li>Pick a scope: selection, page or document.</li>
-        <li>Review alerts; <em>Locate</em> jumps to the layer.</li>
-        <li>Check the export summary, then export a ZIP.</li>
-      </ol>
-      <div style={{ marginTop: 10 }}>Nothing in your file is ever modified.</div>
+    <div class={styles.emptyNote}>
+      <p>Press <strong>Scan {scope}</strong> to list its icons. Choose Page or Document to look wider.</p>
+      <p class={styles.muted}>Read-only: your file is never changed.</p>
     </div>
   )
 }
@@ -822,8 +824,8 @@ function StatusPill({ icon, onClick }: { icon: Icon; onClick?: () => void }) {
   const errs = icon.findings.filter((f) => f.severity === 'error').length
   const warns = icon.findings.filter((f) => f.severity === 'warn').length
   const infos = icon.findings.length - errs - warns
-  if (errs) return <button class={cx(styles.pill, styles.pillError)} onClick={onClick} title="Blocked: has errors, not exported"><BlockIcon /> Blocked{errs > 1 ? ` · ${errs}` : ''}</button>
-  if (warns) return <button class={cx(styles.pill, styles.pillWarn)} onClick={onClick} title="Has alerts, exported anyway"><WarnIcon /> {plural(warns, 'alert')}</button>
+  if (errs) return <button class={cx(styles.pill, styles.pillError)} onClick={onClick} title="Blocked: not exported until fixed or excluded"><BlockIcon /> Blocked{errs > 1 ? ` · ${errs}` : ''}</button>
+  if (warns) return <button class={cx(styles.pill, styles.pillWarn)} onClick={onClick} title="Exported, but worth a look"><WarnIcon /> {plural(warns, 'warning')}</button>
   if (infos) return <button class={cx(styles.pill, styles.pillInfo)} onClick={onClick} title="Informational notes"><InfoIcon /> {infos}</button>
   return <span class={cx(styles.pill, styles.pillOk)} title="No findings"><CheckIcon /></span>
 }
@@ -839,6 +841,10 @@ function FormatChips({ formats }: { formats?: FormatId[] }) {
 
 function Row(props: {
   icon: Icon
+  size: 'S' | 'M' | 'L'
+  bg: PreviewBg
+  onPreview: (icon: Icon, el: HTMLElement) => void
+  onPreviewEnd: () => void
   included: boolean
   expanded: boolean
   onInclude: (v: boolean) => void
@@ -849,13 +855,14 @@ function Row(props: {
 }) {
   const { icon, expanded } = props
   const firstError = icon.findings.find((f) => f.severity === 'error')
-  const sub = [icon.categoryLabel, icon.usage ? `used ×${icon.usage.instances}${icon.usage.remote ? ' · library' : ''}` : '', icon.layerName, icon.kind].filter(Boolean).join(' · ')
+  const sub = [icon.categoryLabel, icon.usage ? `used ${icon.usage.instances}×${icon.usage.remote ? ' · library' : ''}` : ''].filter(Boolean).join(' · ')
+  const rowEl = (e: Event) => (e.currentTarget as HTMLElement).closest('[data-row]') as HTMLElement
   return (
-    <div class={styles.row}>
+    <div class={cx(styles.row, expanded && styles.rowSelected)} data-row>
       <div class={cx(styles.rowMain, !props.included && styles.rowOff)}>
         <Checkbox value={props.included} onValueChange={props.onInclude}>{''}</Checkbox>
-        <span class={styles.thumb}><Thumb icon={icon} /></span>
-        <button class={styles.nameBtn} onClick={props.onExpand} aria-expanded={expanded} title="Show details and rename">
+        <span class={cx(styles.thumb, props.size === 'S' && styles.thumbS, props.size === 'L' && styles.thumbL, bgClass(props.bg))} onMouseEnter={(e) => props.onPreview(icon, rowEl(e))} onMouseLeave={props.onPreviewEnd}><Thumb icon={icon} /></span>
+        <button class={styles.nameBtn} onClick={props.onExpand} aria-expanded={expanded} title="Show details and rename" onFocus={(e) => props.onPreview(icon, rowEl(e))} onBlur={props.onPreviewEnd}>
           <div class={cx(styles.name, styles.ellipsis, icon.nameOverride !== null && styles.renamed)}>{icon.name || '(no name)'}</div>
           <div class={cx(styles.ellipsis, firstError ? styles.sevError : styles.muted)}>{firstError ? firstError.message : sub}</div>
         </button>
@@ -919,12 +926,12 @@ function Row(props: {
   )
 }
 
-function Card(props: { icon: Icon; included: boolean; onInclude: (v: boolean) => void; onLocate: () => void; onExpand: () => void }) {
+function Card(props: { icon: Icon; bg: PreviewBg; included: boolean; onInclude: (v: boolean) => void; onLocate: () => void; onExpand: () => void }) {
   const { icon } = props
   const sev = worst(icon.findings)
   return (
     <div class={cx(styles.card, sev === 'error' && styles.cardError, sev === 'warn' && styles.cardWarn, !props.included && styles.rowOff)}>
-      <div class={styles.cardThumb}><Thumb icon={icon} /></div>
+      <div class={cx(styles.cardThumb, bgClass(props.bg))}><Thumb icon={icon} /></div>
       <button class={styles.nameBtn} onClick={props.onExpand} title={icon.layerName}>
         <div class={cx(styles.name, styles.ellipsis)}>{icon.name}</div>
         {icon.categoryLabel && <div class={cx(styles.muted, styles.ellipsis)}>{icon.categoryLabel}</div>}

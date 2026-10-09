@@ -7,6 +7,7 @@ import { TARGETS } from './targets'
 
 export type { BuildInput, Files } from './common'
 export { ALL_TARGETS_ON, TARGETS } from './targets'
+export type { TargetKey } from './targets'
 
 export function isExportable(icon: Icon): boolean {
   return !icon.findings.some((f) => f.severity === 'error')

@@ -18,6 +18,8 @@ export interface Target {
   key: TargetKey
   label: string
   detail: string
+  /** one short line for the format cards in Settings and Export */
+  hint: string
   build: (b: BuildInput) => Files
   /** does this output path belong to the target? (used for the per-format size overview) */
   owns: (path: string) => boolean
@@ -28,6 +30,7 @@ const under = (dir: string) => (p: string) => p.startsWith(dir + '/')
 export const TARGETS: Target[] = [
   {
     key: 'svg',
+    hint: 'One themeable .svg per icon',
     label: 'SVG files',
     detail: 'One themeable .svg per icon (svg/). Colours and stroke width follow CSS variables when inlined.',
     build: svgFiles,
@@ -35,6 +38,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'sprite',
+    hint: 'One file used with <use>. Best for multi-colour icons',
     label: 'SVG sprite',
     detail: 'One <symbol> sprite used with <svg><use href="…#id">. Best for multi-colour and stroked icons.',
     build: (b) => ({ [`sprite/${ns(b)}-sprite.svg`]: spriteFile(b), ...(b.settings.splitByCategory ? categorySprites(b) : {}) }),
@@ -42,6 +46,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'html',
+    hint: 'Searchable preview page and base CSS',
     label: 'HTML',
     detail: 'Base CSS plus a self-contained, searchable test page (html/index.html).',
     build: (b) => ({ [`html/${ns(b)}-icons.css`]: baseCss(b), 'html/index.html': testPage(b) }),
@@ -49,6 +54,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'mask',
+    hint: 'Single-colour CSS classes, no stroke control',
     label: 'CSS mask classes',
     detail: 'Optional single-colour classes (<i class="…">). No multi-colour or live stroke width.',
     build: (b) => ({ [`html/${ns(b)}-icons-mask.css`]: maskCss(b) }),
@@ -56,6 +62,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'angularModern',
+    hint: 'Signals, tree-shakable, lazy categories',
     label: 'Angular 17.1+',
     detail: 'Standalone <icon> component with signal inputs, per-icon tree-shakable data, lazy category chunks and an optional sprite component.',
     build: (b) => angularFiles(b, 'modern'),
@@ -63,6 +70,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'angularClassic',
+    hint: 'For Angular 14 to 16 (works on newer too)',
     label: 'Angular 14+',
     detail: 'Standalone component with @Input, for older Angular versions (same data, registry and sprite strategy).',
     build: (b) => angularFiles(b, 'classic'),
@@ -70,6 +78,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'react',
+    hint: 'Typed component, no dependencies',
     label: 'React',
     detail: 'Typed <Icon icon={…} /> / name component (React 17+), no dependencies; per-icon data, lazy category chunks. Props: size, color, strokeWidth, label.',
     build: reactFiles,
@@ -77,6 +86,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'webComponent',
+    hint: 'Works in any framework',
     label: 'Web Component',
     detail: 'Framework-free <icon> custom element (plain ES module + typings). Works in any framework or none.',
     build: webComponentFiles,
@@ -84,6 +94,7 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'codeConnect',
+    hint: 'Mappings for Dev Mode and the Figma MCP server',
     label: 'Code Connect',
     detail: 'Templates that map each icon component to <icon name="…"> for Dev Mode and the Figma MCP server (publishing needs an Organization/Enterprise plan).',
     build: codeConnectFiles,
