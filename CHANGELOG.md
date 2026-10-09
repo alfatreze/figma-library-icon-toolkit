@@ -7,6 +7,11 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-09
+
+### Fixed
+- Dropdown menus in Settings (and other dialogs) opened behind the dialog and looked broken. Menus now sit above every dialog.
+
 ## [0.3.0] - 2026-10-09
 ### Changed (UI redesign, see docs/UX-REVIEW.md)
 - One stable window layout: scan bar, fixed-height status row, tabs, toolbar and a sticky Export bar are always in the same place; first run, scanning and results change only the content area (controls are disabled, not hidden).
@@ -80,7 +85,8 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.1.0...v0.2.0
