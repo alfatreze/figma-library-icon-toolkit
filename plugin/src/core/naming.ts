@@ -1,4 +1,5 @@
-const AUTO_NAME = /^(frame|group|vector|rectangle|ellipse|union|subtract|intersect|exclude|component|instance|line|polygon|star|boolean|image|section|slice)\s*\d*$/i
+/** Figma's default names: "Frame 12", "Group 3", "Star 1", and the bare names of a first vector or boolean operation. A bare "group" or "star" is a real icon name. */
+const AUTO_NAME = /^((frame|group|vector|rectangle|ellipse|union|subtract|intersect|exclude|component|instance|line|polygon|star|boolean|image|section|slice)\s*\d+|(vector|union|subtract|intersect|exclude))$/i
 const COPY_NAME = /\b(copy of|copy)\b|\bcopy\s*\d*$/i
 
 /** icons are file names and CSS identifiers: keep them short enough for every file system and tool */

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { nodeUrl } from '../src/core/generators/codeconnect'
 import { webComponentSnippet } from '../src/core/snippets'
 import { changesByName, chunkText, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline } from '../src/core/baseline'
-import { buildName, parseVariantName, resolveDuplicates, slugify, validateName } from '../src/core/naming'
+import { buildName, isAutoName, parseVariantName, resolveDuplicates, slugify, validateName } from '../src/core/naming'
 import { prefixIds, themeSvg } from '../src/core/svg'
 import { tokenVarName, parseMapping, suggestMapping } from '../src/core/tokens'
 import { parseStrokeTable, weightForSize, validateStrokeTable } from '../src/core/stroke'
@@ -34,6 +34,10 @@ function raw(name: string, svg: string, extra: Partial<RawIcon> = {}): RawIcon {
 }
 
 describe('naming', () => {
+  it('flags Figma default names but not icons that are really called group or star', () => {
+    for (const bad of ['Frame 12', 'group 3', 'Star 1', 'Vector', 'Union', 'icon/Rectangle 5']) expect(isAutoName(bad), bad).toBe(true)
+    for (const good of ['group', 'star', 'frame-rate', 'line-chart', 'image', 'component', 'icon/group']) expect(isAutoName(good), good).toBe(false)
+  })
   it('folds diacritics instead of replacing them with underscores', () => {
     expect(slugify('Deficiência visual')).toBe('deficiencia-visual')
     expect(slugify('Círculo metade preenchido')).toBe('circulo-metade-preenchido')
