@@ -16,5 +16,7 @@
 - [DECISIONS-v5.md](DECISIONS-v5.md): publishing to GitHub / GitLab from the plugin
 - [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md): code audit (security, architecture, correctness) with status
 - [UX-REVIEW.md](UX-REVIEW.md): UX review, UX copy, layout rules and the redesign
+- [OUTPUTS.md](OUTPUTS.md): packages vs outputs, typical heterogeneous setups, the outputs model
+
 - [COMMUNITY-LISTING.md](COMMUNITY-LISTING.md): Figma Community tagline, description and features by audience
 - [design/ux-redesign.html](design/ux-redesign.html): mockup of the current UI

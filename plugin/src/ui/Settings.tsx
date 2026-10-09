@@ -11,37 +11,20 @@ import { cleanNamespace } from '../core/naming'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
 import { suggestMapping, TOKEN_MODES, tokenPreview } from '../core/tokens'
 import styles from './styles'
-import { CategorySource, ScanMode, Settings, StrokePolicy, TokenMode } from '../types'
+import { plural } from './util'
+import { CategorySource, OutputSettings, ScanMode, Settings, StrokePolicy, TokenMode } from '../types'
 import { InfoTip } from './InfoTip'
-
-function Field(props: { label: string; info?: { title: string; body: ComponentChildren }; children: ComponentChildren }) {
-  return (
-    <div class={styles.field}>
-      <span class={styles.fieldLabel}>
-        {props.label}
-        {props.info && <InfoTip title={props.info.title}>{props.info.body}</InfoTip>}
-      </span>
-      <div>{props.children}</div>
-    </div>
-  )
-}
-
-function Row(props: { info?: { title: string; body: ComponentChildren }; children: ComponentChildren }) {
-  return (
-    <div class={styles.fieldRow}>
-      <div class={styles.grow}>{props.children}</div>
-      {props.info && <InfoTip title={props.info.title}>{props.info.body}</InfoTip>}
-    </div>
-  )
-}
+import { Field, Row } from './components/Field'
+import { OutputsTab } from './OutputsTab'
 
 const num = (v: string, fallback: number) => {
   const n = parseFloat(v)
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
-export type SettingsTab = 'output' | 'style' | 'scan' | 'team' | 'labs'
+export type SettingsTab = 'packages' | 'output' | 'style' | 'scan' | 'team' | 'labs'
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'packages', label: 'Packages' },
   { id: 'output', label: 'Output' },
   { id: 'style', label: 'Style' },
   { id: 'scan', label: 'Scan' },
@@ -64,14 +47,13 @@ export interface SettingsExtras {
   shared: { at: string; by: string | null; differs: boolean } | null
   onPublish: () => void
   onUseShared: () => void
-  repoTestMessage: string
-  onTestRepo: () => void
+  testMessages: Record<string, string>
+  outputProblems: Record<string, string[]>
+  onTestRepo: (o: OutputSettings) => void
 }
 
-export function SettingsPanel({ settings, patch, onClose, extras, initialTab = 'output' }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras; initialTab?: SettingsTab }) {
+export function SettingsPanel({ settings, patch, onClose, extras, initialTab = 'packages' }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras; initialTab?: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
-  const [hostNote, setHostNote] = useState('')
-  const setRepo = (p: Partial<Settings['repo']>) => patch({ repo: { ...settings.repo, ...p } })
   const f = settings.formats
   const setFormat = (k: keyof Settings['formats'], v: boolean) => patch({ formats: { ...f, [k]: v } })
   const ns = cleanNamespace(settings.namespace)
@@ -86,7 +68,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
       </div>
       <TabBar label="Settings sections" tabs={SETTINGS_TABS} value={tab} onChange={setTab} />
       <div class={styles.overlayBody}>
-        {tab === 'output' && (
+        {tab === 'packages' && (
           <Fragment>
             <div class={styles.section}>
               <span class={styles.sectionTitle}>What to export</span>
@@ -107,9 +89,6 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           >
             <Textbox value={settings.namespace} onValueInput={(v) => patch({ namespace: v })} placeholder="cmn" />
           </Field>
-          <Field label="ZIP file name" info={{ title: 'ZIP name', body: <span>File name of the downloaded ZIP. Leave empty to use <code>{ns}-icons.zip</code>.</span> }}>
-            <Textbox value={settings.zipName} onValueInput={(v) => patch({ zipName: v })} placeholder={`${ns}-icons`} />
-          </Field>
           <Row
             info={{
               title: 'Split output by category',
@@ -125,43 +104,10 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             </Toggle>
           </Row>
         </div>
-            <div class={styles.section}>
-              <span class={styles.sectionTitle}>Publish to a repository</span>
-              <div class={styles.muted}>Create a branch with the export and open a pull request (GitHub) or merge request (GitLab) for review. Optional.</div>
-              <Field label="Host">
-                <Segmented value={settings.repo.provider} onValueChange={(v) => setRepo({ provider: v })} label="Git host" options={[{ value: 'github', children: 'GitHub' }, { value: 'gitlab', children: 'GitLab' }]} />
-              </Field>
-              <Field label="Repository" info={{ title: 'Repository', body: <span>The repository that receives the icons: <code>owner/name</code> on GitHub, <code>group/project</code> (subgroups allowed) on gitlab.com. You can paste the repository URL.</span> }}>
-                <Textbox
-                  value={settings.repo.repo}
-                  placeholder={settings.repo.provider === 'github' ? 'owner/name' : 'group/project'}
-                  onValueInput={(v) => {
-                    const parsed = parseRepoInput(v)
-                    setHostNote(parsed?.unsupportedHost ? `${parsed.unsupportedHost} is not supported yet: only github.com and gitlab.com.` : '')
-                    if (parsed && parsed.provider) setRepo({ provider: parsed.provider, repo: parsed.repo })
-                    else setRepo({ repo: parsed ? parsed.repo : v })
-                  }}
-                />
-              </Field>
-              {hostNote && <div class={styles.sevWarn}>{hostNote}</div>}
-              <Field label="Folder in repo" info={{ title: 'Folder', body: <span>Where the export goes inside the repository, e.g. <code>icons</code> or <code>src/assets/icons</code>. Not the repository root, and not a hidden folder such as <code>.github</code>. Only files this tool published before are ever replaced or removed there.</span> }}>
-                <Textbox value={settings.repo.subdir} onValueInput={(v) => setRepo({ subdir: v })} placeholder="icons" />
-              </Field>
-              <Field label="Branch" info={{ title: 'Branch', body: <span>The new branch to create. Leave empty for <code>icons/update-&lt;date&gt;-&lt;time&gt;</code>. It always branches from the default branch and the default branch is never changed directly.</span> }}>
-                <Textbox value={settings.repo.branch} onValueInput={(v) => setRepo({ branch: v })} placeholder="icons/update-<date>-<time>" />
-              </Field>
-              <Field label="Access token" info={{ title: 'Access token', body: <span>{HOSTS[settings.repo.provider].tokenHelp} The token stays on this computer: it is not part of the team config, not in exports and not in diagnostics.</span> }}>
-                <Textbox password value={settings.repo.token} onValueInput={(v) => setRepo({ token: v.trim() })} placeholder="paste your token" />
-              </Field>
-              <div class={styles.muted}>{HOSTS[settings.repo.provider].tokenHelp}</div>
-              <div class={styles.fieldRow}>
-                <Button secondary onClick={extras.onTestRepo} disabled={!settings.repo.token || !settings.repo.repo}>Test connection</Button>
-                <span class={styles.muted}>{extras.repoTestMessage}</span>
-              </div>
-              <div class={styles.muted}>The plugin connects to {HOSTS[settings.repo.provider].domain} only when you press Test connection or Publish, and sends only the export and your token. Self-hosted GitLab and other hosts are not supported yet.</div>
-            </div>
           </Fragment>
         )}
+
+        {tab === 'output' && <OutputsTab settings={settings} patch={patch} testMessages={extras.testMessages} problems={extras.outputProblems} onTest={extras.onTestRepo} />}
 
         {tab === 'style' && (
           <Fragment>
@@ -230,8 +176,8 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           {settings.tokenNaming.mode === 'custom' && (
             <Field label="Mapping table" info={{ title: 'Custom mapping', body: <span>One mapping per line: <code>figma/variable/name = --css-variable</code>. Lines starting with <code>#</code> are comments. Scope a line to a collection with <code>Collection::name</code>, or map a whole group with a wildcard: <code>color/icon/* = --icon-*</code> (longest match wins). Variables that are not listed use the path rule (with the prefix above).</span> }}>
               <div class={styles.fieldRow}>
-                <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} title={extras.scanVariables.length ? '' : 'Scan first: the table is built from the variables your icons use'} onClick={() => patch({ tokenNaming: { ...settings.tokenNaming, mapping: suggestMapping(extras.scanVariables, settings.tokenNaming) } })}>
-                  Fill from scan ({extras.scanVariables.length} variable{extras.scanVariables.length === 1 ? '' : 's'})
+                <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} data-hint={extras.scanVariables.length ? '' : 'Scan first: the table is built from the variables your icons use'} onClick={() => patch({ tokenNaming: { ...settings.tokenNaming, mapping: suggestMapping(extras.scanVariables, settings.tokenNaming) } })}>
+                  Fill from scan ({plural(extras.scanVariables.length, 'variable')})
                 </button>
               </div>
               <TextboxMultiline rows={8} value={settings.tokenNaming.mapping} onValueInput={(v) => patch({ tokenNaming: { ...settings.tokenNaming, mapping: v } })} placeholder={'color/icon/default = --icon-color\ncolor/icon/muted = --icon-muted'} />

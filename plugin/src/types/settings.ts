@@ -22,16 +22,26 @@ export interface TokenNaming {
   mapping: string
 }
 
-/** Where "Publish to a repository" sends the export. The token stays on this computer (never in the team config). */
-export interface RepoSettings {
-  provider: 'github' | 'gitlab'
+export type GitProvider = 'github' | 'gitlab'
+
+/**
+ * One repository destination for the export: which packages it receives and where they go.
+ * Several outputs can share a repository (a monorepo with one folder per package); they are then published as one branch and one
+ * pull / merge request. Access tokens are per host and live in `Settings.tokens`, never here.
+ */
+export interface OutputSettings {
+  id: string
+  /** shown in lists and in the pull request, e.g. "Angular library" */
+  name: string
+  provider: GitProvider
   /** owner/name (GitHub) or group/subgroup/project (gitlab.com) */
   repo: string
-  /** folder inside the repository that holds the icons, e.g. "icons" or "src/assets/icons" */
+  /** folder inside the repository that receives the files, e.g. "icons" or "packages/icons-angular" */
   subdir: string
   /** branch to create; empty = icons/update-<date-time> */
   branch: string
-  token: string
+  /** package keys this output receives; null = every package that is switched on in Packages */
+  packages: (keyof Settings['formats'])[] | null
 }
 
 export type FormatId = 'svg' | 'sprite' | 'html' | 'mask' | 'angular' | 'react' | 'webComponent'
@@ -76,7 +86,10 @@ export interface Settings {
   labs: boolean
   labsBranchAck: boolean
   compositeFrames: 'ignore' | 'include'
-  repo: RepoSettings
+  /** repository destinations for "Publish" (the local ZIP always has every package) */
+  outputs: OutputSettings[]
+  /** one access token per git host; stays on this computer (never in the team config, exports or diagnostics) */
+  tokens: { github: string; gitlab: string }
   precision: number
   formats: {
     svg: boolean
@@ -126,7 +139,8 @@ export const DEFAULT_SETTINGS: Settings = {
   labs: false,
   labsBranchAck: false,
   compositeFrames: 'ignore',
-  repo: { provider: 'github', repo: '', subdir: 'icons', branch: '', token: '' },
+  outputs: [],
+  tokens: { github: '', gitlab: '' },
   precision: 3,
   formats: {
     svg: true,

@@ -93,7 +93,7 @@ export default async function () {
 
   // Settings → Copy diagnostics: what a bug report needs, without the sync token or any layer content
   on<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS', safe('Diagnostics', () => {
-    const redacted = { ...latest, repo: { ...latest.repo, token: latest.repo.token ? '(set)' : '' }, ignoredDuplicates: `${latest.ignoredDuplicates.length} groups` }
+    const redacted = { ...latest, tokens: { github: latest.tokens.github ? '(set)' : '', gitlab: latest.tokens.gitlab ? '(set)' : '' }, ignoredDuplicates: `${latest.ignoredDuplicates.length} groups` }
     const text = [
       'Icon Library Toolkit diagnostics',
       `figma.mode: ${figma.mode} · editorType: ${figma.editorType} · apiVersion: ${figma.apiVersion}`,

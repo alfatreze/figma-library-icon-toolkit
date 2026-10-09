@@ -1,4 +1,6 @@
-import { DEFAULT_SETTINGS, Settings } from '../types'
+import { DEFAULT_SETTINGS, OutputSettings, Settings } from '../types'
+
+export const MAX_OUTPUTS = 12
 
 /**
  * One place that says, for every setting: is it shared with the team (toolkit.config.json / the file) or local to this computer,
@@ -7,7 +9,7 @@ import { DEFAULT_SETTINGS, Settings } from '../types'
  * `SCHEMA` is typed over `keyof Settings`: adding a setting without classifying it is a compile error.
  */
 
-export const SETTINGS_VERSION = 2
+export const SETTINGS_VERSION = 3
 
 type Check<T> = (v: unknown) => T | undefined
 interface Rule<T> {
@@ -77,13 +79,33 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   labs: rule(false, bool),
   labsBranchAck: rule(false, bool),
   compositeFrames: rule(true, oneOf('ignore', 'include')),
-  repo: rule(
-    false,
-    shape<Settings['repo']>(
-      { provider: oneOf('github', 'gitlab'), repo: str(200), subdir: str(200), branch: str(100), token: str(400) },
-      DEFAULT_SETTINGS.repo
+  outputs: rule(false, (v) => {
+    if (!Array.isArray(v) || v.length > MAX_OUTPUTS) return undefined
+    const keys = Object.keys(DEFAULT_SETTINGS.formats)
+    const one = shape<OutputSettings>(
+      {
+        id: (x) => (typeof x === 'string' && /^[\w-]{1,40}$/.test(x) ? x : undefined),
+        name: str(60),
+        provider: oneOf('github', 'gitlab'),
+        repo: str(200),
+        subdir: str(200),
+        branch: str(100),
+        packages: (x) => (x === null ? null : Array.isArray(x) && x.every((k) => typeof k === 'string' && keys.includes(k)) ? (x as OutputSettings['packages']) : undefined)
+      },
+      { id: 'output', name: '', provider: 'github', repo: '', subdir: 'icons', branch: '', packages: null }
     )
-  ),
+    // an entry without a repository string is garbage, not an empty output
+    const list = v.filter((x) => x && typeof x === 'object' && typeof (x as { repo?: unknown }).repo === 'string').map((x) => one(x)).filter((x): x is OutputSettings => !!x)
+    // ids must be unique: a duplicate gets a new one rather than silently merging two outputs
+    const seen = new Set<string>()
+    return list.map((o, i) => {
+      let id = o.id
+      while (seen.has(id)) id = `${o.id}-${i + 1}`
+      seen.add(id)
+      return { ...o, id }
+    })
+  }),
+  tokens: rule(false, shape<Settings['tokens']>({ github: str(400), gitlab: str(400) }, DEFAULT_SETTINGS.tokens)),
   precision: rule(true, int(1, 6)),
   formats: rule(
     true,
@@ -109,12 +131,23 @@ export function checkSetting<K extends keyof Settings>(key: K, value: unknown): 
 /**
  * Upgrades saved settings to the current version and validates every key (invalid or missing → default).
  * v1 → v2: `useTokens` toggle became `tokenNaming.mode`; the old default zip name "icons" produced "icons-icons.zip".
+ * v2 → v3: the single `repo` (with its token) became one output plus a token per host.
  */
 export function migrateSettings(stored: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, repo: { ...DEFAULT_SETTINGS.repo } }
+  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens } }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out
   const s = { ...(stored as Record<string, unknown>) }
   if (s.zipName === 'icons') s.zipName = ''
+  const legacy = s.repo as Record<string, unknown> | undefined
+  if (legacy && typeof legacy === 'object' && !s.outputs) {
+    const provider = legacy.provider === 'gitlab' ? 'gitlab' : 'github'
+    const token = typeof legacy.token === 'string' ? legacy.token : ''
+    if (typeof legacy.repo === 'string' && legacy.repo.trim()) {
+      s.outputs = [{ id: 'default', name: 'Icon library', provider, repo: legacy.repo, subdir: legacy.subdir ?? 'icons', branch: legacy.branch ?? '', packages: null }]
+    }
+    if (token && !s.tokens) s.tokens = { github: '', gitlab: '', [provider]: token }
+  }
+  delete s.repo
   if (s.useTokens === false && !s.tokenNaming) s.tokenNaming = { ...DEFAULT_SETTINGS.tokenNaming, mode: 'none' }
   for (const k of Object.keys(SCHEMA) as (keyof Settings)[]) {
     if (!(k in s)) continue

@@ -5,7 +5,8 @@ import {
 } from '../../core/baseline'
 import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from '../../core/changelog'
 import { BaselinesHandler, BaselineSavedHandler, Icon, SaveBaselineHandler, Settings } from '../../types'
-import { clientFor, repoConfigured } from '../repoClient'
+import { outputReady } from '../../core/outputs'
+import { clientFor } from '../repoClient'
 import { countChanges } from '../selectors'
 
 /**
@@ -73,15 +74,18 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
   }
   const loadRepo = async () => {
     try {
-      if (!repoConfigured(settings.repo)) {
-        setMessage('Set the repository and token in Settings → Output → Publish to a repository first.')
+      // every output carries the same icons.json, so the first one that is ready is the baseline
+      const out = settings.outputs.find((o) => outputReady(o, settings.tokens))
+      if (!out) {
+        setMessage('Add a repository and its token in Settings → Output first.')
         return
       }
-      const client = clientFor(settings.repo)
+      const client = clientFor(out, settings.tokens)
       const info = await client.info()
-      const text = await client.readFile(info.defaultBranch, `${settings.repo.subdir.replace(/^\/+|\/+$/g, '')}/icons.json`)
+      const folder = out.subdir.replace(/^\/+|\/+$/g, '')
+      const text = await client.readFile(info.defaultBranch, `${folder}/icons.json`)
       if (text === null) {
-        setMessage(`No icons.json in “${settings.repo.subdir}” on ${info.defaultBranch} yet.`)
+        setMessage(`No icons.json in “${out.subdir}” on ${info.defaultBranch} yet.`)
         return
       }
       setRepoCatalog(parseCatalog(text))

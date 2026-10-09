@@ -41,6 +41,7 @@ export interface ExportPanelProps {
   onDownload: () => void
   /** publish to the configured repository; null when none is set up */
   onPublish: (() => void) | null
+  publishLabel: string
   onSetupPublish: () => void
   onShowBlocked: () => void
   onClose: () => void
@@ -160,7 +161,7 @@ export function ExportPanel(p: ExportPanelProps) {
           {p.baseline.source && <div class={styles.muted}>Baseline: {BASELINE_LABEL[p.baseline.source]}. Priority is repo, then shared in this file, then this computer, then a loaded file.</div>}
           <div class={styles.fieldRow}>
             {p.baseline.canRepo && <button class={styles.linkBtn} onClick={p.baseline.onLoadRepo}>Read from the repository</button>}
-            {p.baseline.canShare && <button class={styles.linkBtn} onClick={p.baseline.onSaveShared} title="Writes one small entry into this Figma file (visible to everyone with access, including Dev Mode)">Save as shared baseline (writes to file)</button>}
+            {p.baseline.canShare && <button class={styles.linkBtn} onClick={p.baseline.onSaveShared} data-hint="Writes one small entry into this Figma file (visible to everyone with access, including Dev Mode)">Save as shared baseline (writes to file)</button>}
           </div>
           {p.baseline.message && <div class={styles.muted}>{p.baseline.message}</div>}
           {!p.prevCatalog && <div class={styles.muted}>Export once and this computer remembers it, so the next scan shows what changed. You can also load an <code>icons.json</code> to get a changelog, a suggested version and deprecated aliases for renamed icons. Without it, this is version <strong>1.0.0</strong>.</div>}
@@ -198,12 +199,12 @@ export function ExportPanel(p: ExportPanelProps) {
       <div class={styles.footer}>
         <div class={styles.footerNote}>
           {p.onPublish ? (
-            <Button secondary onClick={p.onPublish} disabled={p.ready === 0 || noFormat}>Publish to repository…</Button>
+            <Button secondary onClick={p.onPublish} disabled={p.ready === 0 || noFormat}>{p.publishLabel}</Button>
           ) : (
             <button class={styles.linkBtn} onClick={p.onSetupPublish}>Set up publishing to GitHub or GitLab</button>
           )}
         </div>
-        <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat} title={noFormat ? 'Choose at least one format' : ''}>
+        <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat} data-hint={noFormat ? 'Choose at least one format' : ''}>
           Download ZIP
         </Button>
       </div>
