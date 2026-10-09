@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icon Library Toolkit: proposed UI</title>
+<style>
+:root{
+  /* proposed tokens (map onto --figma-color-* in the plugin; values here are for the mockup only) */
+  --bg:#fff; --bg2:#f5f5f5; --bg3:#ececec; --text:#1e1e1e; --muted:#5f5f5f; --line:#e2e2e2;
+  --brand:#0a6ed1; --brand-ink:#fff; --brand-soft:#e6f1fc; --brand-line:#8dbdee;
+  --ok:#1a7f45; --warn:#9a5b00; --warn-bg:#fff3d6; --err:#b42318; --err-bg:#fde8e6;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px;
+  --r:6px; --shadow:0 1px 2px rgba(0,0,0,.12);
+}
+:root[data-theme=dark]{
+  --bg:#2c2c2c; --bg2:#383838; --bg3:#444; --text:#f2f2f2; --muted:#b3b3b3; --line:#4a4a4a;
+  --brand:#4aa3ff; --brand-ink:#0b1f33; --brand-soft:#1f3a57; --brand-line:#3a74ad;
+  --ok:#5fd08d; --warn:#f3b95f; --warn-bg:#4a3a1a; --err:#ff8a80; --err-bg:#4d2724; --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#d9dbe0;color:var(--text);font:12px/1.4 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+:root[data-theme=dark] body{background:#161616}
+.page{max-width:1500px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:18px;margin:0 0 4px}
+.lead{max-width:760px;color:#333;margin:0 0 16px}
+:root[data-theme=dark] .lead{color:#ccc}
+.bar{display:flex;gap:12px;align-items:center;margin-bottom:20px}
+.bar button{font:inherit;padding:6px 12px;border:1px solid #999;border-radius:6px;background:#fff;cursor:pointer}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+figure{margin:0}
+figcaption{font-size:12px;font-weight:600;margin:0 0 8px;color:#222}
+:root[data-theme=dark] figcaption{color:#ddd}
+figcaption span{font-weight:400;color:#555;display:block}
+:root[data-theme=dark] figcaption span{color:#aaa}
+
+/* ---------- the plugin window ---------- */
+.win{width:460px;height:640px;background:var(--bg);color:var(--text);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.top{padding:var(--s4) var(--s4) var(--s3);display:flex;flex-direction:column;gap:var(--s3)}
+.row{display:flex;align-items:center;gap:var(--s2)}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted)}
+.title{font-size:13px;font-weight:600}
+button{font:inherit;color:inherit}
+.btn{height:32px;padding:0 var(--s4);border-radius:var(--r);border:1px solid var(--line);background:var(--bg);cursor:pointer;font-weight:500}
+.btn:hover{background:var(--bg2)}
+.btn:active{background:var(--bg3)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.primary:active{filter:brightness(.92)}
+.btn:focus-visible,.tab:focus-visible,.chip:focus-visible,.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.icon-btn{font-size:18px;line-height:1;width:32px;height:32px;display:grid;place-items:center;border-radius:var(--r);border:1px solid transparent;background:none;cursor:pointer}
+.icon-btn:hover{background:var(--bg2)}
+
+/* segmented control: the active segment is a raised, filled pill */
+.seg{display:flex;padding:3px;background:var(--bg3);border-radius:8px;gap:2px}
+.seg button{flex:1;height:26px;border:0;border-radius:6px;background:none;cursor:pointer;color:var(--muted);font-weight:500}
+.seg button[aria-pressed=true]{background:var(--bg);color:var(--brand);font-weight:700;box-shadow:var(--shadow)}
+
+/* tabs: thick underline + bold + brand colour */
+.tabs{display:flex;gap:var(--s1);padding:0 var(--s4);border-bottom:1px solid var(--line)}
+.tab{height:36px;padding:0 var(--s3);border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);cursor:pointer;font-weight:500;display:flex;gap:6px;align-items:center}
+.tab:hover{color:var(--text);background:var(--bg2);border-radius:6px 6px 0 0}
+.tab[aria-selected=true]{color:var(--brand);border-bottom-color:var(--brand);font-weight:700}
+.badge{min-width:18px;height:18px;padding:0 6px;border-radius:9px;background:var(--bg3);color:var(--muted);font-size:10px;font-weight:600;display:inline-grid;place-items:center}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.err{background:var(--err-bg);color:var(--err)}
+.tab[aria-selected=true] .badge{background:var(--brand-soft);color:var(--brand)}
+
+/* chips: active = filled brand */
+.chips{display:flex;gap:var(--s2);flex-wrap:wrap}
+.chip{height:28px;padding:0 var(--s3);border-radius:14px;border:1px solid var(--line);background:var(--bg);cursor:pointer;display:inline-flex;gap:6px;align-items:center;font-weight:500}
+.chip:hover{background:var(--bg2)}
+.chip[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.chip[disabled]{opacity:.45;cursor:not-allowed}
+
+.body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.scroll{flex:1;overflow:auto;padding:var(--s3) var(--s4)}
+.field{height:32px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);display:flex;align-items:center;padding:0 var(--s3);gap:var(--s2);color:var(--muted)}
+.field.focus{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);color:var(--text)}
+
+/* icon list: one line of meta, selected row has a bar + tint */
+.list{display:flex;flex-direction:column;gap:2px}
+.item{display:grid;grid-template-columns:20px 36px 1fr auto auto;gap:var(--s3);align-items:center;height:52px;padding:0 var(--s3) 0 var(--s3);border-radius:var(--r);border-left:3px solid transparent}
+.item:hover{background:var(--bg2)}
+.item.sel{background:var(--brand-soft);border-left-color:var(--brand)}
+.item .name{font-weight:600}
+.thumb{width:36px;height:36px;border-radius:var(--r);background:var(--bg2);display:grid;place-items:center}
+.cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--muted);display:grid;place-items:center}
+.cb.on{background:var(--brand);border-color:var(--brand)}
+.cb.on::after{content:"";width:8px;height:4px;border-left:2px solid var(--brand-ink);border-bottom:2px solid var(--brand-ink);transform:rotate(-45deg) translate(1px,-1px)}
+.tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--muted);white-space:nowrap}
+.tag.warn{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.tag.err{background:var(--err-bg);color:var(--err);font-weight:600}
+
+/* sticky action bar: the one primary action once there are results */
+.foot{border-top:1px solid var(--line);padding:var(--s3) var(--s4);display:flex;align-items:center;gap:var(--s3);background:var(--bg)}
+.status{display:flex;gap:var(--s2);align-items:center;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+
+/* cards and settings */
+.card{border:1px solid var(--line);border-radius:8px;padding:var(--s3) var(--s4);display:flex;flex-direction:column;gap:var(--s3)}
+.card+.card{margin-top:var(--s3)}
+.card h3{margin:0;font-size:12px;font-weight:700}
+.card p{margin:0;color:var(--muted)}
+.fmt{display:grid;grid-template-columns:20px 1fr auto;gap:var(--s3);align-items:center;min-height:44px;padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--r)}
+.fmt+.fmt{margin-top:var(--s2)}
+.fmt.on{border-color:var(--brand-line);background:var(--brand-soft)}
+.fmt b{font-weight:600}
+.fmt small{display:block;color:var(--muted)}
+.size{color:var(--muted);font-variant-numeric:tabular-nums}
+.group-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:var(--s4) 0 var(--s2)}
+.group-label:first-child{margin-top:0}
+.form{display:grid;grid-template-columns:120px 1fr;gap:var(--s3) var(--s3);align-items:center}
+.form label{color:var(--text)}
+.hint{grid-column:2;color:var(--muted);margin-top:-6px}
+.switch{width:32px;height:18px;border-radius:9px;background:var(--bg3);position:relative;display:inline-block}
+.switch.on{background:var(--brand)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:var(--shadow)}
+.switch.on::after{left:16px}
+.notice{border-radius:var(--r);padding:var(--s3);background:var(--bg2);display:flex;gap:var(--s2)}
+.notice.warn{background:var(--warn-bg);color:var(--warn)}
+.step{display:flex;gap:var(--s2);align-items:center;color:var(--muted);font-size:11px}
+.step b{color:var(--text)}
+svg{display:block}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Icon Library Toolkit: proposed UI</h1>
+  <p class="lead">Mockup of the redesign proposed in <code>docs/UX-REVIEW.md</code>. Same 460 × 640 window. Changes: one scan row, Export as the single primary action, tabbed Settings with output formats first, a 4 / 8 / 12 / 16 spacing scale, and clearly visible active states (tabs, chips, segments, selected rows, format cards). Use the toggle to check dark mode.</p>
+  <div class="bar"><button id="theme">Toggle dark mode</button></div>
+
+  <div class="frames">
+
+  <!-- 1. Icons tab -->
+  <figure>
+    <figcaption>1 · Review results: Icons tab<span>One scan row. Status line replaces the tier jargon. Export is the only primary button.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row">
+          <div class="seg grow" role="group" aria-label="Scan scope">
+            <button aria-pressed="false">Selection</button><button aria-pressed="true">Page</button><button aria-pressed="false">Document</button>
+          </div>
+          <button class="btn">Scan again</button>
+          <button class="icon-btn" aria-label="Settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        </div>
+        <div class="status"><span class="dot"></span><span><b style="color:var(--text)">16 icons</b> · 2 warnings · 24 × 24 grid · Library health good</span></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">Icons <span class="badge">16</span></button>
+        <button class="tab" role="tab" aria-selected="false">Issues <span class="badge warn">2</span></button>
+        <button class="tab" role="tab" aria-selected="false">Skipped <span class="badge">0</span></button>
+      </div>
+      <div class="body">
+        <div class="scroll">
+          <div class="row" style="margin-bottom:12px">
+            <div class="field focus grow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search 16 icons</div>
+            <div class="seg" style="width:104px"><button aria-pressed="true">☰</button><button aria-pressed="false">▦</button></div>
+          </div>
+          <div class="chips" style="margin-bottom:12px">
+            <button class="chip" aria-pressed="true">All 16</button>
+            <button class="chip" aria-pressed="false" disabled>Blocked 0</button>
+            <button class="chip" aria-pressed="false">Warnings 2</button>
+            <button class="chip" aria-pressed="false">Category ▾</button>
+          </div>
+          <div class="row" style="padding:0 12px 8px 15px"><span class="cb on"></span><span class="muted">Select all 16</span></div>
+          <div class="list">
+            <div class="item"><span class="cb on"></span><span class="thumb">⌂</span><div><div class="name">home</div><div class="muted">Navigation · used 4×</div></div><span></span><span style="color:var(--ok)">✓</span></div>
+            <div class="item sel"><span class="cb on"></span><span class="thumb">⌕</span><div><div class="name">search</div><div class="muted">Navigation · used 2×</div></div><span></span><span style="color:var(--ok)">✓</span></div>
+            <div class="item"><span class="cb on"></span><span class="thumb">＋</span><div><div class="name">plus</div><div class="muted">Actions · used 3×</div></div><span></span><span style="color:var(--ok)">✓</span></div>
+            <div class="item"><span class="cb on"></span><span class="thumb">－</span><div><div class="name">minus</div><div class="muted">Actions · used 4×</div></div><span class="tag warn">Shadow effect</span><span class="icon-btn" title="Show in Figma">◎</span></div>
+            <div class="item"><span class="cb on"></span><span class="thumb">✕</span><div><div class="name">close</div><div class="muted">Actions · used 5×</div></div><span></span><span style="color:var(--ok)">✓</span></div>
+          </div>
+        </div>
+        <div class="foot">
+          <div class="status grow"><span class="dot"></span>16 icons ready · 5 formats</div>
+          <button class="btn primary">Export 16 icons</button>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- 2. Issues tab -->
+  <figure>
+    <figcaption>2 · Review results: Issues tab<span>One summary sentence, then grouped cards. "Fix" is an action, not a paragraph.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row">
+          <div class="seg grow"><button aria-pressed="false">Selection</button><button aria-pressed="true">Page</button><button aria-pressed="false">Document</button></div>
+          <button class="btn">Scan again</button>
+          <button class="icon-btn">⚙</button>
+        </div>
+        <div class="status"><span class="dot" style="background:var(--warn)"></span><span><b style="color:var(--text)">16 icons</b> · 2 warnings · nothing blocks the export</span></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Icons <span class="badge">16</span></button>
+        <button class="tab" role="tab" aria-selected="true">Issues <span class="badge warn">2</span></button>
+        <button class="tab" role="tab" aria-selected="false">Skipped <span class="badge">0</span></button>
+      </div>
+      <div class="body">
+        <div class="scroll">
+          <div class="row" style="margin-bottom:12px"><div class="grow muted">2 warnings affect 2 icons. None can be fixed automatically.</div><button class="btn">Export report</button></div>
+          <div class="card" style="border-left:4px solid var(--warn)">
+            <div class="row"><b class="grow" style="font-size:13px">Shadow or blur effect</b><span class="tag warn">1 icon</span></div>
+            <p>Effects can't be themed, so the export draws the icon without them.</p>
+            <div class="row"><b>How to fix:</b><span>remove the effect in Figma, then scan again.</span></div>
+            <div class="row"><button class="btn">Show icon</button><button class="btn">Select in Figma</button></div>
+          </div>
+          <div class="card" style="border-left:4px solid var(--warn)">
+            <div class="row"><b class="grow" style="font-size:13px">Layer still has a default name</b><span class="tag warn">1 icon</span></div>
+            <p>Names like “Frame 12” don't tell developers what the icon is.</p>
+            <div class="row"><b>How to fix:</b><span>rename the layer, or rename it here for the export only.</span></div>
+            <div class="row"><button class="btn">Show icon</button><button class="btn">Select in Figma</button></div>
+          </div>
+          <p class="muted" style="margin-top:12px"><a href="#" style="color:var(--brand)">Suggested order for fixing a whole library</a></p>
+        </div>
+        <div class="foot">
+          <div class="status grow"><span class="dot"></span>16 icons ready · 5 formats</div>
+          <button class="btn primary">Export 16 icons</button>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- 3. Settings: Output -->
+  <figure>
+    <figcaption>3 · Settings → Output (first tab)<span>Formats come first, as cards with a size estimate. Five tabs replace the 1,480 px scroll.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row"><div class="title grow">Settings</div><button class="btn primary">Done</button></div>
+        <div class="muted">Saved on this computer. Nothing is written to your Figma file.</div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">Output</button>
+        <button class="tab" role="tab" aria-selected="false">Style</button>
+        <button class="tab" role="tab" aria-selected="false">Scan</button>
+        <button class="tab" role="tab" aria-selected="false">Team</button>
+        <button class="tab" role="tab" aria-selected="false">Labs</button>
+      </div>
+      <div class="body"><div class="scroll">
+        <div class="group-label">What to export</div>
+        <div class="fmt on"><span class="cb on"></span><div><b>SVG files</b><small>One themeable .svg per icon</small></div><span class="size">6 files · 3 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>SVG sprite</b><small>One file, used with &lt;use&gt;. Best for multi-colour icons</small></div><span class="size">1 file · 3 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>HTML preview</b><small>Searchable page and base CSS</small></div><span class="size">2 files · 18 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>Angular 17.1+</b><small>Signals, tree-shakable, lazy categories</small></div><span class="size">20 files · 15 KB</span></div>
+        <div class="fmt"><span class="cb"></span><div><b>React</b><small>Typed component, no dependencies</small></div><span class="size">13 files · 9 KB</span></div>
+        <div class="fmt"><span class="cb"></span><div><b>Web Component</b><small>Works in any framework</small></div><span class="size">3 files · 5 KB</span></div>
+        <p class="muted" style="margin:8px 0 0"><a href="#" style="color:var(--brand)">More formats</a> (Angular 14+, CSS masks, Code Connect)</p>
+        <div class="group-label">Package</div>
+        <div class="form">
+          <label>Name prefix</label><div class="field">cmn</div>
+          <span class="hint">Used in file names and CSS variables: <code>cmn-home.svg</code>, <code>--cmn-icon-color</code></span>
+          <label>ZIP file name</label><div class="field">cmn-icons.zip</div>
+          <label>Group by folder</label><div class="row"><span class="switch"></span><span>Put icons of each category in its own folder</span></div>
+        </div>
+      </div></div>
+      <div class="foot"><span class="muted grow">4 formats · 42 files · 41 KB</span><button class="btn">Reset section</button></div>
+    </div>
+  </figure>
+
+  <!-- 4. Settings: Scan -->
+  <figure>
+    <figcaption>4 · Settings → Scan<span>Plain-language labels, a fixed label column, hints under fields instead of ⓘ on every row.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row"><div class="title grow">Settings</div><button class="btn primary">Done</button></div>
+        <div class="muted">Saved on this computer. Nothing is written to your Figma file.</div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="false">Output</button>
+        <button class="tab" role="tab" aria-selected="false">Style</button>
+        <button class="tab" role="tab" aria-selected="true">Scan</button>
+        <button class="tab" role="tab" aria-selected="false">Team</button>
+        <button class="tab" role="tab" aria-selected="false">Labs</button>
+      </div>
+      <div class="body"><div class="scroll">
+        <div class="group-label">What counts as an icon</div>
+        <div class="form">
+          <label>Look for</label><div class="field">Components, instances and frames ▾</div>
+          <label>Largest icon</label><div class="field">128 px</div>
+          <label>Grid size</label><div class="seg"><button aria-pressed="true">Detect</button><button aria-pressed="false">Set manually</button></div>
+        </div>
+        <div class="group-label">How strict to be</div>
+        <div class="form">
+          <label>Audit level</label><div class="seg"><button aria-pressed="true">Relaxed</button><button aria-pressed="false">Standard</button><button aria-pressed="false">Strict</button></div>
+          <span class="hint">Strict turns missing components and default layer names into errors.</span>
+          <label>Same name twice</label><div class="seg"><button aria-pressed="true">Stop export</button><button aria-pressed="false">Add category</button><button aria-pressed="false">Add number</button></div>
+          <label>Folders to ignore</label><div class="field">icon, icons</div>
+          <span class="hint">“icon/Home” becomes <code>home</code>, not <code>icon-home</code>.</span>
+        </div>
+        <div class="group-label">Vector layer names</div>
+        <div class="form">
+          <label>Standard name</label><div class="seg"><button aria-pressed="true">Detect from file</button><button aria-pressed="false">Always use…</button></div>
+          <span class="hint">Matching names keep colour overrides when designers swap icons.</span>
+        </div>
+        <p class="muted" style="margin-top:16px"><a href="#" style="color:var(--brand)">Advanced scan options</a></p>
+      </div></div>
+      <div class="foot"><span class="muted grow">Changes apply to the next scan</span><button class="btn">Reset section</button></div>
+    </div>
+  </figure>
+
+  <!-- 5. Export dialog -->
+  <figure>
+    <figcaption>5 · Export<span>Reads like a receipt: what, how big, where to. The same format cards as Settings → Output, so there is one pattern.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row"><div class="title grow">Export 16 icons</div><button class="btn">Close</button></div>
+        <div class="step"><span><b>1</b> Scanned</span>›<span><b>2</b> Reviewed (2 warnings)</span>›<span style="color:var(--brand)"><b>3 Export</b></span></div>
+      </div>
+      <div class="body"><div class="scroll">
+        <div class="group-label">Formats <a href="#" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--brand);float:right">Change in Settings</a></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>SVG files</b></div><span class="size">6 files · 3 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>SVG sprite</b></div><span class="size">1 file · 3 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>HTML preview</b></div><span class="size">2 files · 18 KB</span></div>
+        <div class="fmt on"><span class="cb on"></span><div><b>Angular 17.1+</b></div><span class="size">20 files · 15 KB</span></div>
+        <div class="group-label">Version</div>
+        <div class="card">
+          <div class="row"><b class="grow">Suggested version 1.3.0</b><span class="tag">minor</span></div>
+          <div class="chips"><span class="tag">2 new</span><span class="tag">1 renamed</span><span class="tag">3 drawing changed</span></div>
+          <p>Compared with: <b style="color:var(--text)">this computer · exported 9 Oct</b> <a href="#" style="color:var(--brand)">Change</a></p>
+        </div>
+      </div>
+      <div class="foot" style="flex-direction:column;align-items:stretch">
+        <button class="btn primary" style="height:36px">Download ZIP · 16 icons, 42 files</button>
+        <button class="btn">Send to project folder…</button>
+      </div></div>
+    </div>
+  </figure>
+
+  <!-- 6. Empty / first run -->
+  <figure>
+    <figcaption>6 · First run (empty state)<span>Says what happens, what will not happen, and the next step. No results chrome until there are results.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row"><div class="title grow">Icon Library Toolkit</div><button class="icon-btn">⚙</button></div>
+      </div>
+      <div class="body"><div class="scroll" style="display:flex;flex-direction:column;justify-content:center;gap:16px">
+        <div class="card" style="gap:16px">
+          <h3 style="font-size:14px">Find and export your icons</h3>
+          <p>Choose where to look, then scan. Your file is never changed.</p>
+          <div class="seg"><button aria-pressed="true">Selection</button><button aria-pressed="false">Page</button><button aria-pressed="false">Document</button></div>
+          <div class="notice"><span>ℹ</span><span>1 layer selected: <b>Icons / Navigation</b>. Selection scans only what you picked.</span></div>
+          <button class="btn primary" style="height:36px">Scan selection</button>
+          <div class="row"><span class="switch"></span><span>Only icons used in designs (instances)</span></div>
+        </div>
+        <p class="muted" style="text-align:center">Then: review warnings → export SVG, sprite, Angular, React and more.</p>
+      </div></div>
+    </div>
+  </figure>
+
+  </div>
+</div>
+<script>
+document.getElementById('theme').addEventListener('click',function(){
+  var r=document.documentElement; r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';
+});
+</script>
+</body>
+</html>
