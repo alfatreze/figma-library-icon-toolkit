@@ -5,7 +5,7 @@ import {
 } from '../../core/baseline'
 import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from '../../core/changelog'
 import { BaselinesHandler, BaselineSavedHandler, Icon, SaveBaselineHandler, Settings } from '../../types'
-import { outputReady } from '../../core/outputs'
+import { baselineOutputOf } from '../../core/outputs'
 import { clientFor } from '../repoClient'
 import { countChanges } from '../selectors'
 
@@ -74,8 +74,8 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
   }
   const loadRepo = async () => {
     try {
-      // every output carries the same icons.json, so the first one that is ready is the baseline
-      const out = settings.outputs.find((o) => outputReady(o, settings.tokens))
+      // every output carries the same icons.json: use the chosen one, else the first that is ready
+      const out = baselineOutputOf(settings)
       if (!out) {
         setMessage('Add a repository and its token in Settings → Output first.')
         return

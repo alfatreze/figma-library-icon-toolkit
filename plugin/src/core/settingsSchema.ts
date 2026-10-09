@@ -105,6 +105,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
       return { ...o, id }
     })
   }),
+  baselineOutput: rule(false, str(40)),
   tokens: rule(false, shape<Settings['tokens']>({ github: str(400), gitlab: str(400) }, DEFAULT_SETTINGS.tokens)),
   precision: rule(true, int(1, 6)),
   formats: rule(

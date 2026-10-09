@@ -13,6 +13,12 @@ export interface BuildInput {
   grid: GridInfo
   tier: Tier
   generatedAt: string
+  /**
+   * Add the Angular sprite strategy (loader + <sprite-icon>) even though this build does not contain the sprite file, because another
+   * output publishes it. The component reads the sprite URL at runtime (provide…Sprite({ url })), so it needs no path to the other repository.
+   * Default: whether the sprite package is part of this build.
+   */
+  spriteStrategy?: boolean
   /** library version + identity history (from comparing with a previous icons.json) */
   release?: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null }
 }

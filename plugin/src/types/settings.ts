@@ -88,6 +88,8 @@ export interface Settings {
   compositeFrames: 'ignore' | 'include'
   /** repository destinations for "Publish" (the local ZIP always has every package) */
   outputs: OutputSettings[]
+  /** id of the output whose icons.json is the baseline for "changed since"; empty or unknown = the first output that is ready */
+  baselineOutput: string
   /** one access token per git host; stays on this computer (never in the team config, exports or diagnostics) */
   tokens: { github: string; gitlab: string }
   precision: number
@@ -140,6 +142,7 @@ export const DEFAULT_SETTINGS: Settings = {
   labsBranchAck: false,
   compositeFrames: 'ignore',
   outputs: [],
+  baselineOutput: '',
   tokens: { github: '', gitlab: '' },
   precision: 3,
   formats: {

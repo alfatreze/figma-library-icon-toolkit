@@ -1,4 +1,4 @@
-import { Button, Checkbox, Textbox, Toggle } from '@create-figma-plugin/ui'
+import { Button, Checkbox, Dropdown, Textbox, Toggle } from '@create-figma-plugin/ui'
 import { Fragment, h } from 'preact'
 import { useState } from 'preact/hooks'
 import { TARGETS } from '../core/generators'
@@ -101,6 +101,15 @@ export function OutputsTab(props: {
             </div>
           )
         })}
+        {settings.outputs.length > 1 && (
+          <Field label="Baseline" info={{ title: 'Baseline for “changed since”', body: <span>Every output carries the same <code>icons.json</code>, so any of them can tell the plugin what changed since the last publish. Choose the one that is the source of truth for your releases. “Read from the repository” in the Export dialog reads this output.</span> }}>
+            <Dropdown
+              value={settings.outputs.some((o) => o.id === settings.baselineOutput) ? settings.baselineOutput : settings.outputs[0].id}
+              onValueChange={(v) => patch({ baselineOutput: v })}
+              options={settings.outputs.map((o, i) => ({ value: o.id, text: o.name || `${o.repo || 'Output ' + (i + 1)} / ${o.subdir || '…'}` }))}
+            />
+          </Field>
+        )}
         <div class={styles.fieldRow}>
           <Button secondary onClick={() => patch({ outputs: [...settings.outputs, newOutput(settings.outputs)] })} disabled={settings.outputs.length >= MAX_OUTPUTS}>Add output</Button>
           {groups.length > 1 && <span class={styles.muted}>{plural(groups.length, 'repository')}: each gets its own branch and request.</span>}

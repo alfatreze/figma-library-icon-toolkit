@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildFiles } from '../src/core/generators'
 import { createClient, planPublish, publishPlan } from '../src/core/gitHost'
-import { groupOutputs, mergePlans, newOutput, outputReady, packagesOf, settingsFor, validateOutputs } from '../src/core/outputs'
+import { baselineOutputOf, groupOutputs, mergePlans, newOutput, outputReady, packagesOf, settingsFor, validateOutputs } from '../src/core/outputs'
 import { migrateSettings, SCHEMA, SHARED_KEYS } from '../src/core/settingsSchema'
 import { DEFAULT_SETTINGS, OutputSettings, Settings } from '../src/types'
 import { fakeGithub, newState } from './helpers/fakeHost'
@@ -99,5 +99,29 @@ describe('settings migration', () => {
     expect(shared).not.toContain('outputs')
     expect(shared).not.toContain('tokens')
     expect(SCHEMA.outputs.shared || SCHEMA.tokens.shared).toBe(false)
+  })
+})
+
+describe('baseline output', () => {
+  const settings = (baselineOutput: string, outputsList: OutputSettings[]) => ({ outputs: outputsList, tokens, baselineOutput })
+  it('uses the chosen output when it is ready, else the first that is', () => {
+    const list = [out({ id: 'a' }), out({ id: 'b', subdir: 'b' }), out({ id: 'c', provider: 'gitlab', subdir: 'c' })]
+    expect(baselineOutputOf(settings('b', list))?.id).toBe('b')
+    expect(baselineOutputOf(settings('c', list))?.id).toBe('a') // chosen one has no token for its host
+    expect(baselineOutputOf(settings('gone', list))?.id).toBe('a')
+    expect(baselineOutputOf(settings('', []))).toBeUndefined()
+  })
+})
+
+describe('Angular without the sprite package in the same output', () => {
+  const base = { allIcons: [], grid: { width: 24, height: 24, count: 0, total: 0, padding: 0, detected: false } as never, tier: 'A' as never, generatedAt: '2026-01-01' }
+  const only = (o: OutputSettings) => settingsFor({ ...DEFAULT_SETTINGS, formats: { ...formats, sprite: true } }, o)
+  it('keeps the sprite strategy when another output publishes the sprite file', () => {
+    const o = out({ packages: ['angularModern'] })
+    const without = Object.keys(buildFiles({ ...base, settings: only(o) }))
+    expect(without.some((p) => p.includes('-sprite'))).toBe(false)
+    const withStrategy = Object.keys(buildFiles({ ...base, settings: only(o), spriteStrategy: true }))
+    expect(withStrategy.some((p) => p.startsWith('angular/') && p.endsWith('-sprite.ts'))).toBe(true)
+    expect(withStrategy.some((p) => p.startsWith('sprite/'))).toBe(false) // the file itself stays in the other output
   })
 })

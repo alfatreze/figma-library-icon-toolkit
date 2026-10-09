@@ -497,7 +497,7 @@ Icons: ${b.icons.length}. \`icon-data.ts\` has the typed name list (\`${C}Name\`
 export function angularFiles(b: BuildInput, flavour: 'modern' | 'classic'): Files {
   const dir = flavour === 'modern' ? 'angular' : 'angular-classic'
   const { n, C, P, reg, provide } = names(b)
-  const sprite = b.settings.formats.sprite
+  const sprite = b.spriteStrategy ?? b.settings.formats.sprite
   const out: Files = {
     ...iconDataFiles(b, dir),
     [`${dir}/${n}-icon-registry.ts`]: flavour === 'modern' ? registryModern(b) : registryClassic(b),

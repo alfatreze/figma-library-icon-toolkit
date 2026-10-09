@@ -24,6 +24,12 @@ const repoShape = (r: string) => /^[\w.-]+(\/[\w.-]+)+$/.test(r.trim())
 /** ready to publish: a valid repository and a token for its host */
 export const outputReady = (o: OutputSettings, tokens: Settings['tokens']): boolean => repoShape(o.repo) && tokens[o.provider].trim().length > 0
 
+/** the output whose icons.json is the "changed since" baseline: the chosen one if it is ready, else the first that is */
+export function baselineOutputOf(settings: Pick<Settings, 'outputs' | 'tokens' | 'baselineOutput'>): OutputSettings | undefined {
+  const ready = settings.outputs.filter((o) => outputReady(o, settings.tokens))
+  return ready.find((o) => o.id === settings.baselineOutput) ?? ready[0]
+}
+
 export function newOutput(existing: OutputSettings[], over: Partial<OutputSettings> = {}): OutputSettings {
   let n = existing.length + 1
   while (existing.some((o) => o.id === `output-${n}`)) n++
