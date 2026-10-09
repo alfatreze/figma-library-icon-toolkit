@@ -98,12 +98,12 @@ plugin/src/
 | A7 handler validation | **done** | `main/guards.ts` (+ `safe()` wrapper so no handler leaves the UI waiting) |
 | A8 baseline decode | **done** | streaming inflate with a cap, size limit, entry validation |
 | A9 companion hardening | **done** | symlink refusal, managed-list allow-list, 20 MB cap, Host check, `check-ref-format`, `pathToFileURL`, `ICON_SYNC_TOKEN` |
-| A10 CI/supply chain | **partly** | read-only token, release job scoped, lockfiles + `npm ci` for pinned toolchains, `latest` job non-blocking, notices check, release checksum. **Not done:** pin actions by SHA, build provenance attestation |
+| A10 CI/supply chain | **partly** | read-only token, release job scoped, lockfiles + `npm ci` for pinned toolchains, `latest` job non-blocking, notices check, release checksum. Actions pinned by SHA. **Not done:** build provenance attestation |
 | B1-B8, B11-B16, B18 | **done** | scan isolation/yield/cancel/busy reply, page-by-page load, parallel export, set variants, inside-instance, usage in components, stroke colour carry, rename-after-success, outline limits and render bounds, two-pass changelog + alias chains, reserved-word rule removed, codegen timeout, override lookups capped, caches cleared, precision 0, locale-independent ordering |
 | B9 duplicates | **partly** | stroke weight/cap/join in the signature, 64-bit hash, indexed lookups. Confidence is not downgraded for colour-only state variants |
 | B10 geometry hash | **done** | shapes, stroke attrs, transforms; plain filled paths keep their old hash (no false "changed" on upgrade). Strokes/non-path icons change once |
 | B17 baseline identity | **done** | first page id instead of name + all page ids; at most 20 local baselines |
-| Arch 1 `ui.tsx` | **partly** | `useScan`, `useBaselines`, `useSync`, `ui/selectors.ts`, `ui/companion.ts` extracted (1177 → about 1000 lines). **Not done:** `useFixes`, `useFilters` reducer, splitting the three tab panels into components |
+| Arch 1 `ui.tsx` | **partly** | `useScan`, `useBaselines`, `useSync`, `ui/selectors.ts`, `ui/companion.ts` extracted (1177 → about 1000 lines). `useFixes` (also restored the `FIX_RESULT`/`FIXES_APPLIED` listeners lost in the hook refactor), list/issue components in `ui/components/`, `IconsPanel`/`IssuesPanel`/`SkippedPanel` in `ui/panels/`. **Not done:** `useFilters` reducer |
 | Arch 2 types + messages | **done** | `types/{settings,domain,fixes,messages}.ts`; one `Messages` map ties each message name to its arguments |
 | Arch 3 settings versioning | **done** | see A1 |
 | Arch 4 generators | **partly** | `Target` registry (`generators/targets.ts`) drives `buildFiles`, the overview and file ownership; helper duplication removed. **Not done:** merging the Angular modern/classic templates |
@@ -113,4 +113,4 @@ plugin/src/
 | Arch 9 performance | **done** | per-icon theme cache, only relevant settings re-run processing, throttled batches, overview not rebuilt on format toggles, ZIP toast before the blocking work, O(n²) spots removed. **Not done:** zip in a worker |
 | Arch 10 bundle | **partly** | budget now 490 KB (the bundle grew with validation); generators are not lazy-loaded because the plugin bundler emits one file |
 | Arch 11 tests | **partly** | added: scan, guards, security, hooks, dialog, selectors, baseline housekeeping. **Still untested:** `diagnose.ts`, `facts.ts`, `codegen.ts` |
-| Arch 12 accessibility | **partly** | `Dialog` (focus move, trap, Esc, restore), tab keyboard, live region. **Not done:** `tabpanel`/`aria-controls`, keyboard-accessible tooltips, dark-mode contrast check |
+| Arch 12 accessibility | **partly** | `Dialog` (focus move, trap, Esc, restore), tab keyboard, live region. keyboard-accessible hints (`data-hint`), `theme-contrast` rule for fixed colours. **Not done:** `tabpanel`/`aria-controls`, contrast of the warn chips in dark mode |

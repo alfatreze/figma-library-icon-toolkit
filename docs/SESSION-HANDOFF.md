@@ -26,7 +26,7 @@ Data flow: UI sends `SCAN` → main traverses (components, instances, frames, lo
 ## 3. Feature status (v0.4.0)
 Done: scope selector, usage mode, categories, scan robustness (per-layer isolation, page-by-page load, parallel export), export formats via a `Target` registry (SVG, sprite, HTML preview, mask, Angular 17.1+/14+ with per-icon tree-shakable data, lazy category chunks and sprite strategy, React, Web Component, Code Connect templates), identity/versions with layered baselines (this computer / shared in file (Labs) / repository / loaded file), token naming and variable matching by paint order, stroke policy + stroke-to-path, team config, duplicate-name policy and aliases for intentional duplicates, Issues with Labs fixes (hardened: auto-layout, reactions, rollback), Dev Mode codegen + inspect panel + dev resources (Labs), **publish to GitHub / GitLab** (new branch, one commit, pull / merge request, generated description, no local helper), settings schema with validation and migrations, allow-list SVG sanitiser, diagnostics ("Copy diagnostics").
 
-UI (v0.3): one stable skeleton (scan bar, fixed-height status row, tabs, toolbar, sticky Export bar; states change content only), five-tab Settings with output formats first, S/M/L previews + hover preview + grid, visible active states, each fact shown once.
+UI (v0.3): one stable skeleton (scan bar, fixed-height status row, tabs, toolbar, sticky Export bar; states change content only), six-tab Settings (Packages, Output, Style, Scan, Team, Labs), S/M/L previews + hover preview + grid, visible active states, each fact shown once.
 
 **Not verified inside Figma yet (this is Gate 0 in `ROADMAP.md`):** everything since v0.1.0, notably Dev Mode codegen and inspect panel, Labs fixes, shared config and baselines, publishing against real GitHub/GitLab accounts (only fake servers and a bad-token call to the real APIs), stroke-to-path accuracy, manifest keys (`capabilities`, `codegenPreferences`, `networkAccess`). Checklist: `docs/verification.md` (V1-V33).
 
@@ -41,7 +41,7 @@ UI (v0.3): one stable skeleton (scan bar, fixed-height status row, tabs, toolbar
 | Tokens | path / collection+path / custom mapping / none, prefix, preview | `DECISIONS-v3.md` |
 | Dev Mode | config published in the file (opt-in write); preferences; Angular > HTML > React > CSS; Code Connect deferred (needs Org plan) | `DEV-MODE.md`, `DECISIONS-v4.md` |
 | Storage | clientStorage = per user; in-file plugin data = shared; repo `icons.json` = durable | `CHANGE-DETECTION.md` |
-| Publishing | Directly from the plugin to github.com / gitlab.com with the user's token; always a new branch + PR/MR; no local helper (a helper was built and removed: it was a misreading of the request) | `DECISIONS-v5.md` |
+| Publishing | Directly from the plugin to github.com / gitlab.com with the user's token; always a new branch + PR/MR; no local helper (a helper was built and removed: it was a misreading of the request). Several outputs (packages per folder / repository), one branch per repository | `DECISIONS-v5.md`, `OUTPUTS.md` |
 | UX | Stable skeleton, show each fact once, 4-point spacing, visible active states, bigger previews | `UX-REVIEW.md` |
 | Security | Everything from outside is validated (settings schema, catalog, baseline, UI messages); allow-list sanitiser | `AUDIT-v0.2.0.md` |
 
@@ -49,12 +49,12 @@ UI (v0.3): one stable skeleton (scan bar, fixed-height status row, tabs, toolbar
 See **`ROADMAP.md`** (Gate 0 = verify in Figma; v0.5 designer / system-manager workflow; v0.6 developer experience; later: drift check in CI, self-hosted git hosts). Immediate next steps:
 1. **Gate 0:** run `docs/verification.md` in Figma (V10, V14, V16-V18, V21-V33); publish to a throwaway GitHub and GitLab repo (V14, V32, V33); fix what breaks.
 2. Community submission (listing text drafted in the session; review `networkAccess` and the `inspect` capability).
-3. v0.4 polish: auto-contrast preview tile, plural helper, dark-mode contrast check, hints instead of tooltips, `useFixes` + panel split, tests for `diagnose`/`facts`/`codegen`, Actions pinned by SHA.
+3. v0.4 polish: done (unreleased): auto-contrast preview tile, plural helper, `theme-contrast` audit rule, keyboard-reachable hints (`data-hint`) instead of `title`, `useFixes` hook, `ui.tsx` split (621 lines): row/issue components in `ui/components/`, the three tab panels in `ui/panels/`, tests for `diagnose`/`facts`/`codegen`, Actions pinned by SHA. Left: build provenance attestation, and a Figma/visual check of the hints (Gate 0).
 
 Open owner decisions: audience of the first Community release (design-system teams vs developers), Org/Enterprise plan (Code Connect, CI drift check), which frameworks next (Vue / Svelte), brand colour (follow Figma's token or a darker blue for text contrast).
 
 ## 5b. Audit follow-up
-`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: `useFixes`/filters reducer and tab-panel components in `ui.tsx`, Angular modern/classic template merge, tests for `diagnose.ts`/`facts.ts`/`codegen.ts`, action SHA pinning and release provenance, tooltip keyboard access.
+`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: filters reducer and tab-panel components in `ui.tsx`, Angular modern/classic template merge, release provenance attestation.
 
 ## 6. Lessons learned (avoid repeating)
 - **Manifest:** unknown keys are rejected (`editorAPI` broke loading). `@create-figma-plugin` spreads unknown `figma-plugin` keys into `manifest.json`. If Figma rejects the manifest, remove `codegenPreferences`, then `vscode`.
