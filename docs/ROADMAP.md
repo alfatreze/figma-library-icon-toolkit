@@ -32,7 +32,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | Feature | Value | Size |
 |---|---|---|
 | **Icon detail panel** (replaces the inline expander): all sizes, colour slots, usage and overrides, findings, history | One place to understand an icon | M |
-| **Library health report** as a shareable HTML or Markdown file (score by area, what changed, what blocks) | Lets a system manager show progress without opening Figma | M |
+| ~~**Library health report**~~ done (unreleased, not yet run in Figma): Issues → Report… previews the summary and downloads a self-contained HTML page (light/dark, printable), Markdown, or the per-icon fix plan: verdict, ready %, coverage (components, descriptions, bound colours), the 8 areas, changes since the baseline, most common issues, blocked icons | Lets a system manager show progress without opening Figma | M |
 | **Unused-icons report**: icons never placed as instances in the scanned files | Pruning decisions backed by data | M |
 | **Bulk rename with preview** and a naming-pattern check (kebab-case, verb-noun, category prefix) | The most common cleanup job; Labs for writes, report-only otherwise | M |
 | ~~**Descriptions and tags helper**~~ done (unreleased, not yet run in Figma): Issues → Descriptions… downloads a CSV template (only without a description, or all), reads the filled one back, shows what would change with the parsed tags, and writes in Labs (checked in the main thread too, skips descriptions changed since the scan, one undo step) | Feeds the searchable preview page and AI guide | S |

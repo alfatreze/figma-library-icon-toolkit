@@ -17,6 +17,8 @@ import { ConfirmApply, FixCard } from './ui/Fixes'
 import { useFilters } from './ui/hooks/useFilters'
 import { useDescriptions } from './ui/hooks/useDescriptions'
 import { DescriptionsDialog } from './ui/DescriptionsDialog'
+import { ReportDialog } from './ui/ReportDialog'
+import { buildHealth, healthHtml, healthMarkdown } from './core/report'
 import { useFixes } from './ui/hooks/useFixes'
 import { groupOutputs, outputReady, settingsFor } from './core/outputs'
 import { IconsPanel, Status, View } from './ui/panels/IconsPanel'
@@ -269,6 +271,14 @@ function Plugin() {
     }
   }
   const doFixesReport = () => download('FIXES-DRY-RUN.md', fixesReportMarkdown(allFixes, new Date().toISOString().slice(0, 10)), 'text/markdown')
+  const [reportOpen, setReportOpen] = useState(false)
+  const healthReport = useMemo(
+    () =>
+      reportOpen
+        ? buildHealth({ title: cleanNamespace(settings.namespace), generatedAt: new Date().toISOString().slice(0, 10), icons, tier: processed.tier, grid: processed.grid, profile: settings.profile, diff: release.diff, baseline: baseline.source ? BASELINE_LABEL[baseline.source] : null, skipped: summary?.skipped.length ?? 0 })
+        : null,
+    [reportOpen, icons, processed.tier, processed.grid, settings.profile, settings.namespace, release.diff, baseline.source, summary]
+  )
   const doReport = () => download('FIX-PLAN.md', fixPlanMarkdown(icons, new Date().toISOString().slice(0, 10)), 'text/markdown')
 
   // ---- render --------------------------------------------------------------
@@ -502,7 +512,7 @@ function Plugin() {
           cursor={cursor}
           showNotes={showNotes}
           renderFix={renderFix}
-          onReport={doReport}
+          onReport={() => setReportOpen(true)}
           onFixesReport={doFixesReport}
           onFix={fixAll}
           onShowRule={(rule) => showInList({ rule })}
@@ -579,6 +589,16 @@ function Plugin() {
           onCancel={fixes.closeConfirm}
           onApply={fixes.apply}
           applying={fixes.applying}
+        />
+      )}
+
+      {reportOpen && healthReport && (
+        <ReportDialog
+          report={healthReport}
+          onClose={() => setReportOpen(false)}
+          onHtml={() => download(`${cleanNamespace(settings.namespace)}-health-report.html`, healthHtml(healthReport), 'text/html')}
+          onMarkdown={() => download(`${cleanNamespace(settings.namespace)}-health-report.md`, healthMarkdown(healthReport), 'text/markdown')}
+          onFixPlan={doReport}
         />
       )}
 

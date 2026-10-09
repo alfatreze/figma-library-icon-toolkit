@@ -7,6 +7,7 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 ### Added
+- **Library health report** (Issues → *Report…*): a preview of the summary and a download as one self-contained HTML page (no scripts or external files, light and dark, printable) or Markdown. It shows the verdict, the share of icons that are ready, coverage (components, descriptions, colours bound to variables), the eight areas with their status, the changes since the baseline (and whether they are breaking), the most common issues with how many can be fixed automatically, and the icons that block the export. The per-icon fix plan moved into the same dialog.
 - **Descriptions and tags helper** (Issues → *Descriptions…*): download a CSV template of the components without a description (or all), fill in comma-separated search words, load it back, review what would change with the tags it produces, and write the descriptions (Labs, one undo step). An empty cell never clears a description; a description changed in the file since the scan is left alone; spreadsheet formulas in the CSV are neutralised.
 
 ## [0.5.0] - 2026-10-10

@@ -99,3 +99,20 @@ describe('DescriptionsDialog', () => {
     expect(root.textContent).toContain('All 3 components have a description')
   })
 })
+
+import { ReportDialog } from '../src/ui/ReportDialog'
+import { buildHealth } from '../src/core/report'
+
+describe('ReportDialog', () => {
+  const icons = [icon('1:1', 'home'), icon('1:2', 'search', 'find')]
+  const report = buildHealth({ title: 'cmn', generatedAt: '2026-10-10', icons, tier: 'T4', grid: { width: 16, height: 16, count: 2, total: 2, padding: 0, detected: true }, profile: 'standard', diff: null, baseline: null, skipped: 0 })
+
+  it('summarises the library and offers the downloads', () => {
+    const calls: string[] = []
+    act(() => render(<ReportDialog report={report} onClose={() => {}} onHtml={() => calls.push('html')} onMarkdown={() => calls.push('md')} onFixPlan={() => calls.push('plan')} />, root))
+    expect(root.textContent).toContain('Library health: good')
+    expect(root.textContent).toContain('No baseline is selected')
+    for (const b of Array.from(root.querySelectorAll('button'))) if (/HTML|Markdown|Fix plan/.test(b.textContent ?? '')) (b as HTMLButtonElement).click()
+    expect(calls.sort()).toEqual(['html', 'md', 'plan'])
+  })
+})

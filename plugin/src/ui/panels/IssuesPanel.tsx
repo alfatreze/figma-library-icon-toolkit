@@ -58,7 +58,7 @@ export function IssuesPanel(p: IssuesPanelProps) {
           <span>{p.summary}</span>
           <span class={styles.fieldRow}>
           <Button secondary onClick={p.onDescriptions} disabled={p.iconCount === 0}>Descriptions…</Button>
-          <Button secondary onClick={p.onReport} disabled={p.iconCount === 0}>Export report</Button>
+          <Button secondary onClick={p.onReport} disabled={p.iconCount === 0}>Report…</Button>
         </span>
         </div>
         {actionable.length > 0 && p.autoFixCount > 0 && (
