@@ -8,7 +8,7 @@
  * Without --dump, a sample export is generated first (plugin/test/dump.test.ts).
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,7 +39,9 @@ const src = join(work, 'src')
 execFileSync('cp', ['-R', dir, src])
 const bin = (name) => join(toolchain, 'node_modules', '.bin', name)
 
-const base = { strict: true, skipLibCheck: true, noEmit: false, outDir: join(work, 'out'), target: 'ES2022', module: 'ES2022', moduleResolution: 'node', lib: ['ES2022', 'DOM'], declaration: false }
+// TypeScript 5+ wants "bundler" resolution (and TypeScript 6 drops "node10" entirely); 4.x only knows "node"
+const tsMajor = Number(JSON.parse(readFileSync(join(toolchain, 'node_modules', 'typescript', 'package.json'), 'utf8')).version.split('.')[0])
+const base = { strict: true, skipLibCheck: true, noEmit: false, outDir: join(work, 'out'), rootDir: src, target: 'ES2022', module: 'ES2022', moduleResolution: tsMajor >= 5 ? 'bundler' : 'node', lib: ['ES2022', 'DOM'], declaration: false }
 const ts = (extra, files) => writeFileSync(join(work, 'tsconfig.json'), JSON.stringify({ compilerOptions: { ...base, ...extra }, include: files ?? ['src/**/*.ts', 'src/**/*.tsx'] }, null, 2))
 
 if (kind.startsWith('angular')) {
@@ -49,7 +51,7 @@ if (kind.startsWith('angular')) {
   writeFileSync(join(work, 'tsconfig.json'), JSON.stringify(cfg, null, 2))
   execFileSync(bin('ngc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit', cwd: work })
 } else if (kind === 'react') {
-  ts({ jsx: 'react-jsx', moduleResolution: 'bundler' }, ['src/**/*.ts', 'src/**/*.tsx'])
+  ts({ jsx: 'react-jsx', moduleResolution: tsMajor >= 5 ? 'bundler' : 'node' }, ['src/**/*.ts', 'src/**/*.tsx'])
   execFileSync(bin('tsc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit', cwd: work })
 } else if (kind === 'web-component') {
   ts({ allowJs: true, checkJs: true, strict: false }, ['src/**/*.js', 'src/**/*.d.ts'])
