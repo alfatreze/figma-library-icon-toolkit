@@ -4,7 +4,7 @@ import { summariseCategories } from '../categories'
 import { OVERRIDES } from '../overrides'
 import { RULES, STEPS } from '../rules'
 import { changelogMarkdown } from '../changelog'
-import { BuildInput, componentName, Files, ns, strokeSteps, symbolId } from './common'
+import { BuildInput, componentName, Files, ns, strokeSteps, symbolId, policyOf } from './common'
 
 export function manifestFile(b: BuildInput): string {
   const n = ns(b)
@@ -14,7 +14,7 @@ export function manifestFile(b: BuildInput): string {
     libraryVersion: b.release?.version ?? '1.0.0',
     generatedAt: b.generatedAt,
     deprecated: b.release?.deprecated ?? [],
-    stroke: { policy: b.settings.strokePolicy, table: strokeSteps(b), note: b.settings.strokePolicy === 'scale' ? 'strokes scale with the icon' : 'strokes use vector-effect: non-scaling-stroke (screen px)' },
+    stroke: { policy: policyOf(b), table: strokeSteps(b), note: policyOf(b) === 'scale' ? 'strokes scale with the icon' : 'strokes use vector-effect: non-scaling-stroke (screen px)' },
     tier: { id: b.tier, label: TIER_LABEL[b.tier] },
     grid: { width: b.grid.width, height: b.grid.height, padding: b.grid.padding, detected: b.grid.detected },
     cssVariables: {
@@ -120,7 +120,7 @@ These icons have identical artwork to another icon on purpose (the design team m
 Aliases: ${b.icons.filter((i) => i.aliasOf).slice(0, 12).map((i) => `\`${i.name}\` → \`${i.aliasOf}\``).join(', ')}${b.icons.filter((i) => i.aliasOf).length > 12 ? ', …' : ''}.
 
 ` : ''}## Stroke weight
-Policy: **${b.settings.strokePolicy}**. ${b.settings.strokePolicy === 'constant' ? 'Stroke weight is constant in screen px at every icon size.' : b.settings.strokePolicy === 'table' ? 'Weight by size: ' + strokeSteps(b).map((s) => `${s.size}px→${s.weight}px`).join(', ') + '. Use the size classes or the component\'s size input.' : 'Strokes scale with the icon.'}
+Policy: **${policyOf(b)}**. ${policyOf(b) === 'constant' ? 'Stroke weight is constant in screen px at every icon size.' : policyOf(b) === 'table' ? 'Weight by size: ' + strokeSteps(b).map((s) => `${s.size}px→${s.weight}px`).join(', ') + '. Use the size classes or the component\'s size input.' : 'Strokes scale with the icon.'}
 
 ## Usage and overrides (when scanned from designs)
 \`inUse\` (when present) says how often the icon is placed, from a linked library or locally, which sizes are used and which

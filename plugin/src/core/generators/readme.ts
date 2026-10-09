@@ -1,4 +1,4 @@
-import { BuildInput, componentName, constName, ns } from './common'
+import { BuildInput, componentName, constName, ns, policyOf } from './common'
 import { strokeSteps } from './common'
 
 /** README.md shipped inside every export: how it works, the formats, and how to add it to a project. Only enabled formats are documented. */
@@ -10,7 +10,7 @@ export function readmeFile(b: BuildInput): string {
   const name = sample?.name ?? 'icon-name'
   const stroked = b.icons.find((i) => i.kind === 'stroked' || i.kind === 'mixed')
   const multi = b.icons.find((i) => i.kind === 'multicolor')
-  const policy = b.settings.strokePolicy
+  const policy = policyOf(b)
   const angular = f.angularModern || f.angularClassic
   const react = f.react
   const ver = b.release?.version ?? '1.0.0'

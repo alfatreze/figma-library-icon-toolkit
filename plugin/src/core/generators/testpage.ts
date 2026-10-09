@@ -1,4 +1,4 @@
-import { BuildInput, escapeHtml, ns, strokeSteps, symbolId } from './common'
+import { BuildInput, escapeHtml, ns, strokeSteps, symbolId, policyOf } from './common'
 import { inlineSprite } from './svg-files'
 
 const CSS = String.raw`
@@ -207,7 +207,7 @@ ${inlineSprite(b)}
 <aside id="drawer" aria-hidden="true" aria-label="Icon details"></aside>
 <div class="toast" id="toast" role="status">Copied</div>
 <script type="application/json" id="data">${json}</script>
-<script type="application/json" id="stroke">${JSON.stringify({ policy: b.settings.strokePolicy, table: strokeSteps(b) })}</script>
+<script type="application/json" id="stroke">${JSON.stringify({ policy: policyOf(b), table: strokeSteps(b) })}</script>
 <script>${JS.replace(/__NS__/g, n)}</script>
 </body>
 </html>

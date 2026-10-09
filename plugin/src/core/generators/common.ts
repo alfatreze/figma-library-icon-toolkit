@@ -35,3 +35,6 @@ export function esc(s: string): string {
 }
 
 export const strokeSteps = (b: BuildInput) => parseStrokeTable(b.settings.strokeTable)
+
+/** Generators interpolate this into code: never trust the settings object to hold a valid value. */
+export const policyOf = (b: BuildInput): 'constant' | 'scale' | 'table' => (b.settings.strokePolicy === 'scale' || b.settings.strokePolicy === 'table' ? b.settings.strokePolicy : 'constant')

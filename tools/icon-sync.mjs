@@ -10,17 +10,22 @@
  *   node tools/icon-sync.mjs --dir ../my-app --git --allow-push
  *
  * Safety: listens on 127.0.0.1 only · every request needs the token printed at start · writes only inside --dir ·
- * only deletes files that an earlier sync created (listed in <subdir>/.icon-toolkit.json) · never runs arbitrary commands.
+ * only deletes files that an earlier sync created (listed in <subdir>/.icon-toolkit.json) · never runs arbitrary commands ·
+ * the folder must be a real subfolder (never the project root, never a dot-folder such as .git, .github or .husky) · symlinks are refused ·
+ * requests must carry a localhost Host header (DNS-rebinding defence).
+ *
+ * Tip: --token shows up in `ps`; prefer the ICON_SYNC_TOKEN environment variable.
  */
 import { execFile } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const MAX_BODY = 200 * 1024 * 1024
+const MAX_BODY = 20 * 1024 * 1024 // a 700-icon export with every format is a few MB
 const MANAGED = '.icon-toolkit.json'
 
 export function parseArgs(argv) {
@@ -43,6 +48,47 @@ export function safeRel(p) {
   const n = normalize(p)
   if (n.startsWith('..') || n.split(sep).includes('..')) return null
   return n.split(sep).join('/')
+}
+
+/** a folder inside the project that tools do not treat as code: no dot-segments (.git, .github, .husky…), no node_modules, not the root */
+export function safeSubdir(p) {
+  const rel = safeRel(p)
+  if (!rel || rel === '.') return null
+  const parts = rel.split('/')
+  if (parts.some((x) => x.startsWith('.') || x === 'node_modules')) return null
+  return rel
+}
+
+/** generated files are plain text assets: no dot-files, no executables, no package manifests */
+const ALLOWED_EXT = new Set(['.svg', '.ts', '.js', '.css', '.html', '.json', '.md', '.png'])
+export function safeGeneratedPath(rel) {
+  if (!rel) return false
+  const parts = rel.split('/')
+  if (parts.some((x) => x.startsWith('.'))) return false
+  const base = parts[parts.length - 1]
+  if (['package.json', 'package-lock.json', 'tsconfig.json'].includes(base)) return false
+  const dot = base.lastIndexOf('.')
+  return dot > 0 && ALLOWED_EXT.has(base.slice(dot).toLowerCase())
+}
+
+/** refuses a path that is, or passes through, a symlink (a link inside the folder could point anywhere on disk) */
+export function assertNoSymlinks(root, full) {
+  const rootReal = realpathSync(root)
+  const rel = relative(root, full)
+  if (rel.startsWith('..') || isAbsolute(rel)) throw httpError(400, 'Path is outside the project')
+  let cur = root
+  for (const part of rel.split(sep).filter(Boolean)) {
+    cur = join(cur, part)
+    let st
+    try {
+      st = lstatSync(cur)
+    } catch {
+      return // the rest does not exist yet
+    }
+    if (st.isSymbolicLink()) throw httpError(400, `Refusing to follow a symbolic link: ${relative(root, cur)}`)
+  }
+  const real = existsSync(full) ? realpathSync(full) : full
+  if (existsSync(full) && real !== rootReal && !real.startsWith(rootReal + sep)) throw httpError(400, 'Path resolves outside the project')
 }
 
 function walk(dir, base = dir) {
@@ -71,22 +117,26 @@ function pruneEmptyDirs(dir, stop) {
 
 /** Reads <subdir>/icons.json (the catalogue developers actually ship) as the change-detection baseline. */
 export function readCatalog(root, subdir) {
-  const sub = safeRel(subdir || '.') ?? null
+  const sub = safeSubdir(subdir || 'icons')
   if (sub === null) throw httpError(400, 'Invalid folder name')
   const target = resolve(root, sub)
   if (target !== root && !target.startsWith(root + sep)) throw httpError(400, 'Folder is outside the project')
   const file = join(target, 'icons.json')
+  assertNoSymlinks(root, file)
   if (!existsSync(file)) return null
   if (statSync(file).size > MAX_BODY) throw httpError(413, 'icons.json is too large')
   return readFileSync(file, 'utf8')
 }
 
 export function planSync(root, subdir, files) {
-  const sub = safeRel(subdir || '.') ?? null
-  if (sub === null) throw httpError(400, 'Invalid folder name')
+  if (!files || typeof files !== 'object' || Array.isArray(files)) throw httpError(400, 'files must be an object')
+  const sub = safeSubdir(subdir || 'icons')
+  if (sub === null) throw httpError(400, 'Invalid folder name: use a plain subfolder such as "icons" (not the project root, and not a dot-folder)')
   const target = resolve(root, sub)
   if (target !== root && !target.startsWith(root + sep)) throw httpError(400, 'Folder is outside the project')
   const managedPath = join(target, MANAGED)
+  assertNoSymlinks(root, target)
+  assertNoSymlinks(root, managedPath)
   let previous = []
   if (existsSync(managedPath)) {
     try {
@@ -100,6 +150,7 @@ export function planSync(root, subdir, files) {
     const rel = safeRel(rawPath)
     if (!rel) throw httpError(400, `Unsafe path: ${rawPath}`)
     if (rel === MANAGED) throw httpError(400, 'Reserved file name')
+    if (!safeGeneratedPath(rel)) throw httpError(400, `Not an allowed file: ${rawPath}`)
     if (typeof content !== 'string') throw httpError(400, `File content must be text: ${rawPath}`)
     next.set(rel, content)
   }
@@ -112,7 +163,10 @@ export function planSync(root, subdir, files) {
     else if (readFileSync(full, 'utf8') !== content) changed.push(rel)
     else unchanged.push(rel)
   }
-  const removed = previous.filter((p) => safeRel(p) && !next.has(p) && existsSync(join(target, p)))
+  // only files this tool plausibly created: the managed list is data in the repo and may have been edited
+  const removed = previous.filter((p) => typeof p === 'string' && safeRel(p) === p && safeGeneratedPath(p) && !next.has(p) && existsSync(join(target, p)))
+  for (const rel of next.keys()) assertNoSymlinks(root, join(target, rel))
+  for (const rel of removed) assertNoSymlinks(root, join(target, rel))
   return { target, sub, next, added, changed, unchanged, removed, managedPath }
 }
 
@@ -140,7 +194,7 @@ async function gitInfo(root) {
 
 export function startServer(opts) {
   const root = resolve(opts.dir)
-  const token = opts.token || randomBytes(16).toString('hex')
+  const token = opts.token || process.env.ICON_SYNC_TOKEN || randomBytes(16).toString('hex')
   const server = createServer(async (req, res) => {
     const cors = {
       'Access-Control-Allow-Origin': '*',
@@ -158,6 +212,9 @@ export function startServer(opts) {
         res.end()
         return
       }
+      const host = String(req.headers.host ?? '').toLowerCase()
+      const port = server.address()?.port
+      if (![`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(host)) throw httpError(403, 'Unexpected Host header')
       const given = String(req.headers['x-toolkit-token'] ?? '')
       const a = Buffer.from(given)
       const b = Buffer.from(token)
@@ -175,6 +232,7 @@ export function startServer(opts) {
         return
       }
       if (req.method === 'POST' && req.url === '/export') {
+        if (Number(req.headers['content-length'] ?? 0) > MAX_BODY) throw httpError(413, 'Payload too large')
         let size = 0
         const chunks = []
         for await (const c of req) {
@@ -208,6 +266,11 @@ export function startServer(opts) {
           if (body.branch) {
             const branch = String(body.branch)
             if (!/^[\w./-]{1,100}$/.test(branch) || branch.startsWith('-')) throw httpError(400, 'Invalid branch name')
+            try {
+              await git(root, ['check-ref-format', '--branch', branch])
+            } catch {
+              throw httpError(400, 'Invalid branch name')
+            }
             const others = (await git(root, ['status', '--porcelain'])).split('\n').filter(Boolean).filter((l) => !l.slice(3).startsWith(plan.sub + '/') && l.slice(3) !== plan.sub)
             if (others.length) throw httpError(409, 'The repo has uncommitted changes outside the icons folder; commit or stash them before switching branches')
             const exists = (await git(root, ['branch', '--list', branch])).length > 0
@@ -238,7 +301,7 @@ export function startServer(opts) {
   })
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const opts = parseArgs(process.argv.slice(2))
   if (opts.help || !opts.dir) {
     console.log('Usage: node tools/icon-sync.mjs --dir <project folder> [--port 5199] [--git] [--allow-push] [--token <fixed token>]')

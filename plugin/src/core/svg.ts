@@ -1,5 +1,5 @@
 import { IconKind, PaintFact, SlotInfo, StrokePolicy, TokenNaming } from '../types'
-import { sanitizeSvgTree } from './sanitize'
+import { safeViewBox, sanitizeSvgTree } from './sanitize'
 import { tokenVarName } from './tokens'
 
 export interface ThemeOptions {
@@ -130,7 +130,7 @@ export function themeSvg(svgText: string, opts: ThemeOptions): ThemedSvg {
 
   const width = parseFloat(root.getAttribute('width') ?? '') || 24
   const height = parseFloat(root.getAttribute('height') ?? '') || 24
-  const viewBox = root.getAttribute('viewBox') ?? `0 0 ${width} ${height}`
+  const viewBox = safeViewBox(root.getAttribute('viewBox'), `0 0 ${width} ${height}`)
 
   // 1. collect colours (fills + strokes) in document order
   const drawables: { el: Element; attr: 'fill' | 'stroke'; hex: string }[] = []
@@ -244,7 +244,9 @@ function applyPrecision(root: Element, precision: number): void {
 }
 
 export function wrapSvg(width: number, height: number, viewBox: string, body: string): string {
-  return `<svg xmlns="${SVG_NS}" width="${width}" height="${height}" viewBox="${viewBox}" fill="none">${body}</svg>`
+  const w = Number.isFinite(width) ? width : 24
+  const h = Number.isFinite(height) ? height : 24
+  return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="${safeViewBox(viewBox, `0 0 ${w} ${h}`)}" fill="none">${body}</svg>`
 }
 
 /** Prefix ids and their references so many icons can share one sprite/page without collisions. */

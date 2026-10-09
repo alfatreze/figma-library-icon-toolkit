@@ -1,6 +1,8 @@
 import { Button, Checkbox, RadioButtons } from '@create-figma-plugin/ui'
 import { ComponentChildren, Fragment, h } from 'preact'
+import { useMemo } from 'preact/hooks'
 import { FIX_GROUPS, FIX_INFO } from '../core/fixes'
+import { sanitizeSvgString } from '../core/sanitize'
 import styles from '../styles.css'
 import { FixActionId, FixCandidate, FixResult } from '../types'
 import { InfoTip } from './InfoTip'
@@ -20,7 +22,8 @@ export const CONFIDENCE_INFO = (
   </span>
 )
 
-function Svg({ svg }: { svg: string | null }) {
+function Svg({ svg: raw }: { svg: string | null }) {
+  const svg = useMemo(() => (raw ? sanitizeSvgString(raw) : null), [raw]) // previews come straight from Figma's exporter: sanitise like everything else that reaches innerHTML
   return svg ? <span class={styles.pvSvg} dangerouslySetInnerHTML={{ __html: svg }} /> : <span class={styles.muted}>no preview</span>
 }
 

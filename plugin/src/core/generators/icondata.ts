@@ -1,5 +1,5 @@
 import { Icon } from '../../types'
-import { BuildInput, categoryId, componentName, constName, esc, Files, ns, strokeSteps } from './common'
+import { BuildInput, categoryId, componentName, constName, esc, Files, ns, strokeSteps, policyOf } from './common'
 
 /**
  * Framework-neutral icon data, shared by the Angular and React outputs:
@@ -54,7 +54,7 @@ export type ${C}DeprecatedName = keyof typeof ${k}_DEPRECATED;
 export const ${k}_CATEGORY_OF: Readonly<Record<string, string>> = ${JSON.stringify(cat)};
 
 /** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
-export const ${k}_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: '${b.settings.strokePolicy}', table: ${JSON.stringify(strokeSteps(b).map((s) => [s.size, s.weight]))} };
+export const ${k}_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: '${policyOf(b)}', table: ${JSON.stringify(strokeSteps(b).map((s) => [s.size, s.weight]))} };
 
 /** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
 export function ${camelNs(b)}StrokeFor(size: number | string | undefined): number | null {

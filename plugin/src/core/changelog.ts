@@ -43,10 +43,52 @@ export function artworkHash(body: string): string {
   return hash32(body)
 }
 
-export function parseCatalog(text: string): PreviousCatalog {
-  const data = JSON.parse(text) as Partial<PreviousCatalog>
-  if (!data || !Array.isArray(data.icons)) throw new Error('This does not look like an icons.json from this tool')
-  return data as PreviousCatalog
+const SLUG = /^[a-z0-9][a-z0-9-]{0,99}$/
+const SEMVER = /^\d{1,6}\.\d{1,6}\.\d{1,6}(?:-[0-9A-Za-z.-]{1,30})?$/
+const HASH = /^[0-9a-z]{1,40}$/
+const MAX_ICONS = 50000
+const text = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length <= max && !/[\u0000-\u001f]/.test(v) ? v : undefined)
+
+/**
+ * Reads an icons.json (loaded by hand or fetched from the repo) as DATA: only the fields the diff needs survive, each validated.
+ * Names end up in sprite ids, CSS selectors and Markdown, so anything that is not a slug is dropped here rather than escaped later.
+ */
+export function parseCatalog(input: string): PreviousCatalog {
+  const data = JSON.parse(input) as Record<string, unknown>
+  if (!data || typeof data !== 'object' || !Array.isArray(data.icons)) throw new Error('This does not look like an icons.json from this tool')
+  if (data.icons.length > MAX_ICONS) throw new Error('This icons.json is too large')
+  const seen = new Set<string>()
+  const icons: CatalogIcon[] = []
+  for (const raw of data.icons as unknown[]) {
+    if (!raw || typeof raw !== 'object') continue
+    const i = raw as Record<string, unknown>
+    if (typeof i.name !== 'string' || !SLUG.test(i.name)) continue
+    const fig = (i.figma && typeof i.figma === 'object' ? i.figma : {}) as Record<string, unknown>
+    const category = Array.isArray(i.category) && i.category.length < 20 && i.category.every((c) => typeof c === 'string' && SLUG.test(c)) ? (i.category as string[]) : undefined
+    icons.push({
+      name: i.name,
+      hash: typeof i.hash === 'string' && HASH.test(i.hash) ? i.hash : undefined,
+      colorHash: typeof i.colorHash === 'string' && HASH.test(i.colorHash) ? i.colorHash : undefined,
+      category,
+      figma: { componentKey: text(fig.componentKey, 100) ?? null, nodeId: text(fig.nodeId, 60), layerName: text(fig.layerName, 300) }
+    })
+    seen.add(i.name)
+  }
+  if (!icons.length && data.icons.length) throw new Error('No valid icons found in this file')
+  const deprecated = Array.isArray(data.deprecated)
+    ? (data.deprecated as unknown[]).flatMap((d) => {
+        const x = (d && typeof d === 'object' ? d : {}) as Record<string, unknown>
+        return typeof x.name === 'string' && SLUG.test(x.name) && typeof x.replacedBy === 'string' && SLUG.test(x.replacedBy) && typeof x.since === 'string' && SEMVER.test(x.since)
+          ? [{ name: x.name, replacedBy: x.replacedBy, since: x.since }]
+          : []
+      })
+    : undefined
+  return {
+    namespace: typeof data.namespace === 'string' && SLUG.test(data.namespace) ? data.namespace : undefined,
+    libraryVersion: typeof data.libraryVersion === 'string' && SEMVER.test(data.libraryVersion) ? data.libraryVersion : undefined,
+    icons,
+    deprecated
+  }
 }
 
 /**

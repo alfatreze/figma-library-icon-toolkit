@@ -1,4 +1,4 @@
-import { BuildInput, ns, strokeSteps } from './common'
+import { BuildInput, ns, strokeSteps, policyOf } from './common'
 
 export function baseCss(b: BuildInput): string {
   const n = ns(b)
@@ -25,7 +25,7 @@ ${strokeCss(b)}`
 
 function strokeCss(b: BuildInput): string {
   const n = ns(b)
-  const policy = b.settings.strokePolicy
+  const policy = policyOf(b)
   if (policy === 'scale') return `/* Stroke policy: scale. Strokes grow and shrink with the icon (default SVG behaviour). */\n`
   if (policy === 'constant') {
     return `/* Stroke policy: constant. Strokes use vector-effect: non-scaling-stroke, so the weight stays the same in screen px at any size.\n   Override with --${n}-icon-stroke-width (px). */\n`

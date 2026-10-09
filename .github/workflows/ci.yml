@@ -2,6 +2,9 @@ name: ci
 on:
   push:
   pull_request:
+# least privilege: CI only reads the repository
+permissions:
+  contents: read
 jobs:
   plugin:
     runs-on: ubuntu-latest
@@ -19,6 +22,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Third-party notices are up to date
+        working-directory: .
+        run: node scripts/generate-notices.mjs && git diff --exit-code THIRD_PARTY_NOTICES.md
       - name: Size budgets (export formats + plugin bundle)
         working-directory: .
         run: node scripts/size-budget.mjs
@@ -36,6 +42,8 @@ jobs:
   # The generated code must compile with the real toolchains, not just type-check as plain TypeScript.
   generated-code:
     runs-on: ubuntu-latest
+    # "latest" toolchains have no lockfile on purpose (they tell us when a new Angular breaks the output) but must not block merges
+    continue-on-error: ${{ matrix.toolchain == 'ng-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +66,7 @@ jobs:
         working-directory: plugin
       - name: Install toolchain
         working-directory: scripts/toolchains/${{ matrix.toolchain }}
-        run: npm install --no-audit --no-fund
+        run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
       - run: node scripts/compile-check.mjs --toolchain scripts/toolchains/${{ matrix.toolchain }} --kind ${{ matrix.kind }}
 
   # Renders the export in Chromium: inline SVG, sprite and Web Component must draw the same pixels, follow the colour variable, and match the golden images.
@@ -71,7 +79,7 @@ jobs:
           node-version: 22
       - run: npm ci
         working-directory: plugin
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
         working-directory: e2e
       - run: npx playwright install --with-deps chromium
         working-directory: e2e

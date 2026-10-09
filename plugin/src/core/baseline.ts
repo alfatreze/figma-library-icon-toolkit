@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzlibSync, zlibSync } from 'fflate'
+import { strFromU8, strToU8, Unzlib, zlibSync } from 'fflate'
 import { CatalogIcon, Diff, PreviousCatalog } from './changelog'
 import { hash32 } from './fixes'
 
@@ -60,11 +60,38 @@ export function encodeSnapshot(s: Snapshot): string {
   return toBase64(zlibSync(strToU8(JSON.stringify(s)), { level: 9 }))
 }
 
+/** limits against hostile plugin data (any editor of the file can write it): a few MB of text, at most 8 MB inflated */
+export const MAX_ENCODED = 4_000_000
+export const MAX_INFLATED = 8_000_000
+
+function inflateLimited(bytes: Uint8Array): Uint8Array {
+  const chunks: Uint8Array[] = []
+  let total = 0
+  const z = new Unzlib((chunk) => {
+    total += chunk.length
+    if (total > MAX_INFLATED) throw new Error('snapshot too large')
+    chunks.push(chunk)
+  })
+  z.push(bytes, true)
+  const out = new Uint8Array(total)
+  let o = 0
+  for (const c of chunks) {
+    out.set(c, o)
+    o += c.length
+  }
+  return out
+}
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,99}$/
+
 export function decodeSnapshot(text: string | null | undefined): Snapshot | null {
-  if (!text) return null
+  if (!text || text.length > MAX_ENCODED) return null
   try {
-    const s = JSON.parse(strFromU8(unzlibSync(fromBase64(text)))) as Snapshot
-    return s && s.v === 1 && Array.isArray(s.icons) ? s : null
+    const s = JSON.parse(strFromU8(inflateLimited(fromBase64(text)))) as Snapshot
+    if (!s || s.v !== 1 || !Array.isArray(s.icons)) return null
+    // keep only well-formed entries: a malformed one must not throw later inside the diff
+    const icons = s.icons.filter((i) => i && typeof i === 'object' && typeof i.name === 'string' && SLUG_RE.test(i.name))
+    return { ...s, id: String(s.id ?? '').slice(0, 40), at: typeof s.at === 'string' ? s.at.slice(0, 40) : '', icons }
   } catch {
     return null
   }

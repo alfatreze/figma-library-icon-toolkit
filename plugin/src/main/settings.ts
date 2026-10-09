@@ -1,25 +1,19 @@
+import { migrateSettings, SETTINGS_VERSION } from '../core/settingsSchema'
 import { DEFAULT_SETTINGS, Settings } from '../types'
 
 export const SETTINGS_KEY = 'ilt:settings:v1'
 
-/** Reads saved settings, filling new fields with defaults and migrating older versions. */
+/** Reads saved settings: migrated to the current version and validated key by key, so one bad value never resets the rest. */
 export async function loadSettings(): Promise<Settings> {
   try {
-    const stored = (await figma.clientStorage.getAsync(SETTINGS_KEY)) as (Partial<Settings> & { useTokens?: boolean }) | undefined
-    if (stored && typeof stored === 'object') {
-      if (stored.zipName === 'icons') stored.zipName = '' // v0.1.0 default produced "icons-icons.zip"
-      const tokenNaming = { ...DEFAULT_SETTINGS.tokenNaming, ...(stored.tokenNaming ?? {}) }
-      if (stored.useTokens === false && !stored.tokenNaming) tokenNaming.mode = 'none' // migrate the old on/off toggle
-      return {
-        ...DEFAULT_SETTINGS,
-        ...stored,
-        formats: { ...DEFAULT_SETTINGS.formats, ...(stored.formats ?? {}) },
-        tokenNaming,
-        sync: { ...DEFAULT_SETTINGS.sync, ...(stored.sync ?? {}) }
-      }
-    }
-  } catch {
-    /* fall through to defaults */
+    const stored = await figma.clientStorage.getAsync(SETTINGS_KEY)
+    if (stored && typeof stored === 'object') return migrateSettings(stored)
+  } catch (e) {
+    console.warn('[icon-toolkit] could not read saved settings, using defaults', e)
   }
   return { ...DEFAULT_SETTINGS }
+}
+
+export function serializeSettings(settings: Settings, size: { w: number; h: number }) {
+  return { ...settings, windowWidth: size.w, windowHeight: size.h, settingsVersion: SETTINGS_VERSION }
 }

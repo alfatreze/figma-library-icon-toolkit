@@ -3,10 +3,12 @@ on:
   push:
     tags: ['v*.*.*']
 permissions:
-  contents: write
+  contents: read
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # only this job publishes the release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,8 +39,9 @@ jobs:
           cp -R plugin/build dist/$NAME/build
           cp LICENSE THIRD_PARTY_NOTICES.md dist/$NAME/
           cp -R tools dist/$NAME/tools
-          (cd dist && zip -r $NAME.zip $NAME)
+          (cd dist && zip -r $NAME.zip $NAME && sha256sum $NAME.zip > $NAME.zip.sha256)
           echo "ASSET=dist/$NAME.zip" >> "$GITHUB_ENV"
+          echo "ASSET_SUM=dist/$NAME.zip.sha256" >> "$GITHUB_ENV"
       - name: Release notes from CHANGELOG
         run: |
           V="${GITHUB_REF_NAME#v}"
@@ -50,4 +53,4 @@ jobs:
         run: |
           PRE=""
           case "${GITHUB_REF_NAME}" in *-*) PRE="--prerelease";; esac
-          gh release create "${GITHUB_REF_NAME}" "$ASSET" --title "${GITHUB_REF_NAME}" --notes-file notes.md $PRE
+          gh release create "${GITHUB_REF_NAME}" "$ASSET" "$ASSET_SUM" --title "${GITHUB_REF_NAME}" --notes-file notes.md $PRE

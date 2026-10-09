@@ -1,38 +1,38 @@
 import { DEFAULT_SETTINGS, Settings } from '../types'
 
-/** Settings that describe the library (shared by the team). Window size, Labs acknowledgement and the sync token stay local. */
-const KEYS: (keyof Settings)[] = [
-  'namespace', 'profile', 'scanMode', 'ignoreSegments', 'ignoreVariantValues', 'libSizeMode', 'libWidth', 'libHeight', 'maxIconSize',
-  'colorMode', 'tokenNaming', 'strokePolicy', 'strokeTable', 'outlineStrokes', 'precision', 'formats', 'zipName', 'categorySource',
-  'codeConnectUrl', 'devResourceUrl', 'splitByCategory', 'duplicateNames', 'aliasDuplicates', 'leafName', 'leafNameMode', 'compositeFrames'
-]
+import { checkSetting, SHARED_KEYS } from './settingsSchema'
 
 export function exportConfig(settings: Settings): string {
   const out: Record<string, unknown> = { $schema: 'icon-library-toolkit/config@1' }
-  for (const k of KEYS) out[k] = settings[k]
+  for (const k of SHARED_KEYS) out[k] = checkSetting(k, settings[k]) ?? DEFAULT_SETTINGS[k] // never write a value that would be rejected on import
   return JSON.stringify(out, null, 2) + '\n'
 }
 
-/** Merges a config file over the current settings; unknown or wrongly typed keys are ignored and reported. */
+/**
+ * Merges a config file over the current settings. Unknown keys, local-only keys and values that fail validation
+ * (wrong type, not in the allowed list, out of range) are ignored and reported, never applied.
+ */
 export function parseConfig(text: string, current: Settings): { settings: Settings; applied: string[]; ignored: string[] } {
-  const data = JSON.parse(text) as Record<string, unknown>
+  const data = JSON.parse(text) as unknown
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Not a config object')
   const applied: string[] = []
   const ignored: string[] = []
   const next: Settings = { ...current }
-  for (const [k, v] of Object.entries(data)) {
+  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
     if (k === '$schema') continue
-    if (!(KEYS as string[]).includes(k)) {
+    if (!(SHARED_KEYS as string[]).includes(k)) {
       ignored.push(k)
       continue
     }
-    const def = (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[k]
-    const sameType = typeof v === typeof def && Array.isArray(v) === Array.isArray(def)
-    if (!sameType) {
+    const key = k as keyof Settings
+    const ok = checkSetting(key, v)
+    if (ok === undefined) {
       ignored.push(k)
       continue
     }
-    if (def && typeof def === 'object' && !Array.isArray(def)) (next as unknown as Record<string, unknown>)[k] = { ...(def as object), ...(v as object) }
-    else (next as unknown as Record<string, unknown>)[k] = v
+    const def = DEFAULT_SETTINGS[key]
+    if (def && typeof def === 'object' && !Array.isArray(def)) (next as unknown as Record<string, unknown>)[k] = { ...(def as object), ...(ok as object) }
+    else (next as unknown as Record<string, unknown>)[k] = ok
     applied.push(k)
   }
   return { settings: next, applied, ignored }
