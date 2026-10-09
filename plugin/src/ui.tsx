@@ -24,6 +24,7 @@ import {
 import { computeOverview, kb } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
 import { InspectPanel } from './ui/Inspect'
+import { cx, download, notify, plural } from './ui/util'
 import { SettingsPanel } from './ui/Settings'
 import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
 import {
@@ -38,26 +39,10 @@ type Tab = 'icons' | 'issues' | 'skipped'
 type Status = 'all' | 'blocked' | 'alerts' | 'excluded'
 type View = 'list' | 'grouped' | 'grid'
 
-const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
-
-function download(name: string, data: Uint8Array | string, mime: string) {
-  const blob = new Blob([data as BlobPart], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 2000)
-}
-
-const notify = (message: string, error = false) => emit<NotifyHandler>('NOTIFY', message, error)
 const worst = (fs: Finding[]): Severity | null =>
   fs.some((f) => f.severity === 'error') ? 'error' : fs.some((f) => f.severity === 'warn') ? 'warn' : fs.length ? 'info' : null
 const SevIcon = ({ s }: { s: Severity }) => (s === 'error' ? <BlockIcon /> : s === 'warn' ? <WarnIcon /> : <InfoIcon />)
 const sevClass = (s: Severity) => (s === 'error' ? styles.sevError : s === 'warn' ? styles.sevWarn : styles.sevInfo)
-const plural = (n: number, w: string) => `${n} ${n === 1 ? w : /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(x|s|ch|sh)$/.test(w) ? w + 'es' : w + 's'}`
 
 interface IssueGroup {
   ruleId: string

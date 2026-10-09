@@ -1,4 +1,5 @@
 import { Icon } from '../../types'
+import { camel, snake } from '../naming'
 import { BuildInput, categoryId, componentName, constName, esc, Files, ns, strokeSteps, policyOf } from './common'
 
 /**
@@ -10,8 +11,8 @@ import { BuildInput, categoryId, componentName, constName, esc, Files, ns, strok
  *   loaders.ts        category → dynamic import, so icons used by name load in per-category chunks
  */
 
-export const camelNs = (b: BuildInput) => ns(b).replace(/-([a-z0-9])/g, (_m, c) => c.toUpperCase())
-export const K = (b: BuildInput) => ns(b).toUpperCase().replace(/-/g, '_')
+export const camelNs = (b: BuildInput) => camel(ns(b))
+export const K = (b: BuildInput) => snake(ns(b)).toUpperCase()
 
 const catSlug = (icon: Icon) => categoryId(icon).replace(/\//g, '-') || '_uncategorised'
 
@@ -19,7 +20,9 @@ export function categoryGroups(b: BuildInput): Map<string, Icon[]> {
   const by = new Map<string, Icon[]>()
   for (const i of b.icons) {
     const s = catSlug(i)
-    by.set(s, [...(by.get(s) ?? []), i])
+    const list = by.get(s)
+    if (list) list.push(i)
+    else by.set(s, [i])
   }
   return by
 }

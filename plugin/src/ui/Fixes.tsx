@@ -7,9 +7,8 @@ import styles from '../styles.css'
 import { FixActionId, FixCandidate, FixResult } from '../types'
 import { InfoTip } from './InfoTip'
 import { BlockIcon, CheckIcon, InfoIcon, LocateIcon, NextIcon, WarnIcon } from './icons'
+import { cx, plural } from './util'
 
-const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
-const plural = (n: number, w: string) => `${n} ${n === 1 ? w : /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /(x|s|ch|sh)$/.test(w) ? w + 'es' : w + 's'}`
 
 export const CONFIDENCE_INFO = (
   <span>

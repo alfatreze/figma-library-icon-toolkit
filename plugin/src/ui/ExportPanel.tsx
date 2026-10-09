@@ -9,9 +9,8 @@ import { Settings } from '../types'
 import { InfoTip } from './InfoTip'
 import { BlockIcon, CheckIcon } from './icons'
 import { kb, OverviewRow } from './overview'
+import { cx, plural } from './util'
 
-const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
-const plural = (n: number, w: string) => `${n} ${n === 1 ? w : /[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : w + 's'}`
 
 export interface ExportPanelProps {
   settings: Settings

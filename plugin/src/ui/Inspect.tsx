@@ -8,40 +8,12 @@ import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
 import styles from '../styles.css'
+import { copyText, download, notify } from './util'
 import {
-  DEFAULT_SETTINGS, Icon, NotifyHandler, RawIcon, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanStartHandler, SelectionHandler,
+  DEFAULT_SETTINGS, Icon, RawIcon, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanStartHandler, SelectionHandler,
   Settings, SettingsLoadedHandler, UiReadyHandler
 } from '../types'
 
-function download(name: string, data: Uint8Array | string, mime: string) {
-  const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 2000)
-}
-
-/** navigator.clipboard is blocked in plugin iframes; the textarea route works everywhere */
-function copyText(text: string): boolean {
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.style.cssText = 'position:fixed;opacity:0'
-  document.body.appendChild(ta)
-  ta.select()
-  let ok = false
-  try {
-    ok = document.execCommand('copy')
-  } catch {
-    ok = false
-  }
-  document.body.removeChild(ta)
-  return ok
-}
-
-const notify = (message: string, error = false) => emit<NotifyHandler>('NOTIFY', message, error)
 
 function snippetInput(icon: Icon, settings: Settings): SnippetInput {
   return { ns: cleanNamespace(settings.namespace), name: icon.name, spritePath: './icons/sprite/', sizePx: null, sizeUnit: 'px', vars: {} }

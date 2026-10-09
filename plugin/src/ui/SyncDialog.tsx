@@ -2,6 +2,7 @@ import { Button } from '@create-figma-plugin/ui'
 import { h } from 'preact'
 import styles from '../styles.css'
 import { BlockIcon, CheckIcon, WarnIcon } from './icons'
+import { plural } from './util'
 
 export interface SyncPlan {
   added: string[]
@@ -14,7 +15,6 @@ export interface SyncResult {
   committed?: { branch: string; sha: string | null; files: number; pushed?: boolean } | null
 }
 
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 export function SyncDialog(props: {
   plan: SyncPlan
