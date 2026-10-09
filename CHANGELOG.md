@@ -7,6 +7,7 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-09
 ### Added
 - **Change detection baseline** (layered): the previous export is remembered on this computer automatically; optionally saved *in the Figma file* (Labs) so the team and Dev Mode share it; or read from the project's `icons.json` through the companion (`GET /catalog`). Priority repo > shared > local > loaded file. Icons list gets filter chips (new, renamed, drawing, colour, moved, layer name).
 - **Variable matching by paint order** instead of colour value: two variables that resolve to the same hex stay separate colour slots, and an unbound paint no longer inherits a variable from a same-coloured one. Token mapping table supports `Collection::name`, wildcards (`color/icon/* = --icon-*`) and **Fill from scan**.
@@ -39,5 +40,6 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alfatreze/figma-library-icon-toolkit/releases/tag/v0.1.0
