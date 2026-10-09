@@ -1,0 +1,2531 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generated Angular packages > stay the same: sprite strategy supplied by another output 1`] = `
+{
+  "angular-classic/README.md": "# cmn icons — Angular (classic)
+
+Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular-classic';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular-classic/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular-classic/cmn-icon-registry.ts": "import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+import { Subject } from 'rxjs';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = new Map<string, CmnIconData>();
+  private readonly requested = new Set<string>();
+  /** emits when icons were added (a lazy category arrived) */
+  readonly changes = new Subject<void>();
+
+  constructor(@Optional() @Inject(CMN_ICONS_TOKEN) given: readonly (readonly IconInput[])[] | null) {
+    for (const group of given ?? []) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    for (const i of icons) this.store.set(i.name, i);
+    this.changes.next();
+  }
+
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store.get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  preload(...categories: string[]): Promise<void[]> {
+    return Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return Promise.resolve();
+    this.requested.add(category);
+    return loader().then(
+      (icons) => this.add(...icons),
+      () => { this.requested.delete(category); }
+    );
+  }
+}
+",
+  "angular-classic/cmn-icon.component.ts": "import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…"></cmn-icon>          looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome"></cmn-icon>  imported directly: synchronous and tree-shakable
+ * (Angular 14+, standalone, classic @Input)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<span class="cmn-icon__inner" [innerHTML]="html"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon implements OnChanges, OnInit, OnDestroy {
+  @Input() name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (wins over name) */
+  @Input() icon?: CmnIconData;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  html: SafeHtml = '';
+  private sub?: Subscription;
+
+  constructor(
+    private readonly sanitizer: DomSanitizer,
+    private readonly registry: CmnIconRegistry,
+    private readonly cdr: ChangeDetectorRef
+  ) {}
+
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+
+  ngOnInit(): void {
+    // a lazily loaded category arrived
+    this.sub = this.registry.changes.subscribe(() => {
+      this.render();
+      this.cdr.markForCheck();
+    });
+  }
+
+  ngOnChanges(): void {
+    this.render();
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private render(): void {
+    const data = this.icon ?? (this.name ? this.registry.get(this.name) : undefined);
+    // Trusted, generated markup (not user input).
+    this.html = data ? this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data)) : '';
+  }
+}
+",
+  "angular-classic/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, HostBinding, Input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…"></cmn-sprite-icon>   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  @Input() name!: CmnIconName | CmnIconDeprecatedName;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  constructor(private readonly sprite: CmnSpriteLoader) {}
+
+  get href(): string {
+    this.sprite.ensure();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[this.name] ?? this.name);
+  }
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+}
+",
+  "angular-classic/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular-classic/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular-classic/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular-classic/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular-classic/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular-classic/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+  "angular/README.md": "# cmn icons — Angular (modern)
+
+Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular/cmn-icon-registry.ts": "import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = signal<ReadonlyMap<string, CmnIconData>>(new Map());
+  private readonly requested = new Set<string>();
+
+  constructor() {
+    const given = inject(CMN_ICONS_TOKEN, { optional: true }) ?? [];
+    for (const group of given) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    this.store.update((m) => {
+      const next = new Map(m);
+      for (const i of icons) next.set(i.name, i);
+      return next;
+    });
+  }
+
+  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store().get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  async preload(...categories: string[]): Promise<void> {
+    await Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private async loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return;
+    this.requested.add(category);
+    try {
+      this.add(...(await loader()));
+    } catch {
+      this.requested.delete(category); // allow a retry (network hiccup)
+    }
+  }
+}
+",
+  "angular/cmn-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…" />        looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome" />  imported directly: synchronous and tree-shakable
+ * (Angular 17.1+, standalone, signals)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<span class="cmn-icon__inner" [innerHTML]="html()"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly registry = inject(CmnIconRegistry);
+
+  readonly name = input<CmnIconName | CmnIconDeprecatedName | undefined>(undefined);
+  /** icon object imported from './icons' (wins over name) */
+  readonly icon = input<CmnIconData | undefined>(undefined);
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+
+  /** explicit strokeWidth wins; otherwise the plugin's weight-by-size table (when that policy is used) */
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+
+  protected readonly html = computed(() => {
+    const name = this.name();
+    const data = this.icon() ?? (name ? this.registry.get(name) : undefined);
+    if (!data) return '';
+    // Trusted, generated markup (not user input).
+    return this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data));
+  });
+}
+",
+  "angular/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…" />   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href()"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  private readonly sprite = inject(CmnSpriteLoader);
+
+  readonly name = input.required<CmnIconName | CmnIconDeprecatedName>();
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+  protected readonly href = computed(() => {
+    this.sprite.ensure();
+    const requested = this.name();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[requested] ?? requested);
+  });
+}
+",
+  "angular/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated Angular packages > stay the same: weight-by-size stroke policy and category split 1`] = `
+{
+  "angular-classic/README.md": "# cmn icons — Angular (classic)
+
+Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular-classic';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular-classic/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular-classic/cmn-icon-registry.ts": "import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+import { Subject } from 'rxjs';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = new Map<string, CmnIconData>();
+  private readonly requested = new Set<string>();
+  /** emits when icons were added (a lazy category arrived) */
+  readonly changes = new Subject<void>();
+
+  constructor(@Optional() @Inject(CMN_ICONS_TOKEN) given: readonly (readonly IconInput[])[] | null) {
+    for (const group of given ?? []) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    for (const i of icons) this.store.set(i.name, i);
+    this.changes.next();
+  }
+
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store.get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  preload(...categories: string[]): Promise<void[]> {
+    return Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return Promise.resolve();
+    this.requested.add(category);
+    return loader().then(
+      (icons) => this.add(...icons),
+      () => { this.requested.delete(category); }
+    );
+  }
+}
+",
+  "angular-classic/cmn-icon.component.ts": "import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…"></cmn-icon>          looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome"></cmn-icon>  imported directly: synchronous and tree-shakable
+ * (Angular 14+, standalone, classic @Input)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<span class="cmn-icon__inner" [innerHTML]="html"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon implements OnChanges, OnInit, OnDestroy {
+  @Input() name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (wins over name) */
+  @Input() icon?: CmnIconData;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  html: SafeHtml = '';
+  private sub?: Subscription;
+
+  constructor(
+    private readonly sanitizer: DomSanitizer,
+    private readonly registry: CmnIconRegistry,
+    private readonly cdr: ChangeDetectorRef
+  ) {}
+
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+
+  ngOnInit(): void {
+    // a lazily loaded category arrived
+    this.sub = this.registry.changes.subscribe(() => {
+      this.render();
+      this.cdr.markForCheck();
+    });
+  }
+
+  ngOnChanges(): void {
+    this.render();
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private render(): void {
+    const data = this.icon ?? (this.name ? this.registry.get(this.name) : undefined);
+    // Trusted, generated markup (not user input).
+    this.html = data ? this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data)) : '';
+  }
+}
+",
+  "angular-classic/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, HostBinding, Input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…"></cmn-sprite-icon>   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  @Input() name!: CmnIconName | CmnIconDeprecatedName;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  constructor(private readonly sprite: CmnSpriteLoader) {}
+
+  get href(): string {
+    this.sprite.ensure();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[this.name] ?? this.name);
+  }
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+}
+",
+  "angular-classic/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular-classic/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'table', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular-classic/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular-classic/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular-classic/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular-classic/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+  "angular/README.md": "# cmn icons — Angular (modern)
+
+Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular/cmn-icon-registry.ts": "import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = signal<ReadonlyMap<string, CmnIconData>>(new Map());
+  private readonly requested = new Set<string>();
+
+  constructor() {
+    const given = inject(CMN_ICONS_TOKEN, { optional: true }) ?? [];
+    for (const group of given) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    this.store.update((m) => {
+      const next = new Map(m);
+      for (const i of icons) next.set(i.name, i);
+      return next;
+    });
+  }
+
+  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store().get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  async preload(...categories: string[]): Promise<void> {
+    await Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private async loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return;
+    this.requested.add(category);
+    try {
+      this.add(...(await loader()));
+    } catch {
+      this.requested.delete(category); // allow a retry (network hiccup)
+    }
+  }
+}
+",
+  "angular/cmn-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…" />        looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome" />  imported directly: synchronous and tree-shakable
+ * (Angular 17.1+, standalone, signals)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<span class="cmn-icon__inner" [innerHTML]="html()"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly registry = inject(CmnIconRegistry);
+
+  readonly name = input<CmnIconName | CmnIconDeprecatedName | undefined>(undefined);
+  /** icon object imported from './icons' (wins over name) */
+  readonly icon = input<CmnIconData | undefined>(undefined);
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+
+  /** explicit strokeWidth wins; otherwise the plugin's weight-by-size table (when that policy is used) */
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+
+  protected readonly html = computed(() => {
+    const name = this.name();
+    const data = this.icon() ?? (name ? this.registry.get(name) : undefined);
+    if (!data) return '';
+    // Trusted, generated markup (not user input).
+    return this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data));
+  });
+}
+",
+  "angular/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…" />   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href()"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  private readonly sprite = inject(CmnSpriteLoader);
+
+  readonly name = input.required<CmnIconName | CmnIconDeprecatedName>();
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+  protected readonly href = computed(() => {
+    this.sprite.ensure();
+    const requested = this.name();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[requested] ?? requested);
+  });
+}
+",
+  "angular/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'table', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated Angular packages > stay the same: with the sprite package 1`] = `
+{
+  "angular-classic/README.md": "# cmn icons — Angular (classic)
+
+Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular-classic';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular-classic/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular-classic/cmn-icon-registry.ts": "import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+import { Subject } from 'rxjs';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = new Map<string, CmnIconData>();
+  private readonly requested = new Set<string>();
+  /** emits when icons were added (a lazy category arrived) */
+  readonly changes = new Subject<void>();
+
+  constructor(@Optional() @Inject(CMN_ICONS_TOKEN) given: readonly (readonly IconInput[])[] | null) {
+    for (const group of given ?? []) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    for (const i of icons) this.store.set(i.name, i);
+    this.changes.next();
+  }
+
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store.get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  preload(...categories: string[]): Promise<void[]> {
+    return Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return Promise.resolve();
+    this.requested.add(category);
+    return loader().then(
+      (icons) => this.add(...icons),
+      () => { this.requested.delete(category); }
+    );
+  }
+}
+",
+  "angular-classic/cmn-icon.component.ts": "import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…"></cmn-icon>          looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome"></cmn-icon>  imported directly: synchronous and tree-shakable
+ * (Angular 14+, standalone, classic @Input)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<span class="cmn-icon__inner" [innerHTML]="html"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon implements OnChanges, OnInit, OnDestroy {
+  @Input() name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (wins over name) */
+  @Input() icon?: CmnIconData;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  html: SafeHtml = '';
+  private sub?: Subscription;
+
+  constructor(
+    private readonly sanitizer: DomSanitizer,
+    private readonly registry: CmnIconRegistry,
+    private readonly cdr: ChangeDetectorRef
+  ) {}
+
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+
+  ngOnInit(): void {
+    // a lazily loaded category arrived
+    this.sub = this.registry.changes.subscribe(() => {
+      this.render();
+      this.cdr.markForCheck();
+    });
+  }
+
+  ngOnChanges(): void {
+    this.render();
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private render(): void {
+    const data = this.icon ?? (this.name ? this.registry.get(this.name) : undefined);
+    // Trusted, generated markup (not user input).
+    this.html = data ? this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data)) : '';
+  }
+}
+",
+  "angular-classic/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, HostBinding, Input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…"></cmn-sprite-icon>   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  @Input() name!: CmnIconName | CmnIconDeprecatedName;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  constructor(private readonly sprite: CmnSpriteLoader) {}
+
+  get href(): string {
+    this.sprite.ensure();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[this.name] ?? this.name);
+  }
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+}
+",
+  "angular-classic/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular-classic/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular-classic/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular-classic/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular-classic/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular-classic/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+  "angular/README.md": "# cmn icons — Angular (modern)
+
+Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+## Sprite strategy
+\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`\`\`ts
+providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
+\`\`\`
+\`inline: true\` fetches the sprite once and inserts it in the page (use for another origin or older browsers); without it the component references the file directly (same origin).
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular/cmn-icon-registry.ts": "import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = signal<ReadonlyMap<string, CmnIconData>>(new Map());
+  private readonly requested = new Set<string>();
+
+  constructor() {
+    const given = inject(CMN_ICONS_TOKEN, { optional: true }) ?? [];
+    for (const group of given) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    this.store.update((m) => {
+      const next = new Map(m);
+      for (const i of icons) next.set(i.name, i);
+      return next;
+    });
+  }
+
+  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store().get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  async preload(...categories: string[]): Promise<void> {
+    await Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private async loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return;
+    this.requested.add(category);
+    try {
+      this.add(...(await loader()));
+    } catch {
+      this.requested.delete(category); // allow a retry (network hiccup)
+    }
+  }
+}
+",
+  "angular/cmn-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…" />        looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome" />  imported directly: synchronous and tree-shakable
+ * (Angular 17.1+, standalone, signals)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<span class="cmn-icon__inner" [innerHTML]="html()"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly registry = inject(CmnIconRegistry);
+
+  readonly name = input<CmnIconName | CmnIconDeprecatedName | undefined>(undefined);
+  /** icon object imported from './icons' (wins over name) */
+  readonly icon = input<CmnIconData | undefined>(undefined);
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+
+  /** explicit strokeWidth wins; otherwise the plugin's weight-by-size table (when that policy is used) */
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+
+  protected readonly html = computed(() => {
+    const name = this.name();
+    const data = this.icon() ?? (name ? this.registry.get(name) : undefined);
+    if (!data) return '';
+    // Trusted, generated markup (not user input).
+    return this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data));
+  });
+}
+",
+  "angular/cmn-sprite-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, CMN_DEPRECATED } from './icon-data';
+import { CmnSpriteLoader } from './cmn-sprite';
+
+/**
+ * <cmn-sprite-icon name="…" />   renders from the sprite file (<use>): one request, cached, nothing per icon in your JS.
+ * Configure with provideCmnSprite({ url, inline }). Same inputs and CSS variables as <cmn-icon>.
+ */
+@Component({
+  selector: 'cmn-sprite-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="href()"/></svg>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    'svg{display:block}'
+  ]
+})
+export class CmnSpriteIcon {
+  private readonly sprite = inject(CmnSpriteLoader);
+
+  readonly name = input.required<CmnIconName | CmnIconDeprecatedName>();
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+  protected readonly href = computed(() => {
+    this.sprite.ensure();
+    const requested = this.name();
+    return this.sprite.href((CMN_DEPRECATED as Record<string, string>)[requested] ?? requested);
+  });
+}
+",
+  "angular/cmn-sprite.ts": "import { DOCUMENT } from '@angular/common';
+import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+
+export interface CmnSpriteConfig {
+  /** where the sprite file is served, e.g. '/assets/cmn-sprite.svg' */
+  url: string;
+  /**
+   * false (default): reference the file with <use href="url#id"> (same origin only).
+   * true: fetch it once and insert it into the page, so icons use <use href="#id"> (works cross-origin with CORS, and in older browsers).
+   */
+  inline?: boolean;
+}
+
+export const CMN_SPRITE = new InjectionToken<CmnSpriteConfig>('cmn sprite');
+
+/** Sprite strategy: providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })] */
+export function provideCmnSprite(config: CmnSpriteConfig): Provider {
+  return { provide: CMN_SPRITE, useValue: config };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnSpriteLoader {
+  private started = false;
+  readonly config: CmnSpriteConfig | null;
+
+  constructor(@Optional() @Inject(CMN_SPRITE) config: CmnSpriteConfig | null, @Inject(DOCUMENT) private readonly doc: Document) {
+    this.config = config;
+  }
+
+  /** href for an icon symbol */
+  href(name: string): string {
+    const id = 'cmn-' + name;
+    return this.config && !this.config.inline ? this.config.url + '#' + id : '#' + id;
+  }
+
+  /** inline mode: fetch the sprite once */
+  ensure(): void {
+    if (this.started || !this.config?.inline) return;
+    this.started = true;
+    fetch(this.config.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('sprite ' + r.status))))
+      .then((svg) => {
+        const holder = this.doc.createElement('div');
+        holder.setAttribute('aria-hidden', 'true');
+        holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+        holder.innerHTML = svg;
+        this.doc.body.prepend(holder);
+      })
+      .catch(() => { this.started = false; });
+  }
+}
+",
+  "angular/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+export { CmnSpriteLoader, provideCmnSprite } from './cmn-sprite';
+export type { CmnSpriteConfig } from './cmn-sprite';
+export { CmnSpriteIcon } from './cmn-sprite-icon.component';
+",
+  "angular/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated Angular packages > stay the same: without the sprite package 1`] = `
+{
+  "angular-classic/README.md": "# cmn icons — Angular (classic)
+
+Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular-classic';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular-classic/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular-classic/cmn-icon-registry.ts": "import { Inject, Injectable, InjectionToken, Optional, Provider } from '@angular/core';
+import { Subject } from 'rxjs';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = new Map<string, CmnIconData>();
+  private readonly requested = new Set<string>();
+  /** emits when icons were added (a lazy category arrived) */
+  readonly changes = new Subject<void>();
+
+  constructor(@Optional() @Inject(CMN_ICONS_TOKEN) given: readonly (readonly IconInput[])[] | null) {
+    for (const group of given ?? []) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    for (const i of icons) this.store.set(i.name, i);
+    this.changes.next();
+  }
+
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store.get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  preload(...categories: string[]): Promise<void[]> {
+    return Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return Promise.resolve();
+    this.requested.add(category);
+    return loader().then(
+      (icons) => this.add(...icons),
+      () => { this.requested.delete(category); }
+    );
+  }
+}
+",
+  "angular-classic/cmn-icon.component.ts": "import { ChangeDetectionStrategy, ChangeDetectorRef, Component, HostBinding, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…"></cmn-icon>          looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome"></cmn-icon>  imported directly: synchronous and tree-shakable
+ * (Angular 14+, standalone, classic @Input)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '<span class="cmn-icon__inner" [innerHTML]="html"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon implements OnChanges, OnInit, OnDestroy {
+  @Input() name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (wins over name) */
+  @Input() icon?: CmnIconData;
+  @Input() size?: string | number;
+  @Input() color?: string;
+  @Input() strokeWidth?: number | string;
+  @Input() label?: string;
+
+  html: SafeHtml = '';
+  private sub?: Subscription;
+
+  constructor(
+    private readonly sanitizer: DomSanitizer,
+    private readonly registry: CmnIconRegistry,
+    private readonly cdr: ChangeDetectorRef
+  ) {}
+
+  @HostBinding('attr.role') get role(): string | null { return this.label ? 'img' : null; }
+  @HostBinding('attr.aria-label') get ariaLabel(): string | null { return this.label || null; }
+  @HostBinding('attr.aria-hidden') get ariaHidden(): string | null { return this.label ? null : 'true'; }
+  @HostBinding('style.--cmn-icon-size') get sizeVar(): string | null {
+    return this.size === undefined || this.size === '' ? null : typeof this.size === 'number' ? this.size + 'px' : this.size;
+  }
+  @HostBinding('style.--cmn-icon-color') get colorVar(): string | null { return this.color || null; }
+  @HostBinding('style.--cmn-icon-stroke-width') get strokeVar(): string | number | null {
+    return this.strokeWidth !== undefined ? this.strokeWidth : cmnStrokeFor(this.size);
+  }
+
+  ngOnInit(): void {
+    // a lazily loaded category arrived
+    this.sub = this.registry.changes.subscribe(() => {
+      this.render();
+      this.cdr.markForCheck();
+    });
+  }
+
+  ngOnChanges(): void {
+    this.render();
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private render(): void {
+    const data = this.icon ?? (this.name ? this.registry.get(this.name) : undefined);
+    // Trusted, generated markup (not user input).
+    this.html = data ? this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data)) : '';
+  }
+}
+",
+  "angular-classic/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular-classic/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular-classic/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular-classic/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+",
+  "angular-classic/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+  "angular/README.md": "# cmn icons — Angular (modern)
+
+Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependency.
+
+## Three ways to use an icon
+
+1. **Import the icons you use** (synchronous, tree-shakable; the bundle contains only these):
+\`\`\`ts
+import { CmnIcon, cmnHome } from './angular';
+
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+export class Demo { home = cmnHome; }
+\`\`\`
+2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
+
+Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
+CSS variables: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+Icons: 0. \`icon-data.ts\` has the typed name list (\`CmnIconName\`); \`icons/\` has one file per icon.
+",
+  "angular/all-icons.ts": "import { Provider } from '@angular/core';
+import { CMN_ICONS } from './icons';
+import { provideCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer provideCmnIcons(…) with the icons you use. */
+export function provideCmnAllIcons(): Provider {
+  return provideCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "angular/cmn-icon-registry.ts": "import { inject, Injectable, InjectionToken, Provider, signal } from '@angular/core';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+type IconInput = CmnIconData | readonly CmnIconData[];
+
+export const CMN_ICONS_TOKEN = new InjectionToken<readonly (readonly IconInput[])[]>('cmn icons');
+
+/**
+ * Register icons up front (synchronous, tree-shakable):
+ *   providers: [provideCmnIcons(cmnHome, cmnSearch)]
+ * Icons you do not register are still found by name: their category is loaded on first use as a lazy chunk.
+ */
+export function provideCmnIcons(...icons: IconInput[]): Provider {
+  return { provide: CMN_ICONS_TOKEN, multi: true, useValue: icons };
+}
+
+@Injectable({ providedIn: 'root' })
+export class CmnIconRegistry {
+  private readonly store = signal<ReadonlyMap<string, CmnIconData>>(new Map());
+  private readonly requested = new Set<string>();
+
+  constructor() {
+    const given = inject(CMN_ICONS_TOKEN, { optional: true }) ?? [];
+    for (const group of given) for (const item of group) this.add(...(Array.isArray(item) ? item : [item as CmnIconData]));
+  }
+
+  add(...icons: CmnIconData[]): void {
+    if (!icons.length) return;
+    this.store.update((m) => {
+      const next = new Map(m);
+      for (const i of icons) next.set(i.name, i);
+      return next;
+    });
+  }
+
+  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */
+  get(requested: string): CmnIconData | undefined {
+    const name = (CMN_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const hit = this.store().get(name);
+    if (!hit) this.load(name);
+    return hit;
+  }
+
+  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  async preload(...categories: string[]): Promise<void> {
+    await Promise.all(categories.map((c) => this.loadCategory(c)));
+  }
+
+  private load(name: string): void {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void this.loadCategory(category);
+  }
+
+  private async loadCategory(category: string): Promise<void> {
+    const loader = CMN_LOADERS[category];
+    if (!loader || this.requested.has(category)) return;
+    this.requested.add(category);
+    try {
+      this.add(...(await loader()));
+    } catch {
+      this.requested.delete(category); // allow a retry (network hiccup)
+    }
+  }
+}
+",
+  "angular/cmn-icon.component.ts": "import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { CmnIconRegistry } from './cmn-icon-registry';
+
+/**
+ * <cmn-icon name="…" />        looked up by name (registered icons, otherwise its category loads lazily)
+ * <cmn-icon [icon]="cmnHome" />  imported directly: synchronous and tree-shakable
+ * (Angular 17.1+, standalone, signals)
+ * Customise via inputs or CSS variables: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ * Pass [label] for meaningful icons; without it the icon is decorative (aria-hidden).
+ */
+@Component({
+  selector: 'cmn-icon',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.role]': 'label() ? "img" : null',
+    '[attr.aria-label]': 'label() || null',
+    '[attr.aria-hidden]': 'label() ? null : "true"',
+    '[style.--cmn-icon-size]': 'sizeCss()',
+    '[style.--cmn-icon-color]': 'color() || null',
+    '[style.--cmn-icon-stroke-width]': 'strokeCss()'
+  },
+  template: '<span class="cmn-icon__inner" [innerHTML]="html()"></span>',
+  styles: [
+    ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+    '.cmn-icon__inner{display:block;width:100%;height:100%}'
+  ]
+})
+export class CmnIcon {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly registry = inject(CmnIconRegistry);
+
+  readonly name = input<CmnIconName | CmnIconDeprecatedName | undefined>(undefined);
+  /** icon object imported from './icons' (wins over name) */
+  readonly icon = input<CmnIconData | undefined>(undefined);
+  readonly size = input<string | number | undefined>(undefined);
+  readonly color = input<string | undefined>(undefined);
+  readonly strokeWidth = input<number | string | undefined>(undefined);
+  readonly label = input<string | undefined>(undefined);
+
+  protected readonly sizeCss = computed(() => {
+    const s = this.size();
+    return s === undefined || s === '' ? null : typeof s === 'number' ? s + 'px' : s;
+  });
+
+  /** explicit strokeWidth wins; otherwise the plugin's weight-by-size table (when that policy is used) */
+  protected readonly strokeCss = computed(() => this.strokeWidth() ?? cmnStrokeFor(this.size()));
+
+  protected readonly html = computed(() => {
+    const name = this.name();
+    const data = this.icon() ?? (name ? this.registry.get(name) : undefined);
+    if (!data) return '';
+    // Trusted, generated markup (not user input).
+    return this.sanitizer.bypassSecurityTrustHtml(cmnSvg(data));
+  });
+}
+",
+  "angular/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "angular/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "angular/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "angular/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { CmnIconRegistry, provideCmnIcons } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon.component';
+",
+  "angular/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
