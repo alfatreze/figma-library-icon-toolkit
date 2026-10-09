@@ -19,7 +19,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * Here the handles are created once, size is never kept in React state, deltas use `screenX/Y` (the iframe itself
  * moves under the pointer while Figma resizes it, so client coordinates would feed back), and a drag ends cleanly
  * if the button is released outside the iframe.
+ *
+ * Expanding: the pointer leaves the iframe on the first outward pixel, before Figma has grown the window, and the iframe receives
+ * no pointer events outside itself. So while the drag grows the window it stays `LEAD` px ahead of the pointer (the pointer is
+ * still inside the iframe), and the exact size is applied when the drag ends, or after `IDLE` ms without events (the button was
+ * released outside the iframe). Shrinking needs no lead: the pointer stays inside.
  */
+const LEAD = 160
+const IDLE = 700
 export function useResizeHandles(onSize: (width: number, height: number) => void, limits: Limits): void {
   useEffect(() => {
     const cleanups: (() => void)[] = []
@@ -30,14 +37,17 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
       const common = 'position:fixed;z-index:1000;touch-action:none;user-select:none;'
       el.style.cssText =
         dir === 'both'
-          ? `${common}right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;`
+          ? `${common}right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;`
           : dir === 'x'
-            ? `${common}right:0;top:0;bottom:16px;width:8px;cursor:ew-resize;`
-            : `${common}left:0;right:16px;bottom:0;height:8px;cursor:ns-resize;`
+            ? `${common}right:0;top:0;bottom:20px;width:10px;cursor:ew-resize;`
+            : `${common}left:0;right:20px;bottom:0;height:10px;cursor:ns-resize;`
       document.body.appendChild(el)
 
       let start: { sx: number; sy: number; w: number; h: number } | null = null
       let pending: { w: number; h: number } | null = null
+      /** the size the pointer is asking for (without the lead) */
+      let target: { w: number; h: number } | null = null
+      let idle = 0
       let raf = 0
 
       const flush = () => {
@@ -48,11 +58,19 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
           onSize(p.w, p.h)
         }
       }
+      const settle = () => {
+        if (raf) cancelAnimationFrame(raf)
+        raf = 0
+        pending = null
+        if (target) onSize(target.w, target.h)
+      }
       const end = (e?: PointerEvent) => {
         if (!start) return
         start = null
-        if (raf) cancelAnimationFrame(raf)
-        flush()
+        if (idle) clearTimeout(idle)
+        idle = 0
+        settle()
+        target = null
         if (e) {
           try {
             el.releasePointerCapture(e.pointerId)
@@ -74,10 +92,20 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
           end(e)
           return
         }
-        const w = clamp(start.w + (e.screenX - start.sx), limits.minWidth, limits.maxWidth)
-        const h = dir === 'x' ? start.h : clamp(start.h + (e.screenY - start.sy), limits.minHeight, limits.maxHeight)
-        pending = { w: dir === 'y' ? start.w : w, h }
+        const dx = e.screenX - start.sx
+        const dy = e.screenY - start.sy
+        const w = dir === 'y' ? start.w : clamp(start.w + dx, limits.minWidth, limits.maxWidth)
+        const h = dir === 'x' ? start.h : clamp(start.h + dy, limits.minHeight, limits.maxHeight)
+        target = { w, h }
+        // growing: stay ahead of the pointer (never past the maximum)
+        pending = {
+          w: dir !== 'y' && dx > 0 ? Math.min(limits.maxWidth, w + LEAD) : w,
+          h: dir !== 'x' && dy > 0 ? Math.min(limits.maxHeight, h + LEAD) : h
+        }
         if (!raf) raf = requestAnimationFrame(flush)
+        // no events for a moment: the button was probably released outside the iframe, so settle on the exact size
+        if (idle) clearTimeout(idle)
+        idle = window.setTimeout(settle, IDLE)
       })
       el.addEventListener('pointerup', end)
       el.addEventListener('pointercancel', end)
@@ -85,6 +113,7 @@ export function useResizeHandles(onSize: (width: number, height: number) => void
 
       cleanups.push(() => {
         if (raf) cancelAnimationFrame(raf)
+        if (idle) clearTimeout(idle)
         el.remove()
       })
     }
