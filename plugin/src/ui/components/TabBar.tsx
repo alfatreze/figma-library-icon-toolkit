@@ -24,12 +24,21 @@ export function TabBar<T extends string>(props: { tabs: TabItem<T>[]; value: T; 
       {props.tabs.map((t) => {
         const active = t.id === props.value
         return (
-          <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={active} tabIndex={active ? 0 : -1} class={`${styles.tab} ${active ? styles.tabActive : ''}`} onClick={() => props.onChange(t.id)}>
+          <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-controls={`panel-${t.id}`} aria-selected={active} tabIndex={active ? 0 : -1} class={`${styles.tab} ${active ? styles.tabActive : ''}`} onClick={() => props.onChange(t.id)}>
             {t.label}
             {t.badge !== undefined && <span class={`${styles.count} ${t.tone === 'error' ? styles.countError : t.tone === 'warn' ? styles.countWarn : ''}`}>{t.badge}</span>}
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/** the panel a tab controls; `display: contents` keeps the panel's own layout (the children stay direct children of the flex column) */
+export function TabPanel(props: { id: string; children: ComponentChildren }) {
+  return (
+    <div role="tabpanel" id={`panel-${props.id}`} aria-labelledby={`tab-${props.id}`} style={{ display: 'contents' }}>
+      {props.children}
     </div>
   )
 }

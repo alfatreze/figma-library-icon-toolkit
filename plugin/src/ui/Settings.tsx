@@ -67,7 +67,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         <div class={styles.muted}>Saved on this computer. Nothing is written to your Figma file.</div>
       </div>
       <TabBar label="Settings sections" tabs={SETTINGS_TABS} value={tab} onChange={setTab} />
-      <div class={styles.overlayBody}>
+      <div class={styles.overlayBody} role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === 'packages' && (
           <Fragment>
             <div class={styles.section}>

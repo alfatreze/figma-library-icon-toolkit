@@ -14,6 +14,7 @@ import { SHARED_KEYS } from './core/settingsSchema'
 import { zipFiles } from './core/zip'
 import styles from './ui/styles'
 import { ConfirmApply, FixCard } from './ui/Fixes'
+import { useFilters } from './ui/hooks/useFilters'
 import { useFixes } from './ui/hooks/useFixes'
 import { groupOutputs, outputReady, settingsFor } from './core/outputs'
 import { IconsPanel, Status, View } from './ui/panels/IconsPanel'
@@ -26,7 +27,7 @@ import { computeOverview } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
 import { IconPreview, PreviewBg } from './ui/IconPreview'
 import { Segmented } from './ui/components/Segmented'
-import { TabBar } from './ui/components/TabBar'
+import { TabBar, TabPanel } from './ui/components/TabBar'
 import { InspectPanel } from './ui/Inspect'
 import { filterIcons, groupIssues, IssueGroup, isAlert, isBlocked } from './ui/selectors'
 import { useBaselines } from './ui/hooks/useBaselines'
@@ -51,10 +52,8 @@ function Plugin() {
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [off, setOff] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<Tab>('icons')
-  const [status, setStatus] = useState<Status>('all')
-  const [ruleFilter, setRuleFilter] = useState<string | null>(null)
-  const [catFilter, setCatFilter] = useState('')
-  const [query, setQuery] = useState('')
+  const { filters, dispatch: filter } = useFilters(PAGE_SIZE)
+  const { status, rule: ruleFilter, category: catFilter, query, change: changeFilter, limit } = filters
   const [view, setView] = useState<View>('list')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [cursor, setCursor] = useState<Record<string, number>>({})
@@ -69,10 +68,8 @@ function Plugin() {
   const [scannedAt, setScannedAt] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOverrides, setOutlineOverrides] = useState<Record<string, boolean>>({})
-  const [changeFilter, setChangeFilter] = useState<ChangeKind | null>(null)
   const [configMessage, setConfigMessage] = useState('')
   const [sharedCfg, setSharedCfg] = useState<{ at: string; by: string | null; config: string } | null>(null)
-  const [limit, setLimit] = useState(PAGE_SIZE)
   const resetFixes = useRef(() => {})
   // reset what belongs to the previous scan (the hook resets its own rows and progress)
   const resetForScan = () => {
@@ -80,11 +77,7 @@ function Plugin() {
     setOpen(new Set())
     setCursor({})
     resetFixes.current()
-    setRuleFilter(null)
-    setCatFilter('')
-    setStatus('all')
-    setChangeFilter(null)
-    setLimit(PAGE_SIZE)
+    filter({ type: 'reset' })
   }
   const { raws, summary, scanning, progress, phase, scanError } = useScan(resetForScan)
   useEffect(() => {
@@ -183,9 +176,7 @@ function Plugin() {
       return n
     })
   const showInList = (next: { status?: Status; rule?: string | null }) => {
-    setStatus(next.status ?? 'all')
-    setRuleFilter(next.rule ?? null)
-    setLimit(PAGE_SIZE)
+    filter({ type: 'show', ...next })
     setTab('icons')
   }
 
@@ -197,7 +188,7 @@ function Plugin() {
     [icons, query, status, ruleFilter, catFilter, changeFilter, changeMap, off]
   )
 
-  const makeFiles = (forSettings: Settings = settings) => buildFiles({ allIcons: included, settings: forSettings, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10), release })
+  const makeFiles = (forSettings: Settings = settings) => buildFiles({ allIcons: included, settings: forSettings, spriteStrategy: settings.formats.sprite, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10), release })
 
   const onImportConfig = async (file: File) => {
     try {
@@ -449,7 +440,7 @@ function Plugin() {
 
       {/* ---------------- Icons ---------------- */}
       {tab === 'icons' && (
-        <IconsPanel
+        <TabPanel id="icons"><IconsPanel
           icons={icons}
           visible={visible}
           limit={limit}
@@ -474,27 +465,27 @@ function Plugin() {
           blockedCount={blockedIcons.length}
           alertCount={alertIcons.length}
           off={off}
-          onQuery={setQuery}
+          onQuery={(value) => filter({ type: 'query', value })}
           onView={setView}
           onPreviewSize={setPreviewSize}
-          onCategory={setCatFilter}
+          onCategory={(value) => filter({ type: 'category', value })}
           onShow={showInList}
-          onClearRule={() => setRuleFilter(null)}
-          onChangeFilter={(k) => { setChangeFilter(k); setLimit(PAGE_SIZE) }}
-          onLimit={setLimit}
+          onClearRule={() => filter({ type: 'clearRule' })}
+          onChangeFilter={(value) => filter({ type: 'change', value })}
+          onLimit={(value) => filter({ type: 'limit', value })}
           onSelectAll={(v) => setOff(v ? new Set() : new Set(icons.map((i) => i.key)))}
           onInclude={(key, v) => setIncluded([key], v)}
           onLocate={locate}
-          onExpand={(i) => { setView('list'); setOpen((p) => new Set(p).add(i.key)); setQuery(i.name) }}
+          onExpand={(i) => { setView('list'); setOpen((p) => new Set(p).add(i.key)); filter({ type: 'query', value: i.name }) }}
           onScroll={() => hidePreview(true)}
           renderRows={renderRows}
           renderGrouped={renderGrouped}
-        />
+        /></TabPanel>
       )}
 
       {/* ---------------- Issues ---------------- */}
       {tab === 'issues' && (
-        <IssuesPanel
+        <TabPanel id="issues"><IssuesPanel
           summary={issueSummary}
           scanSummary={summary}
           iconCount={icons.length}
@@ -519,11 +510,11 @@ function Plugin() {
           }}
           onToggleNotes={() => setShowNotes(!showNotes)}
           onOpenSettings={() => setShowSettings(true)}
-        />
+        /></TabPanel>
       )}
 
       {/* ---------------- Skipped ---------------- */}
-      {tab === 'skipped' && <SkippedPanel summary={summary} onLocate={locate} />}
+      {tab === 'skipped' && <TabPanel id="skipped"><SkippedPanel summary={summary} onLocate={locate} /></TabPanel>}
 
       {/* ---------------- Footer: the single primary action ---------------- */}
       <div class={styles.footer}>
