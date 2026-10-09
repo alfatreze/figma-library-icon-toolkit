@@ -305,3 +305,9 @@ body > [class*='_menu_'] { z-index: 2600; }
 :global(.figma-dark) .tabActive .countWarn,
 :global(.figma-dark) .conf_medium { background: var(--figma-color-bg-secondary); }
 :global(.figma-dark) .tabActive .count { background: var(--figma-color-bg-brand-tertiary); }
+
+/* hints in the footer open upward (a hint below them is cut off by the window edge); on its left side they start at the left edge of the control */
+.footer [data-hint]:not([data-hint='']):hover::after,
+.footer [data-hint]:not([data-hint='']):focus-visible::after { top: auto; bottom: calc(100% + 6px); }
+.footerNote [data-hint]:not([data-hint='']):hover::after,
+.footerNote [data-hint]:not([data-hint='']):focus-visible::after { right: auto; left: 0; }
