@@ -1,4 +1,4 @@
-import { IconKind, SlotInfo, StrokePolicy, TokenNaming } from '../types'
+import { IconKind, PaintFact, SlotInfo, StrokePolicy, TokenNaming } from '../types'
 import { sanitizeSvgTree } from './sanitize'
 import { tokenVarName } from './tokens'
 
@@ -10,6 +10,40 @@ export interface ThemeOptions {
   precision: number
   /** resolved hex (#rrggbb) -> Figma variable (name + collection) */
   variableByHex: Map<string, { name: string; collection?: string }>
+  /** paints in Figma tree order; when they line up 1:1 with the SVG's colours, variables are matched by order instead of by hex */
+  paints?: PaintFact[]
+}
+
+type VarRef = { name: string; collection?: string }
+
+/**
+ * Match each SVG colour to the Figma variable bound to the same layer, by order, not by colour value.
+ * Two different variables that resolve to the same hex stay apart (separate slots); an unbound paint that happens to share a hex
+ * with a bound one no longer inherits the variable. Returns null when the sequences do not line up (then the hex map is used).
+ */
+export function alignVariables(drawables: { attr: 'fill' | 'stroke'; hex: string }[], paints: PaintFact[] | undefined): (VarRef | undefined)[] | null {
+  if (!paints || paints.length !== drawables.length) return null
+  const out: (VarRef | undefined)[] = []
+  for (let i = 0; i < drawables.length; i++) {
+    const p = paints[i]
+    if (p.role !== drawables[i].attr || p.hex !== drawables[i].hex) return null
+    out.push(p.variable ? { name: p.variable, collection: p.collection } : undefined)
+  }
+  return out
+}
+
+/** hex fallback: only when every variable-bound paint of that hex agrees, otherwise the match would be a guess */
+export function unambiguousByHex(paints: PaintFact[] | undefined, fallback: Map<string, VarRef>): Map<string, VarRef> {
+  if (!paints) return fallback
+  const conflict = new Set<string>()
+  const seen = new Map<string, string | undefined>()
+  for (const p of paints) {
+    if (seen.has(p.hex) && seen.get(p.hex) !== p.variable) conflict.add(p.hex)
+    else seen.set(p.hex, p.variable)
+  }
+  const out = new Map(fallback)
+  for (const h of conflict) out.delete(h)
+  return out
 }
 
 export interface ThemedSvg {
@@ -122,17 +156,23 @@ export function themeSvg(svgText: string, opts: ThemeOptions): ThemedSvg {
     }
   }
 
-  const stats = new Map<string, { uses: number; first: number }>()
+  const aligned = alignVariables(drawables, opts.paints)
+  const hexMap = aligned ? opts.variableByHex : unambiguousByHex(opts.paints, opts.variableByHex)
+  const varOf = (i: number, hex: string): VarRef | undefined => (aligned ? aligned[i] : hexMap.get(hex))
+  const keyOf = (i: number, hex: string) => `${hex}|${varOf(i, hex)?.name ?? ''}`
+  const stats = new Map<string, { uses: number; first: number; hex: string; variable?: VarRef }>()
   drawables.forEach((d, i) => {
-    const s = stats.get(d.hex)
+    const k = keyOf(i, d.hex)
+    const s = stats.get(k)
     if (s) s.uses++
-    else stats.set(d.hex, { uses: 1, first: i })
+    else stats.set(k, { uses: 1, first: i, hex: d.hex, variable: varOf(i, d.hex) })
   })
   const ordered = [...stats.entries()].sort((a, b) => b[1].uses - a[1].uses || a[1].first - b[1].first)
-  const slotByHex = new Map<string, number>()
-  const slots: SlotInfo[] = ordered.map(([hex, s], i) => {
-    slotByHex.set(hex, i + 1)
-    const variable = opts.variableByHex.get(hex)
+  const slotByKey = new Map<string, number>()
+  const slots: SlotInfo[] = ordered.map(([key, s], i) => {
+    slotByKey.set(key, i + 1)
+    const hex = s.hex
+    const variable = s.variable
     return {
       index: i + 1,
       cssVar: slotVar(opts.ns, i + 1),
@@ -168,8 +208,8 @@ export function themeSvg(svgText: string, opts: ThemeOptions): ThemedSvg {
   // 4. rewrite colours + stroke width
   const themed = opts.colorMode === 'themeable'
   if (themed) {
-    for (const d of drawables) {
-      const slot = slotByHex.get(d.hex)!
+    for (const [di, d] of drawables.entries()) {
+      const slot = slotByKey.get(keyOf(di, d.hex))!
       const info = slots[slot - 1]
       const fallback = slot === 1 ? 'currentColor' : d.hex
       const inner = info.token ? `var(${info.token}, ${fallback})` : fallback

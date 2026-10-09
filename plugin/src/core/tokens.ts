@@ -19,7 +19,7 @@ export function parseMapping(text: string): Map<string, string> {
     let to = line.slice(i + 1).trim()
     if (!to) continue
     if (!to.startsWith('--')) to = '--' + to
-    if (/^--[A-Za-z0-9_-]+$/.test(to)) map.set(from, to)
+    if (/^--[A-Za-z0-9_*-]+$/.test(to)) map.set(from, to)
   }
   return map
 }
@@ -39,14 +39,61 @@ function pathVar(variable: string, cfg: TokenNaming, collection?: string): strin
   return '--' + parts.join('-')
 }
 
+/**
+ * Mapping lookup, most specific first:
+ *  1. `Collection::variable/name = --css`   (exact, scoped to a collection)
+ *  2. `variable/name = --css`               (exact)
+ *  3. `Collection::prefix/* = --css-*`      (wildcard, scoped)
+ *  4. `prefix/* = --css-*`                  (wildcard; `*` in the target is replaced by the rest of the path, slugified; longest prefix wins)
+ */
+function mapped(variable: string, collection: string | undefined, table: Map<string, string>): string | null {
+  if (collection) {
+    const scoped = table.get(`${collection}::${variable}`)
+    if (scoped) return scoped
+  }
+  const exact = table.get(variable)
+  if (exact) return exact
+  let best: { len: number; out: string } | null = null
+  for (const [from, to] of table) {
+    if (!from.endsWith('*') || !to.includes('*')) continue
+    let key = from.slice(0, -1)
+    const scope = key.indexOf('::')
+    if (scope >= 0) {
+      if (!collection || key.slice(0, scope) !== collection) continue
+      key = key.slice(scope + 2)
+    }
+    if (!variable.startsWith(key) || (best && key.length <= best.len)) continue
+    const rest = variable.slice(key.length).split('/').map((x) => slugify(x)).filter(Boolean).join('-')
+    if (rest) best = { len: key.length, out: to.replace('*', rest) }
+  }
+  return best?.out ?? null
+}
+
 /** CSS variable name for a bound Figma variable, or null when tokens are disabled */
 export function tokenVarName(variable: string, collection: string | undefined, cfg: TokenNaming): string | null {
   if (cfg.mode === 'none') return null
   if (cfg.mode === 'custom') {
-    const hit = parseMapping(cfg.mapping).get(variable)
+    const hit = mapped(variable, collection, parseMapping(cfg.mapping))
     if (hit) return hit
   }
   return pathVar(variable, cfg, collection)
+}
+
+/** Starting point for the custom table: one line per variable found in the scan, named by the current rules, grouped by collection. */
+export function suggestMapping(vars: { variable: string; collection?: string }[], cfg: TokenNaming): string {
+  const byCollection = new Map<string, Set<string>>()
+  for (const v of vars) {
+    const c = v.collection ?? ''
+    if (!byCollection.has(c)) byCollection.set(c, new Set())
+    byCollection.get(c)!.add(v.variable)
+  }
+  const base: TokenNaming = { ...cfg, mode: cfg.mode === 'collection' ? 'collection' : 'path' }
+  const lines: string[] = []
+  for (const [c, names] of [...byCollection].sort((a, b) => a[0].localeCompare(b[0]))) {
+    lines.push(`# ${c || '(no collection)'}`)
+    for (const n of [...names].sort()) lines.push(`${n} = ${tokenVarName(n, c || undefined, base)}`)
+  }
+  return lines.join('\n')
 }
 
 export function tokenPreview(example: { variable: string; collection?: string }, cfg: TokenNaming): string {

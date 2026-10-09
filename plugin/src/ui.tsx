@@ -464,6 +464,11 @@ function Plugin() {
       setSyncing(false)
     }
   }
+  const scanVariables = useMemo(() => {
+    const seen = new Map<string, { variable: string; collection?: string }>()
+    for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection })
+    return [...seen.values()]
+  }, [raws])
   const exampleVariable = useMemo(() => {
     const p = raws.flatMap((r) => r.facts.paints).find((x) => x.variable)
     return p ? { variable: p.variable!, collection: p.collection } : { variable: 'color/neutral/darkest', collection: 'Primitives' }
@@ -917,7 +922,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ exampleVariable, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
+          extras={{ exampleVariable, scanVariables, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
         />
       )}
       <div class={styles.grip} />

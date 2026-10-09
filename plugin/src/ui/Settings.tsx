@@ -2,7 +2,7 @@ import { Button, Checkbox, Dropdown, SegmentedControl, Textbox, TextboxMultiline
 import { ComponentChildren, h } from 'preact'
 import { cleanNamespace } from '../core/naming'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
-import { TOKEN_MODES, tokenPreview } from '../core/tokens'
+import { suggestMapping, TOKEN_MODES, tokenPreview } from '../core/tokens'
 import styles from '../styles.css'
 import { CategorySource, ScanMode, Settings, StrokePolicy, TokenMode } from '../types'
 import { InfoTip } from './InfoTip'
@@ -35,6 +35,8 @@ const num = (v: string, fallback: number) => {
 
 export interface SettingsExtras {
   exampleVariable: { variable: string; collection?: string }
+  /** every distinct Figma variable bound in the last scan */
+  scanVariables: { variable: string; collection?: string }[]
   onExportConfig: () => void
   onImportConfig: (file: File) => void
   configMessage: string
@@ -307,8 +309,13 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             </Field>
           )}
           {settings.tokenNaming.mode === 'custom' && (
-            <Field label="Mapping table" info={{ title: 'Custom mapping', body: <span>One mapping per line: <code>figma/variable/name = --css-variable</code>. Lines starting with <code>#</code> are comments. Variables that are not listed use the path rule (with the prefix above).</span> }}>
-              <TextboxMultiline rows={4} value={settings.tokenNaming.mapping} onValueInput={(v) => patch({ tokenNaming: { ...settings.tokenNaming, mapping: v } })} placeholder={'color/icon/default = --icon-color\ncolor/icon/muted = --icon-muted'} />
+            <Field label="Mapping table" info={{ title: 'Custom mapping', body: <span>One mapping per line: <code>figma/variable/name = --css-variable</code>. Lines starting with <code>#</code> are comments. Scope a line to a collection with <code>Collection::name</code>, or map a whole group with a wildcard: <code>color/icon/* = --icon-*</code> (longest match wins). Variables that are not listed use the path rule (with the prefix above).</span> }}>
+              <div class={styles.fieldRow}>
+                <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} title={extras.scanVariables.length ? '' : 'Scan first: the table is built from the variables your icons use'} onClick={() => patch({ tokenNaming: { ...settings.tokenNaming, mapping: suggestMapping(extras.scanVariables, settings.tokenNaming) } })}>
+                  Fill from scan ({extras.scanVariables.length} variable{extras.scanVariables.length === 1 ? '' : 's'})
+                </button>
+              </div>
+              <TextboxMultiline rows={8} value={settings.tokenNaming.mapping} onValueInput={(v) => patch({ tokenNaming: { ...settings.tokenNaming, mapping: v } })} placeholder={'color/icon/default = --icon-color\ncolor/icon/muted = --icon-muted'} />
             </Field>
           )}
           <div class={styles.muted}>

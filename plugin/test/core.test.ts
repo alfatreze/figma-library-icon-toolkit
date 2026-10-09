@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { changesByName, chunkText, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline } from '../src/core/baseline'
 import { buildName, parseVariantName, slugify, validateName } from '../src/core/naming'
 import { prefixIds, themeSvg } from '../src/core/svg'
-import { tokenVarName, parseMapping } from '../src/core/tokens'
+import { tokenVarName, parseMapping, suggestMapping } from '../src/core/tokens'
 import { parseStrokeTable, weightForSize, validateStrokeTable } from '../src/core/stroke'
 import { sanitizeSvgTree } from '../src/core/sanitize'
 import { bumpVersion, changelogMarkdown, diffCatalogs, nextDeprecated } from '../src/core/changelog'
@@ -548,5 +548,40 @@ describe('baseline snapshots', () => {
     expect(pickBaseline({ local: s, shared: s })).toBe('shared')
     expect(pickBaseline({ file: s, local: s })).toBe('local')
     expect(pickBaseline({})).toBeNull()
+  })
+})
+
+describe('variable matching by order', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M0 0h10v10H0z" fill="#111111"/><path d="M12 12h10v10H12z" fill="#111111"/></svg>'
+  const base = { ns: 'ds', colorMode: 'themeable' as const, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming, mode: 'path' as const }, strokePolicy: 'constant' as const, precision: 2 }
+  const paint = (variable?: string) => ({ role: 'fill' as const, hex: '#111111', opacity: 1, variable })
+  it('keeps two variables with the same hex apart', () => {
+    const r = themeSvg(svg, { ...base, variableByHex: new Map([['#111111', { name: 'color/a' }]]), paints: [paint('color/a'), paint('color/b')] })
+    expect(r.slots.map((x) => x.variable)).toEqual(['color/a', 'color/b'])
+  })
+  it('does not give an unbound paint the variable of a bound one with the same hex', () => {
+    const r = themeSvg(svg, { ...base, variableByHex: new Map([['#111111', { name: 'color/a' }]]), paints: [paint('color/a'), paint(undefined)] })
+    expect(r.slots.map((x) => x.variable)).toEqual(['color/a', undefined])
+  })
+  it('falls back to hex when the sequences do not line up, but never on an ambiguous hex', () => {
+    const one = themeSvg(svg, { ...base, variableByHex: new Map([['#111111', { name: 'color/a' }]]), paints: [paint('color/a')] })
+    expect(one.slots).toHaveLength(1)
+    expect(one.slots[0].variable).toBe('color/a')
+    const amb = themeSvg(svg, { ...base, variableByHex: new Map([['#111111', { name: 'color/a' }]]), paints: [paint('color/a'), paint('color/b'), paint('color/c')] })
+    expect(amb.slots[0].variable).toBeUndefined()
+  })
+})
+
+describe('token mapping rules', () => {
+  const cfg = { ...DEFAULT_SETTINGS.tokenNaming, mode: 'custom' as const, mapping: 'Semantic::color/icon/default = --icon\ncolor/icon/default = --icon-any\ncolor/brand/* = --brand-*' }
+  it('prefers collection-scoped, then exact, then wildcard', () => {
+    expect(tokenVarName('color/icon/default', 'Semantic', cfg)).toBe('--icon')
+    expect(tokenVarName('color/icon/default', 'Primitives', cfg)).toBe('--icon-any')
+    expect(tokenVarName('color/brand/Primary/500', 'Primitives', cfg)).toBe('--brand-primary-500')
+    expect(tokenVarName('color/other', 'Primitives', cfg)).toBe('--color-other')
+  })
+  it('suggests a table that round-trips through the parser', () => {
+    const text = suggestMapping([{ variable: 'color/a', collection: 'P' }, { variable: 'color/b', collection: 'P' }], DEFAULT_SETTINGS.tokenNaming)
+    expect(parseMapping(text).get('color/a')).toBe('--color-a')
   })
 })

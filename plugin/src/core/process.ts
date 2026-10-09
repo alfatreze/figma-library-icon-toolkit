@@ -78,7 +78,8 @@ export function processIcons(
           tokenNaming: settings.tokenNaming,
           strokePolicy: settings.strokePolicy,
           precision: settings.precision,
-          variableByHex: variableMap(raw)
+          variableByHex: variableMap(raw),
+          paints: raw.facts.paints
         })
       : null
     const name = baseNames[i].name
