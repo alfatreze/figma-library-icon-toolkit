@@ -7,6 +7,8 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-09
+
 ### Security
 - Settings are validated against one schema (enums, ranges, lengths) wherever they enter: imported config, config published in a file, saved settings. A hostile config can no longer put text into generated code; generators also normalise the stroke policy.
 - The SVG sanitiser is now an allow-list (elements, attributes, URL values); comments, CDATA and text nodes are removed; fix previews are sanitised too; `viewBox` is validated; snippets escape labels and colours.
@@ -62,6 +64,7 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alfatreze/figma-library-icon-toolkit/releases/tag/v0.1.0
