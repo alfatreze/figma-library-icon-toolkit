@@ -37,6 +37,8 @@ export interface SettingsExtras {
   exampleVariable: { variable: string; collection?: string }
   /** every distinct Figma variable bound in the last scan */
   scanVariables: { variable: string; collection?: string }[]
+  onAttachDevResources: () => void
+  scannedComponents: number
   onExportConfig: () => void
   onImportConfig: (file: File) => void
   configMessage: string
@@ -393,6 +395,9 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
               </span>
             </InfoTip>
           </div>
+          <Field label="Figma file URL" info={{ title: 'Figma file URL', body: <span>Used by Code Connect templates, e.g. <code>https://www.figma.com/design/&lt;key&gt;/&lt;name&gt;</code>. Plugins cannot read the file key themselves, so paste it once. Part of the team config.</span> }}>
+            <Textbox value={settings.codeConnectUrl} onValueInput={(v) => patch({ codeConnectUrl: v })} placeholder="https://www.figma.com/design/…" />
+          </Field>
           {!settings.labs && <div class={styles.muted}>Enable Labs below to publish.</div>}
           {extras.shared && (
             <div class={styles.release}>
@@ -440,6 +445,20 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
                 <Toggle value={settings.compositeFrames === 'include'} onValueChange={(v) => patch({ compositeFrames: v ? 'include' : 'ignore' })}>
                   Treat frames made of instances as icons
                 </Toggle>
+              </Row>
+              <Row
+                info={{
+                  title: 'Dev resources',
+                  body: <span>Adds a link to every icon <em>component</em> (Dev Mode shows it under “Dev resources”), pointing at <code>&lt;link&gt;#icon-name</code>, e.g. the <code>icons.json</code> in your repository or a Storybook page. This <strong>writes to your Figma file</strong> (one link per component, skipped when it already exists; one undo step). Scan first: it uses the icons currently listed.</span>
+                }}
+              >
+                <div class={styles.section}>
+                  <Field label="Link base"><Textbox value={settings.devResourceUrl} onValueInput={(v) => patch({ devResourceUrl: v })} placeholder="https://github.com/org/repo/blob/main/src/icons/icons.json" /></Field>
+                  <div class={styles.fieldRow}>
+                    <Button secondary onClick={extras.onAttachDevResources} disabled={!settings.labsBranchAck || extras.scannedComponents === 0}>Attach to {extras.scannedComponents} components</Button>
+                  </div>
+                  {!settings.labsBranchAck && <div class={styles.muted}>Confirm “I’m working in a branch or a copy” first.</div>}
+                </div>
               </Row>
               <Row
                 info={{
@@ -504,6 +523,9 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
           </Row>
           <Row info={{ title: 'Web Component', body: <span>A framework-free custom element (<code>&lt;{ns}-icon name="…"&gt;</code>) as a plain ES module with typings. Use it in plain HTML, Vue, Svelte, Lit or anywhere else. It contains every icon in one file.</span> }}>
             <Checkbox value={f.webComponent} onValueChange={(v) => setFormat('webComponent', v)}>Web Component (framework-free)</Checkbox>
+          </Row>
+          <Row info={{ title: 'Code Connect', body: <span>Template files that tell Dev Mode and the Figma MCP server which code each icon component maps to. Needs the Figma file URL (Team config) and, to publish, an Organization or Enterprise plan. Only components get a mapping (instances, frames and loose layers have no component id).</span> }}>
+            <Checkbox value={f.codeConnect} onValueChange={(v) => setFormat('codeConnect', v)}>Code Connect templates</Checkbox>
           </Row>
         </div>
         <div class={styles.muted}>Settings are saved on this computer. Nothing is ever written to your Figma file.</div>

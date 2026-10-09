@@ -3,10 +3,11 @@ import {
   ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixCandidate, FixesAppliedHandler, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, LocateHandler, NotifyHandler, ResizeHandler, SaveSettingsHandler,
   ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanStartHandler, SelectionHandler,
-  Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler
+  Settings, SettingsLoadedHandler, UiReadyHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler
 } from './types'
 import { registerCodegen } from './main/codegen'
 import { applyFix } from './main/apply'
+import { effectiveSettings } from './main/effective'
 import { loadSettings, SETTINGS_KEY } from './main/settings'
 import { readShared, writeShared } from './main/shared'
 import { serializeShared } from './core/config'
@@ -27,11 +28,13 @@ export default async function () {
     registerCodegen()
     return
   }
-  const settings = await loadSettings()
+  // Dev Mode inspect panel: read-only; uses the library config published in the file (a developer has no saved settings).
+  const inspect = figma.mode === 'inspect'
+  const settings = inspect ? (await effectiveSettings()).settings : await loadSettings()
   let cancel = false
   let scanning = false
 
-  showUI({ width: settings.windowWidth, height: settings.windowHeight, title: 'Icon Library Toolkit' })
+  showUI(inspect ? { width: 360, height: 560, title: 'Icon Library Toolkit' } : { width: settings.windowWidth, height: settings.windowHeight, title: 'Icon Library Toolkit' }, { inspect })
 
   on<UiReadyHandler>('UI_READY', async () => {
     emit<SettingsLoadedHandler>('SETTINGS_LOADED', settings)
@@ -43,6 +46,7 @@ export default async function () {
 
   // Local baseline is automatic (clientStorage, no file write). The shared one writes into the file: UI offers it only in Labs.
   on<SaveBaselineHandler>('SAVE_BASELINE', async (text, target) => {
+    if (inspect) return
     try {
       if (target === 'local') {
         await writeLocalBaseline(text)
@@ -59,6 +63,7 @@ export default async function () {
 
   // Opt-in write (Labs): publishes the library settings into the file so Dev Mode and teammates use the same config.
   on<PublishConfigHandler>('PUBLISH_CONFIG', async (settingsJson) => {
+    if (inspect) return
     const res = await writeShared(settingsJson)
     emit<ConfigPublishedHandler>('CONFIG_PUBLISHED', res.ok, res.message)
     if (res.ok) {
@@ -85,11 +90,13 @@ export default async function () {
   }
 
   on<SaveSettingsHandler>('SAVE_SETTINGS', (s) => {
+    if (inspect) return // never overwrite a designer's saved settings from the read-only panel
     latest = s // the window size is owned by the main thread, so UI saves never overwrite it
     persist()
   })
 
   on<ResizeHandler>('RESIZE', (w, h) => {
+    if (inspect) return
     size = { w: Math.round(Math.min(MAX.w, Math.max(MIN.w, w))), h: Math.round(Math.min(MAX.h, Math.max(MIN.h, h))) }
     figma.ui.resize(size.w, size.h)
     persist()
@@ -131,6 +138,7 @@ export default async function () {
   const found = new Map<string, FixCandidate>()
 
   on<ApplyFixesHandler>('APPLY_FIXES', async (requests) => {
+    if (inspect) return
     let ok = 0
     let failed = 0
     for (const req of requests) {
@@ -147,6 +155,36 @@ export default async function () {
     }
     figma.commitUndo() // one undo step for the whole batch
     emit<FixesAppliedHandler>('FIXES_APPLIED', ok, failed)
+  })
+
+  // Labs: attach a "where is this icon in code" link to each icon component (shows in Dev Mode > Dev resources). Writes to the file; no-op when the link already exists.
+  on<AttachDevResourcesHandler>('ATTACH_DEV_RESOURCES', async (items) => {
+    if (inspect) return
+    let added = 0
+    let existing = 0
+    let failed = 0
+    let lastError = ''
+    for (const item of items) {
+      try {
+        const node = await figma.getNodeByIdAsync(item.nodeId)
+        if (!node || !('addDevResourceAsync' in node)) {
+          failed++
+          continue
+        }
+        const have = await node.getDevResourcesAsync()
+        if (have.some((r) => r.url === item.url)) {
+          existing++
+          continue
+        }
+        await node.addDevResourceAsync(item.url, item.name)
+        added++
+      } catch (e) {
+        failed++
+        lastError = e instanceof Error ? e.message : String(e)
+      }
+    }
+    figma.commitUndo()
+    emit<DevResourcesAttachedHandler>('DEV_RESOURCES_ATTACHED', added, existing, failed, lastError)
   })
 
   // Selecting + zooming changes the user's selection/viewport only; it never edits nodes.

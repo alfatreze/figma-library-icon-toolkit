@@ -192,7 +192,9 @@ export async function scan(
   if (opts.scope === 'selection') {
     const sel = figma.currentPage.selection
     if (!sel.length) throw new Error('Nothing is selected. Select layers, or switch the scope to Page or Document.')
-    for (const r of sel) await visit(r, ctx, {})
+    // a selected component is always an icon, even when only usage is being listed (Dev Mode inspect: you click the component itself)
+    const withComponents: ScanContext = { ...ctx, opts: { ...opts, usageOnly: false } }
+    for (const r of sel) await visit(r, opts.usageOnly && (r.type === 'COMPONENT' || r.type === 'COMPONENT_SET') ? withComponents : ctx, {})
   } else if (opts.scope === 'page') {
     for (const r of figma.currentPage.children) await visit(r, ctx, {})
   } else {

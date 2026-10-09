@@ -23,12 +23,13 @@ import {
 } from './ui/icons'
 import { computeOverview, kb } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
+import { InspectPanel } from './ui/Inspect'
 import { SettingsPanel } from './ui/Settings'
 import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
 import {
   ApplyFixRequest, ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixActionId, FixCandidate, FixesAppliedHandler, FixResult, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, Finding, FormatId, Icon, LocateHandler, NotifyHandler, RawIcon, ResizeHandler,
-  SaveSettingsHandler, SaveBaselineHandler, BaselinesHandler, BaselineSavedHandler, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanScope,
+  SaveSettingsHandler, SaveBaselineHandler, BaselinesHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler, BaselineSavedHandler, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanPhaseHandler, ScanScope,
   ScanStartHandler, ScanSummary, SelectionHandler, Settings, SettingsLoadedHandler, Severity, UiReadyHandler
 } from './types'
 
@@ -141,6 +142,9 @@ function Plugin() {
         setSettings(s)
         setLoaded(true)
       }),
+      on<DevResourcesAttachedHandler>('DEV_RESOURCES_ATTACHED', (added, existing, failed, message) =>
+        setConfigMessage(`Dev resources: ${added} added, ${existing} already there${failed ? `, ${failed} failed${message ? ` (${message})` : ''}` : ''}.`)
+      ),
       on<BaselinesHandler>('BASELINES', (local, shared) => {
         setLocalSnap(decodeSnapshot(local))
         setSharedSnap(decodeSnapshot(shared))
@@ -415,6 +419,16 @@ function Plugin() {
     if (!sharedCfg) return null
     return { at: sharedCfg.at, by: sharedCfg.by, differs: sharedCfg.config.trim() !== exportConfig(settings).trim() }
   }, [sharedCfg, settings])
+  const onAttachDevResources = () => {
+    const base = settings.devResourceUrl.trim()
+    const items = icons
+      .filter((i) => (i.sourceKind === 'component' || i.sourceKind === 'component-set') && /^\d+:\d+$/.test(i.nodeId))
+      .map((i) => ({ nodeId: i.nodeId, url: `${base}#${i.name}`, name: `${settings.namespace}: ${i.name}` }))
+    if (!/^https?:\/\//.test(base)) return setConfigMessage('Enter a link first (http:// or https://), e.g. the icons.json in your repository.')
+    if (!items.length) return setConfigMessage('Scan icon components first.')
+    setConfigMessage(`Attaching ${items.length} links…`)
+    emit<AttachDevResourcesHandler>('ATTACH_DEV_RESOURCES', items)
+  }
   const onExportConfig = () => download('toolkit.config.json', exportConfig(settings), 'application/json')
 
   // ---- project sync (Labs; local companion) ----
@@ -922,7 +936,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ exampleVariable, scanVariables, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
+          extras={{ exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
         />
       )}
       <div class={styles.grip} />
@@ -1213,4 +1227,9 @@ function IssueCard(props: { extra?: ComponentChildren; group: IssueGroup; cursor
   )
 }
 
-export default render(Plugin)
+/** Dev Mode inspect panel gets a small read-only UI; everything else is the full plugin. */
+function Root(props: { inspect?: boolean }) {
+  return props.inspect ? <InspectPanel /> : <Plugin />
+}
+
+export default render(Root)

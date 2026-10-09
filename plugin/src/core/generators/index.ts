@@ -2,6 +2,7 @@ import { Icon } from '../../types'
 import { angularFiles } from './angular'
 import { reactFiles } from './react'
 import { webComponentFiles } from './webcomponent'
+import { codeConnectFiles } from './codeconnect'
 import { BuildInput, Files, ns } from './common'
 import { exportConfig } from '../config'
 import { baseCss, maskCss } from './css'
@@ -35,6 +36,7 @@ export function buildFiles(input: Omit<BuildInput, 'icons'>): Files {
   if (f.angularClassic) out = { ...out, ...angularFiles(b, 'classic') }
   if (f.react) out = { ...out, ...reactFiles(b) }
   if (f.webComponent) out = { ...out, ...webComponentFiles(b) }
+  if (f.codeConnect) out = { ...out, ...codeConnectFiles(b) }
   out['icons.json'] = manifestFile(b)
   out['toolkit.config.json'] = exportConfig(b.settings)
   out['AGENTS.md'] = agentsFile(b)

@@ -24,6 +24,7 @@ export function readmeFile(b: BuildInput): string {
   if (f.angularClassic) tree.push('angular-classic/   Angular 14+ component (@Input)')
   if (f.react) tree.push('react/   React component + typed icon data')
   if (f.webComponent) tree.push('web-component/   framework-free custom element')
+  if (f.codeConnect) tree.push('code-connect/   Figma Code Connect templates (Dev Mode + MCP)')
   tree.push('icons.json   catalogue for tools/AI', 'toolkit.config.json   settings used (re-export identically)', 'AGENTS.md   guide for AI agents')
 
   const parts: string[] = []

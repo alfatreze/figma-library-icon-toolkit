@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, Settings } from '../types'
 const KEYS: (keyof Settings)[] = [
   'namespace', 'profile', 'scanMode', 'ignoreSegments', 'ignoreVariantValues', 'libSizeMode', 'libWidth', 'libHeight', 'maxIconSize',
   'colorMode', 'tokenNaming', 'strokePolicy', 'strokeTable', 'outlineStrokes', 'precision', 'formats', 'zipName', 'categorySource',
-  'splitByCategory', 'leafName', 'leafNameMode', 'compositeFrames'
+  'codeConnectUrl', 'devResourceUrl', 'splitByCategory', 'leafName', 'leafNameMode', 'compositeFrames'
 ]
 
 export function exportConfig(settings: Settings): string {

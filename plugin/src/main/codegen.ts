@@ -1,13 +1,11 @@
-import { SharedConfig, parseConfig } from '../core/config'
 import { buildName, cleanNamespace, parseVariantName } from '../core/naming'
 import { tokenVarName } from '../core/tokens'
 import { parseStrokeTable, weightForSize } from '../core/stroke'
-import { angularSnippet, cssSnippet, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput } from '../core/snippets'
-import { DEFAULT_SETTINGS, OverrideClass, Settings } from '../types'
+import { angularSnippet, cssSnippet, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput, webComponentSnippet } from '../core/snippets'
+import { OverrideClass, Settings } from '../types'
 import { isIconish, toHex, variableInfo, VECTOR_TYPES } from './facts'
 import { newAgg, recordInstance } from './overrides'
-import { readShared } from './shared'
-import { loadSettings } from './settings'
+import { effectiveSettings } from './effective'
 
 type Result = { title: string; code: string; language: CodegenResult['language'] }
 
@@ -48,21 +46,6 @@ function nameOf(main: ComponentNode, s: Settings): string {
     ignoreSegments: s.ignoreSegments,
     ignoreVariantValues: s.ignoreVariantValues
   }).name
-}
-
-/** Effective library settings: published in the file > this user's saved settings > defaults. */
-async function effectiveSettings(): Promise<{ settings: Settings; source: 'file' | 'local' | 'defaults'; shared: SharedConfig | null }> {
-  const shared = await readShared()
-  if (shared) {
-    try {
-      return { settings: parseConfig(shared.config, DEFAULT_SETTINGS).settings, source: 'file', shared }
-    } catch {
-      /* fall through */
-    }
-  }
-  const local = await loadSettings()
-  const touched = JSON.stringify(local.namespace) !== JSON.stringify(DEFAULT_SETTINGS.namespace) || JSON.stringify(local.tokenNaming) !== JSON.stringify(DEFAULT_SETTINGS.tokenNaming)
-  return { settings: local, source: touched ? 'local' : 'defaults', shared: null }
 }
 
 interface Pref { spritePath: string; unit: 'px' | 'rem'; a11y: 'decorative' | 'labelled'; tokens: 'names' | 'hex' }
@@ -192,6 +175,7 @@ export function registerCodegen(): void {
       angular: { title: 'Angular', code: angularSnippet(input), language: 'HTML' },
       html: { title: 'HTML (sprite)', code: htmlSnippet(input), language: 'HTML' },
       react: { title: 'React', code: `${reactComponentSnippet(input)}\n\n// or without the component:\n${reactSnippet(input)}`, language: 'JAVASCRIPT' },
+      webcomponent: { title: 'Web Component', code: webComponentSnippet(input), language: 'HTML' },
       css: { title: 'CSS variables', code: cssSnippet(input), language: 'CSS' }
     }
     const main: Result[] = language && all[language] ? [all[language]] : Object.values(all)

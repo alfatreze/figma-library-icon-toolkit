@@ -76,7 +76,13 @@ export interface Settings {
     angularClassic: boolean
     react: boolean
     webComponent: boolean
+    /** Code Connect template files (needs an Organization/Enterprise plan to publish) */
+    codeConnect: boolean
   }
+  /** Figma file URL used by Code Connect and dev resources, e.g. https://www.figma.com/design/<key>/<name> */
+  codeConnectUrl: string
+  /** where developers find an icon (e.g. link to icons.json in the repo); attached as dev resource links (Labs) */
+  devResourceUrl: string
   zipName: string
   windowWidth: number
   windowHeight: number
@@ -117,8 +123,11 @@ export const DEFAULT_SETTINGS: Settings = {
     angularModern: true,
     angularClassic: true,
     react: false,
-    webComponent: false
+    webComponent: false,
+    codeConnect: false
   },
+  codeConnectUrl: '',
+  devResourceUrl: '',
   zipName: '',
   windowWidth: 460,
   windowHeight: 640
@@ -455,6 +464,17 @@ export interface ConfigPublishedHandler extends EventHandler {
 export interface SharedConfigHandler extends EventHandler {
   name: 'SHARED_CONFIG'
   handler: (publishedAt: string | null, publishedBy: string | null, config: string | null) => void
+}
+
+// ---- dev resources (Labs: writes links onto icon components so they show in Dev Mode) ----
+export interface DevResourceItem { nodeId: string; url: string; name: string }
+export interface AttachDevResourcesHandler extends EventHandler {
+  name: 'ATTACH_DEV_RESOURCES'
+  handler: (items: DevResourceItem[]) => void
+}
+export interface DevResourcesAttachedHandler extends EventHandler {
+  name: 'DEV_RESOURCES_ATTACHED'
+  handler: (added: number, existing: number, failed: number, message: string) => void
 }
 
 // ---- change-detection baseline (see docs/CHANGE-DETECTION.md) ----

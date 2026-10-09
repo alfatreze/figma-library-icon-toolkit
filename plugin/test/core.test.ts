@@ -1,5 +1,7 @@
 import { readFileSync } from 'fs'
 import { describe, expect, it } from 'vitest'
+import { nodeUrl } from '../src/core/generators/codeconnect'
+import { webComponentSnippet } from '../src/core/snippets'
 import { changesByName, chunkText, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline } from '../src/core/baseline'
 import { buildName, parseVariantName, slugify, validateName } from '../src/core/naming'
 import { prefixIds, themeSvg } from '../src/core/svg'
@@ -624,5 +626,23 @@ describe('token mapping rules', () => {
   it('suggests a table that round-trips through the parser', () => {
     const text = suggestMapping([{ variable: 'color/a', collection: 'P' }, { variable: 'color/b', collection: 'P' }], DEFAULT_SETTINGS.tokenNaming)
     expect(parseMapping(text).get('color/a')).toBe('--color-a')
+  })
+})
+
+describe('code connect + snippets', () => {
+  it('builds node urls and maps only components', () => {
+    expect(nodeUrl('https://www.figma.com/design/AbC123/My-Lib?node-id=0-1&t=x', '12:34')).toBe('https://www.figma.com/design/AbC123/My-Lib?node-id=12-34')
+    expect(nodeUrl('https://example.com/x', '1:2')).toBeNull()
+    const settings = { ...DEFAULT_SETTINGS, codeConnectUrl: 'https://www.figma.com/design/AbC123/My-Lib', formats: { ...DEFAULT_SETTINGS.formats, codeConnect: true } }
+    const p = processIcons([{ ...raw('icon/Home', fx('stroked.svg')), nodeId: '5:6' }, { ...raw('icon/Plus', fx('stroked.svg')), nodeId: '7:8', sourceKind: 'frame' as const }], settings, {})
+    const files = buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+    const src = files['code-connect/cmn-icons.figma.ts']
+    expect(src).toContain('node-id=5-6')
+    expect(src).not.toContain('node-id=7-8')
+    expect(src).toContain('<cmn-icon name="home">')
+    expect(files['code-connect/README.md']).toContain('1 skipped')
+  })
+  it('web component snippet', () => {
+    expect(webComponentSnippet({ ns: 'cmn', name: 'home', spritePath: '', sizePx: 24, sizeUnit: 'px', vars: {} })).toContain('<cmn-icon name="home" size="24px"></cmn-icon>')
   })
 })

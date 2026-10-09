@@ -67,6 +67,14 @@ export function angularSnippet(i: SnippetInput): string {
   return `<!-- import { ${C} } from './icons';  add ${C} to the component's imports -->\n<${i.ns}-icon ${attrs} />`
 }
 
+export function webComponentSnippet(i: SnippetInput): string {
+  const size = sizeValue(i)
+  const attrs = [`name="${i.name}"`, size ? `size="${size}"` : '', i.color ? `color="${i.color}"` : '', i.strokeWidth !== undefined ? `stroke-width="${i.strokeWidth}"` : '', i.label ? `label="${i.label}"` : '']
+    .filter(Boolean)
+    .join(' ')
+  return `<!-- <script type="module" src="./icons/web-component/${i.ns}-icon.js"></script> -->\n<${i.ns}-icon ${attrs}></${i.ns}-icon>`
+}
+
 export function cssSnippet(i: SnippetInput): string {
   const vars = cssVars(i)
   const lines = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`)
