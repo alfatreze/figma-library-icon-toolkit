@@ -698,3 +698,47 @@ describe('every generated SVG file is well-formed XML (external <use> and <img> 
     })
   }
 })
+
+describe('aliases for intentional duplicates', () => {
+  const dupFix = (groupId: string, ownerNode: string, others: string[]) =>
+    ({ id: 'dupe:' + ownerNode, kind: 'duplicate-component', confidence: 'high', nodeId: ownerNode, nodeType: 'COMPONENT', diffs: [], actions: [], groupId, others: others.map((nodeId) => ({ nodeId, name: nodeId })) }) as never
+  const mkRaws = (sameColour = true) => {
+    const a = { ...raw('icon/Close', fx('stroked.svg')), key: 'a', nodeId: '1:1' }
+    const b2 = { ...raw('icon/Dismiss', fx('stroked.svg')), key: 'b', nodeId: '1:2' }
+    const c = { ...raw('icon/Cancel', sameColour ? fx('stroked.svg') : fx('multicolor.svg')), key: 'c', nodeId: '1:3' }
+    a.fixes = [dupFix('g1', '1:1', ['1:2', '1:3'])]
+    return [a, b2, c]
+  }
+  const build = (settings: typeof DEFAULT_SETTINGS, raws: ReturnType<typeof mkRaws>) => {
+    const p = processIcons(raws, settings, {})
+    return { p, files: buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' }) }
+  }
+  it('does nothing until a group is marked intentional', () => {
+    const { p } = build(DEFAULT_SETTINGS, mkRaws())
+    expect(p.icons.some((i) => i.aliasOf)).toBe(false)
+  })
+  it('owner = shortest name; the others alias it; only identical artwork is shared', () => {
+    const settings = { ...DEFAULT_SETTINGS, ignoredDuplicates: ['g1'] }
+    const { p } = build(settings, mkRaws(false))
+    const by = Object.fromEntries(p.icons.map((i) => [i.name, i.aliasOf]))
+    expect(by['close']).toBeUndefined()
+    expect(by['dismiss']).toBe('close')
+    expect(by['cancel']).toBeUndefined() // different artwork: stays its own icon
+  })
+  it('shares the markup in sprite, Angular data, Web Component and icons.json', () => {
+    const settings = { ...DEFAULT_SETTINGS, ignoredDuplicates: ['g1'], formats: { ...DEFAULT_SETTINGS.formats, webComponent: true } }
+    const { files } = build(settings, mkRaws())
+    expect(files['sprite/cmn-sprite.svg']).toContain('<symbol id="cmn-dismiss" viewBox="0 0 24 24"><use href="#cmn-close"/></symbol>')
+    expect(files['angular/icons/dismiss.ts']).toContain("...cmnClose, name: \"dismiss\"")
+    expect(files['angular/icons/dismiss.ts']).not.toContain('<path')
+    const wc = files['web-component/cmn-icon.js']
+    expect(wc).toContain('"dismiss":"close"')
+    const m = JSON.parse(files['icons.json'])
+    expect(m.icons.find((i: { name: string }) => i.name === 'dismiss').aliasOf).toBe('close')
+    expect(files['AGENTS.md']).toContain('Aliases (intentional duplicates)')
+  })
+  it('can be switched off', () => {
+    const { p } = build({ ...DEFAULT_SETTINGS, ignoredDuplicates: ['g1'], aliasDuplicates: false }, mkRaws())
+    expect(p.icons.some((i) => i.aliasOf)).toBe(false)
+  })
+})

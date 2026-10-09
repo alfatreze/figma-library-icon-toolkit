@@ -247,6 +247,9 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
               options={[{ value: 'block', children: 'Block' }, { value: 'category', children: 'Category' }, { value: 'suffix', children: 'Number' }]}
             />
           </Field>
+          <Row info={{ title: 'Share artwork for intentional duplicates', body: <span>In <em>Issues</em> you can mark a group of components with identical artwork as <strong>intentional</strong> (two names for one drawing, like <code>close</code> and <code>dismiss</code>). With this on, the export stores the drawing once: the shortest name owns it, the others become aliases (<code>aliasOf</code> in <code>icons.json</code>, a <code>&lt;use&gt;</code> in the sprite, a shared object in the Angular/React data). Names keep working. Only icons whose drawing <em>and</em> colours are identical are shared.</span> }}>
+            <Toggle value={settings.aliasDuplicates} onValueChange={(v) => patch({ aliasDuplicates: v })}>Share artwork for intentional duplicates</Toggle>
+          </Row>
           <Field
             label="Ignore folders"
             info={{ title: 'Ignore folders', body: <span>Comma-separated name segments dropped from icon names and categories. With <code>icon</code> ignored, <code>icon/Audio descricao</code> becomes <code>audio-descricao</code> instead of <code>icon-audio-descricao</code>.</span> }}

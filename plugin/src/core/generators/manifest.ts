@@ -27,6 +27,7 @@ export function manifestFile(b: BuildInput): string {
     icons: b.icons.map((i) => ({
       id: `${n}:${i.name}`,
       name: i.name,
+      ...(i.aliasOf ? { aliasOf: i.aliasOf } : {}),
       hash: i.hash,
       colorHash: i.colorHash,
       identity: i.componentKey ? { by: 'componentKey', key: i.componentKey } : { by: 'name', key: i.name },
@@ -114,7 +115,11 @@ so the next export lists the old name under \`deprecated\` with \`replacedBy\`. 
 (\`<${n}-icon name="old-name">\` resolves to the new icon). \`libraryVersion\` follows semver: removal or rename = major, new icons = minor, artwork change = patch.
 ${b.release?.deprecated.length ? 'Deprecated now: ' + b.release.deprecated.map((d) => `\`${d.name}\` → \`${d.replacedBy}\``).join(', ') + '.' : 'No deprecated names.'}
 
-## Stroke weight
+${b.icons.some((i) => i.aliasOf) ? `## Aliases (intentional duplicates)
+These icons have identical artwork to another icon on purpose (the design team marked them as intentional). \`icons[].aliasOf\` names the icon that owns the drawing; the markup is shared in the sprite, the Angular/React data and the Web Component. Prefer the owner's name in new code only if the meaning is the same; keep the alias name when the meaning differs.
+Aliases: ${b.icons.filter((i) => i.aliasOf).slice(0, 12).map((i) => `\`${i.name}\` → \`${i.aliasOf}\``).join(', ')}${b.icons.filter((i) => i.aliasOf).length > 12 ? ', …' : ''}.
+
+` : ''}## Stroke weight
 Policy: **${b.settings.strokePolicy}**. ${b.settings.strokePolicy === 'constant' ? 'Stroke weight is constant in screen px at every icon size.' : b.settings.strokePolicy === 'table' ? 'Weight by size: ' + strokeSteps(b).map((s) => `${s.size}px→${s.weight}px`).join(', ') + '. Use the size classes or the component\'s size input.' : 'Strokes scale with the icon.'}
 
 ## Usage and overrides (when scanned from designs)

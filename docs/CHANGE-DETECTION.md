@@ -38,3 +38,6 @@ Dev Mode reads (1) or (2) to say "this icon changed in v1.3.0".
 ## Decisions needed
 - Allow the opt-in in-file write (one small data entry, visible in version history)? Page-level or root?
 - Do you run an org/private plugin (then `fileKey` is available) or a community plugin?
+
+## Status (implemented after v0.1.0)
+Local snapshot (automatic after each export, `clientStorage`, keyed by file identity), shared in-file snapshot (Labs, explicit button; root + first page, deflate + base64, chunked 90 kB), repo baseline (companion `GET /catalog`), and the manual file load all feed one selector in the Export panel (priority repo > shared > local > file). The Icons list shows chips for new / renamed / drawing / colour / moved / layer-name. File identity: `figma.fileKey` when available, else the id stored with the shared write, else a hash of file name and page ids. Code: `core/baseline.ts`, `main/baseline.ts`. Unverified in Figma: V26, V27.

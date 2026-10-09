@@ -16,8 +16,13 @@ function spriteOf(b: BuildInput, icons: BuildInput['icons']): string {
   const aliases = (b.release?.deprecated ?? [])
     .filter((d) => names.has(d.replacedBy))
     .map((d) => `<symbol id="${ns(b)}-${d.name}" viewBox="${icons.find((i) => i.name === d.replacedBy)!.viewBox}"><use href="#${ns(b)}-${d.replacedBy}"/></symbol>`)
+  // intentional duplicates point at the symbol that owns the drawing when it is in the same sprite
   const symbols = [
-    ...icons.map((icon) => `<symbol id="${symbolId(b, icon)}" viewBox="${icon.viewBox}">${prefixIds(icon.body, symbolId(b, icon))}</symbol>`),
+    ...icons.map((icon) =>
+      icon.aliasOf && names.has(icon.aliasOf)
+        ? `<symbol id="${symbolId(b, icon)}" viewBox="${icon.viewBox}"><use href="#${ns(b)}-${icon.aliasOf}"/></symbol>`
+        : `<symbol id="${symbolId(b, icon)}" viewBox="${icon.viewBox}">${prefixIds(icon.body, symbolId(b, icon))}</symbol>`
+    ),
     ...aliases
   ].join('\n')
   return `<svg xmlns="http://www.w3.org/2000/svg" data-${ns(b)}-sprite="">\n${symbols}\n</svg>\n`

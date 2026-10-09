@@ -1,6 +1,6 @@
 # Session handoff: Figma Library Icon Toolkit
 
-Snapshot at **v0.1.0** (2026-10-09). Read this first when resuming in a fresh session. Repo: https://github.com/alfatreze/figma-library-icon-toolkit
+Snapshot at **v0.1.0 + Unreleased** (2026-10-09; backlog items 2-8 implemented, see CHANGELOG.md `[Unreleased]`). Read this first when resuming in a fresh session. Repo: https://github.com/alfatreze/figma-library-icon-toolkit
 
 ## 1. What this is
 A Figma plugin (TypeScript, Preact, `@create-figma-plugin`) that **scans** icon libraries, **audits** them, **detects/fixes** structural problems (Labs), and **exports** themeable packages for developers (SVG, sprite, HTML preview, Angular 17.1+/14+, React, `icons.json`, README, changelog). It also generates **Dev Mode / VS Code** snippets and has an optional **local companion** (`tools/icon-sync.mjs`) that writes into a project folder and commits with git.
@@ -39,16 +39,17 @@ Done: scope selector (selection/page/document), usage mode + override alerts, ca
 | Storage | clientStorage = per user; in-file plugin data = shared; repo `icons.json` = durable | `CHANGE-DETECTION.md` |
 
 ## 5. Backlog (priority order)
-1. **Verify in Figma** (V10, V14, V16-V18 first: they decide whether Dev Mode and sync work at all).
-2. Layered **baseline** for "changed since last time" (repo > shared in-file > local) with filter chips; file identity without `fileKey`.
-3. Variable matching by **leaf order** instead of hex; configurable token mapping table from variable collections.
-4. Angular: per-icon tree-shakable exports, lazy per-category providers, sprite-injection strategy; Web Component target.
-5. Dev Mode: Inspect-panel UI, "icons used here" subset ZIP, dev resources links, Code Connect generation.
-6. Fix hardening (replace-with-instance placement in auto-layout, reactions, layer name), duplicate-name policy, mock-based tests for `main/`.
-7. CI: `ngc` (Angular 14 + latest), React `tsc`, Playwright render + pixel diff, size budgets.
-8. Aliases in the export for intentional duplicate artwork (`aliasOf`).
+Items 2-8 of the previous backlog are **implemented but unverified inside Figma** (V21-V31 in `docs/verification.md`).
+1. **Verify in Figma** (V10, V14, V16-V18 first, then V21-V31). Nothing below is proven until this is done; the mock tests (`plugin/test/main.test.ts`) only encode our assumptions about the API.
+2. Decide and tag **v0.2.0** (see `RELEASING.md`): behaviour change for Angular/React `name` resolution (lazy categories), new formats default off.
+3. Baseline polish: Dev Mode "changed since" badge from the shared baseline; "compare with code" (is the icon in the repo?) in the inspect panel; file identity without `fileKey` is a hash of file name + page ids (fragile under rename).
+4. Variable matching: configurable mapping table from variable *collections/modes* (today: per-variable lines, wildcards, collection scope).
+5. Dev Mode: Inspect panel previews at several sizes, PNG download; Code Connect with component *properties* (today: static `<x-icon name>` per component).
+6. Fix hardening: reactions that point *to* the replaced node, instance swap props, variable bindings on carried fills; more mock cases (nested auto-layout, rotated parents).
+7. CI: Playwright for the Angular/React components themselves (render in a sample app), cross-OS goldens (generated on macOS, compared on Linux with tolerance), npm publish dry run of the generated packages.
+8. Intentional-duplicate aliases in `svg/` (today each name still gets its own file).
 
-Open owner decisions: adopt component-key identity? allow in-file baseline write? community publishing (plugin id, `devAllowedDomains`).
+Open owner decisions: adopt component-key identity? allow in-file baseline write (Labs, root + first page)? community publishing (plugin id, `devAllowedDomains`, `inspect` capability review)? Code Connect needs an Organization/Enterprise plan.
 
 ## 6. Lessons learned (avoid repeating)
 - **Manifest:** unknown keys are rejected (`editorAPI` broke loading). `@create-figma-plugin` spreads unknown `figma-plugin` keys into `manifest.json`. If Figma rejects the manifest, remove `codegenPreferences`, then `vscode`.
@@ -58,6 +59,9 @@ Open owner decisions: adopt component-key identity? allow in-file baseline write
 - **Signatures:** artwork comparison must include **orientation** (flip/rotation) or mirrored icons look like duplicates.
 - **Naming standards:** detect the dominant vector-layer name from the file instead of hard-coding one.
 - **Generated code must compile:** a literal-typed comparison in generated `icons.ts` slipped through until `ngc` ran; keep the type-check regression test.
+- **Compile what you generate.** Plain-TypeScript checks missed nothing today but real `ngc`/`tsc` runs (`scripts/compile-check.mjs`) and a Chromium render (`e2e/`) are the only honest test; the render test found that sprites with a valueless attribute are not valid XML, so external `<use>` drew nothing.
+- **Modern Angular needs 17.1** (signal `input()`); the classic flavour compiles on 14 through latest. Do not run the modern flavour against Angular 14 in CI.
+- **Harness gotcha:** the UI command id is `src/main.ts--default` (set `__FIGMA_COMMAND__=''`), data for `showUI` arrives as `__SHOW_UI_DATA__`.
 - **Verify UI visually** with a browser harness: serve `build/ui.js` with `theme.css`/`base.css`, a `<div id="create-figma-plugin">`, `__FIGMA_COMMAND__`, and post `{pluginMessage:[name,...args]}` events.
 - **Inspect real files** read-only through the Figma MCP (`use_figma` with `return`), never write to a user's file during diagnosis.
 - Do not publish proprietary icons/fixtures; keep docs free of third-party product critiques and company names.
@@ -68,6 +72,9 @@ cd plugin && npm ci && npm test && npm run build     # tests + build (manifest.j
 node --test tools/icon-sync.test.mjs                  # companion tests
 DUMP_DIR=/tmp/sample npx vitest run test/dump.test.ts # write a sample export to inspect
 node scripts/generate-notices.mjs                     # refresh THIRD_PARTY_NOTICES.md
+node scripts/size-budget.mjs                          # export + bundle size budgets (after npm run build)
+(cd scripts/toolchains/ng-latest && npm i) && node scripts/compile-check.mjs --toolchain scripts/toolchains/ng-latest --kind angular
+(cd e2e && npm i && npx playwright install chromium && npx playwright test)   # render + pixel diff; UPDATE_GOLDEN=1 to refresh
 ```
 Release: see `RELEASING.md` (semver, tag `vX.Y.Z`, workflow publishes the zip).
 

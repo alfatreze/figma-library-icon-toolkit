@@ -58,3 +58,6 @@ Verification (add to `verification.md`): manifest accepted with `inspect` + `cod
 1. May the plugin write the shared config into the file (opt-in, one small entry)? Without it, Dev Mode output cannot be guaranteed to match.
 2. Do you have an Organization/Enterprise plan (Code Connect)? Do developers use Figma for VS Code?
 3. Which outputs matter first for your developers: Angular, plain HTML/sprite, Web Component, React?
+
+## Status (implemented after v0.1.0)
+P1 #5 (icons used here), #6 (inspect panel: list, copy Angular/HTML/React, SVG, subset ZIP), #7 (dev resources, Labs, `ATTACH_DEV_RESOURCES`), #8 (Code Connect templates, HTML parser; static `<x-icon name>` per component, no properties yet) and a `webcomponent` codegen language exist. The inspect panel reads the config published in the file (never the viewer's saved settings) and ignores every write message. Not done: P2 #9 badge, #11 compare with code. Unverified in Figma: V21-V25, V30.

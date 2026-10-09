@@ -43,6 +43,8 @@ export interface Settings {
   leafNameMode: 'auto' | 'fixed'
   /** duplicate-artwork groups you marked as intentional (kept on this computer) */
   ignoredDuplicates: string[]
+  /** icons in an intentional duplicate group with identical artwork share one drawing: the others export as aliases (aliasOf) */
+  aliasDuplicates: boolean
   /** only icons placed as instances (library usage); aggregates usage + overrides */
   usageOnly: boolean
   /** what to do when two icons resolve to the same name: block the export, prefix with the category, or number them (-2, -3) */
@@ -99,6 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
   leafName: 'Vector',
   leafNameMode: 'auto',
   ignoredDuplicates: [],
+  aliasDuplicates: true,
   usageOnly: false,
   duplicateNames: 'block',
   categorySource: 'auto',
@@ -271,6 +274,8 @@ export interface Icon {
   fixes: FixCandidate[]
   layerName: string
   name: string // canonical kebab id
+  /** name of the icon whose artwork this one shares (intentional duplicate group); undefined for the icon that owns the drawing */
+  aliasOf?: string
   nameOverride: string | null
   category: string[] // slugified path, e.g. ['acessibilidade']
   categoryLabel: string // original names, e.g. 'Acessibilidade'

@@ -156,9 +156,31 @@ export function processIcons(
     icons.push(icon)
   })
 
+  if (settings.aliasDuplicates) assignAliases(raws, icons, settings.ignoredDuplicates)
+
   const tierCounts: Record<Tier, number> = { T5: 0, T4: 0, T3: 0, T2: 0, T1: 0 }
   tiers.forEach((t) => tierCounts[t]++)
   return { icons, grid, tier: libraryTier(tiers), tierCounts }
+}
+
+/**
+ * Intentional duplicates (groups you marked in Issues) with really identical artwork (same drawing AND same colours) export once:
+ * the shortest name (then alphabetical) owns the drawing, the others get `aliasOf`. Anything that differs stays a separate icon.
+ */
+export function assignAliases(raws: RawIcon[], icons: Icon[], ignoredGroups: string[]): void {
+  if (!ignoredGroups.length) return
+  const byNode = new Map<string, Icon>()
+  raws.forEach((r, i) => byNode.set(r.nodeId, icons[i]))
+  for (const raw of raws) {
+    for (const fix of raw.fixes ?? []) {
+      if (fix.kind !== 'duplicate-component' || !fix.groupId || !ignoredGroups.includes(fix.groupId)) continue
+      const members = [fix.nodeId, ...(fix.others ?? []).map((o) => o.nodeId)].map((id) => byNode.get(id)).filter((i): i is Icon => !!i && i.svgOk && !!i.hash)
+      const same = (a: Icon, b: Icon) => a.hash === b.hash && a.colorHash === b.colorHash
+      const owner = [...members].sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name))[0]
+      if (!owner) continue
+      for (const m of members) if (m !== owner && !m.aliasOf && same(owner, m)) m.aliasOf = owner.name
+    }
+  }
 }
 
 export function hasBlockingErrors(icon: Icon): boolean {

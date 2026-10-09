@@ -10,7 +10,10 @@ export function webComponentFiles(b: BuildInput): Files {
   const k = K(b)
   const c = camelNs(b)
   const tag = `${n}-icon`
+  const owns = (i: BuildInput['icons'][number]) => !(i.aliasOf && b.icons.some((x) => x.name === i.aliasOf))
+  const aliases = Object.fromEntries(b.icons.filter((i) => !owns(i)).map((i) => [i.name, i.aliasOf]))
   const entries = b.icons
+    .filter(owns)
     .map((i) => `  ${esc(i.name)}: ${JSON.stringify({ viewBox: i.viewBox, body: i.body, category: i.category.join('/') })}`)
     .join(',\n')
   const dep = JSON.stringify(Object.fromEntries((b.release?.deprecated ?? []).map((d) => [d.name, d.replacedBy])))
@@ -22,6 +25,10 @@ export function webComponentFiles(b: BuildInput): Files {
 export const ${k}_ICONS = {
 ${entries}
 };
+
+// intentional duplicates share one drawing
+const ALIASES = ${JSON.stringify(aliases)};
+for (const [alias, owner] of Object.entries(ALIASES)) ${k}_ICONS[alias] = ${k}_ICONS[owner];
 
 export const ${k}_DEPRECATED = ${dep};
 const STROKE_POLICY = '${b.settings.strokePolicy}';
