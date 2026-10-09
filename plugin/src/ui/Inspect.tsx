@@ -16,7 +16,7 @@ import {
 
 
 function snippetInput(icon: Icon, settings: Settings): SnippetInput {
-  return { ns: cleanNamespace(settings.namespace), name: icon.name, spritePath: './icons/sprite/', sizePx: null, sizeUnit: 'px', vars: {} }
+  return { ns: cleanNamespace(settings.namespace), name: icon.name, spritePath: './icons/sprite/', importPath: settings.importPath, sizePx: null, sizeUnit: 'px', vars: {} }
 }
 
 /**

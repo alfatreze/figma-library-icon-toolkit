@@ -66,8 +66,8 @@ describe('codegen (Dev Mode)', () => {
     expect(html).toContain('aria-label="home"')
   })
 
-  it('imports the Angular and React components from the chosen path', async () => {
-    custom = { importPath: '@/icons' }
+  it('imports the Angular and React components from the library import path', async () => {
+    fig.storage.set('ilt:settings:v1', { namespace: 'cmn', importPath: '@/icons' })
     const c = makeComponent(fig, 'icon/Home')
     const r = await run(c.createInstance())
     expect(r.find((x) => x.title === 'Angular')!.code).toContain("from '@/icons'")

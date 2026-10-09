@@ -116,6 +116,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
     )
   ),
   codeConnectUrl: rule(true, url),
+  importPath: rule(true, (v) => (typeof v === 'string' && /^[\w@~./-]{1,80}$/.test(v) ? v : undefined)),
   devResourceUrl: rule(true, url),
   zipName: rule(true, str(80)),
   windowWidth: rule(false, num(360, 1000)),

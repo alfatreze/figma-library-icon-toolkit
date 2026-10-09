@@ -92,6 +92,20 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           {settings.namespace.trim() && settings.namespace.trim() !== ns && (
             <div class={styles.muted}>Used as “{ns}”: only lowercase letters, digits and hyphens are kept.</div>
           )}
+          <Field
+            label="Import path"
+            info={{
+              title: 'Import path in code snippets',
+              body: (
+                <span>
+                  Where developers import the Angular and React components from in the snippets shown in Dev Mode and in the Inspect panel, e.g. <code>./icons</code> (copy <code>angular/</code> or <code>react/</code> into your app as <code>icons/</code>), <code>@/icons</code> or <code>~/icons</code>. Part of the team config, so everyone sees the same snippet.
+                </span>
+              )
+            }}
+          >
+            <Textbox value={settings.importPath} onValueInput={(v) => patch({ importPath: v })} placeholder="./icons" />
+          </Field>
+          {settings.importPath.trim() !== '' && !/^[\w@~./-]{1,80}$/.test(settings.importPath.trim()) && <div class={styles.sevWarn}>Only letters, digits and . / @ ~ _ - are allowed; snippets use ./icons until this is fixed.</div>}
           <Row
             info={{
               title: 'Split output by category',

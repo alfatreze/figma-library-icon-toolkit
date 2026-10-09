@@ -94,30 +94,6 @@
     "codegenPreferences": [
       {
         "itemType": "select",
-        "propertyName": "importPath",
-        "label": "Component import path",
-        "options": [
-          {
-            "label": "./icons",
-            "value": "./icons",
-            "isDefault": true
-          },
-          {
-            "label": "../icons",
-            "value": "../icons"
-          },
-          {
-            "label": "@/icons",
-            "value": "@/icons"
-          },
-          {
-            "label": "~/icons",
-            "value": "~/icons"
-          }
-        ]
-      },
-      {
-        "itemType": "select",
         "propertyName": "spritePath",
         "label": "Sprite location",
         "options": [

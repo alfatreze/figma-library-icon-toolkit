@@ -107,6 +107,8 @@ export interface Settings {
   }
   /** Figma file URL used by Code Connect and dev resources, e.g. https://www.figma.com/design/<key>/<name> */
   codeConnectUrl: string
+  /** module path the Angular and React components are imported from in the code snippets (Dev Mode, Inspect panel), e.g. "./icons" or "@/icons" */
+  importPath: string
   /** where developers find an icon (e.g. link to icons.json in the repo); attached as dev resource links (Labs) */
   devResourceUrl: string
   zipName: string
@@ -157,6 +159,7 @@ export const DEFAULT_SETTINGS: Settings = {
     codeConnect: false
   },
   codeConnectUrl: '',
+  importPath: './icons',
   devResourceUrl: '',
   zipName: '',
   windowWidth: 460,
