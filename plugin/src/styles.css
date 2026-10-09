@@ -17,7 +17,6 @@
 .header { padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
 .scanRow { display: flex; gap: 8px; align-items: center; }
 .scanRow > :first-child { flex: 1; min-width: 0; }
-.scope { display: flex; gap: 6px; align-items: center; justify-content: space-between; color: var(--figma-color-text-secondary); }
 .progress { height: 3px; border-radius: 2px; background: var(--figma-color-bg-secondary); overflow: hidden; }
 .progressBar { height: 100%; background: var(--figma-color-bg-brand); transition: width 0.1s; }
 .iconBtn {
@@ -105,7 +104,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .nameBtn { all: unset; display: block; cursor: pointer; min-width: 0; border-radius: 4px; }
 .name { font-size: 12px; font-weight: 600; }
 .renamed { color: var(--figma-color-text-brand); }
-.reason { color: var(--figma-color-text-danger); }
 .pill {
   display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 999px;
   border: 0; font: inherit; font-size: 10px; font-weight: 500; cursor: pointer;
@@ -130,7 +128,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; padding-bottom: 8px; }
 .card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 12px 8px 8px; border: 1px solid var(--figma-color-border); border-radius: 8px; }
 .card:hover { background: var(--figma-color-bg-hover); }
-.cardSelected, .cardSelected:hover { border-color: var(--figma-color-bg-brand); background: var(--figma-color-bg-selected); box-shadow: inset 0 3px 0 var(--figma-color-bg-brand); }
 .cardError { border-color: var(--figma-color-border-danger); }
 .cardWarn { border-color: var(--figma-color-border-warning); }
 .cardThumb { height: 76px; display: flex; align-items: center; justify-content: center; color: var(--figma-color-text); background: var(--figma-color-bg-secondary); border-radius: 6px; }
@@ -153,7 +150,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .empty { padding: 28px 12px; color: var(--figma-color-text-secondary); text-align: center; line-height: 1.6; }
 .emptyNote { margin: 0 0 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px dashed var(--figma-color-border-strong); border-radius: 8px; line-height: 1.5; }
 .emptyNote p { margin: 0; }
-.emptySteps { text-align: left; max-width: 300px; margin: 12px auto 0; padding-left: 18px; }
 .allClear { display: flex; gap: 8px; align-items: center; justify-content: center; color: var(--figma-color-text-success); }
 
 /* footer */
@@ -166,7 +162,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .section { display: flex; flex-direction: column; gap: 12px; }
 .sectionTitle { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; color: var(--figma-color-text-secondary); }
 .field { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; }
-.hint { margin: -6px 0 0 132px; color: var(--figma-color-text-secondary); }
 .grip {
   position: fixed; right: 1px; bottom: 1px; width: 10px; height: 10px; pointer-events: none; z-index: 30;
   background: linear-gradient(135deg, transparent 50%, var(--figma-color-border-strong) 50%, var(--figma-color-border-strong) 60%, transparent 60%, transparent 75%, var(--figma-color-border-strong) 75%, var(--figma-color-border-strong) 85%, transparent 85%);
@@ -191,32 +186,9 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .tipList { margin: 6px 0 6px 16px; padding: 0; }
 .fieldLabel { display: inline-flex; align-items: center; }
 
-/* header controls */
-.settingsBtn {
-  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--figma-color-border);
-  border-radius: 6px; background: var(--figma-color-bg); color: var(--figma-color-text); font: inherit; cursor: pointer;
-}
-.settingsBtn:hover { background: var(--figma-color-bg-hover); }
-.settingsBtn:focus-visible { outline: 2px solid var(--figma-color-border-selected-strong); outline-offset: 1px; }
-.scopeRow { display: flex; align-items: center; gap: 4px; }
-.checkRow { display: flex; align-items: center; gap: 2px; }
-
 /* groups */
 .groupHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 2px; padding: 4px 0; font-weight: 600; position: sticky; top: 0; background: var(--figma-color-bg); z-index: 2; border-bottom: 1px solid var(--figma-color-border); }
 .usage { color: var(--figma-color-text-brand); }
-
-/* export overview */
-.overviewToggle {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 8px; border: 1px solid var(--figma-color-border);
-  border-radius: 6px; background: var(--figma-color-bg-secondary); color: var(--figma-color-text); font: inherit; cursor: pointer; text-align: left;
-}
-.overviewToggle:hover { background: var(--figma-color-bg-hover); }
-.overviewToggle:focus-visible { outline: 2px solid var(--figma-color-border-selected-strong); outline-offset: 1px; }
-.overview { display: flex; flex-direction: column; gap: 2px; max-height: 40vh; overflow: auto; padding: 4px 2px; }
-.ovRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 3px 4px; border-radius: 4px; }
-.ovRow:hover { background: var(--figma-color-bg-hover); }
-.ovMeta { color: var(--figma-color-text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ovOff { opacity: 0.55; }
 .fmtChips { display: flex; gap: 4px; flex-wrap: wrap; }
 .fmtChip { padding: 0 6px; border-radius: 4px; background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary); font-size: 10px; }
 
@@ -240,8 +212,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .pvArrow { color: var(--figma-color-icon-secondary); display: inline-flex; }
 .diffList { margin: 0; padding-left: 16px; color: var(--figma-color-text-secondary); }
 .confirmRow { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--figma-color-border); }
-.modeRow { display: flex; align-items: center; gap: 4px; }
-.applyBar { display: flex; flex-direction: column; gap: 6px; }
 
 .fileBtn { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--figma-color-border-strong); border-radius: 6px; cursor: pointer; font-weight: 500; }
 .fileBtn:hover { background: var(--figma-color-bg-hover); }
@@ -254,11 +224,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 
 .releaseChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .diffNames { max-height: 140px; overflow: auto; margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: var(--figma-color-bg-secondary); }
-
-.exportSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.exportSummary > div { text-align: center; padding: 8px 4px; border-radius: 8px; background: var(--figma-color-bg-secondary); }
-.exportSummary strong { display: block; font-size: 15px; }
-.exportSummary span { color: var(--figma-color-text-secondary); }
 
 .applyBarSticky { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 6px; padding: 8px; margin-bottom: 8px; border: 1px solid var(--figma-color-border); border-radius: 8px; background: var(--figma-color-bg); }
 .linkBtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--figma-color-text-brand); }
