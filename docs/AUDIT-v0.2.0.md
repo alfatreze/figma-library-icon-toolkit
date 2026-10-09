@@ -106,7 +106,7 @@ plugin/src/
 | Arch 1 `ui.tsx` | **partly** | `useScan`, `useBaselines`, `useSync`, `ui/selectors.ts`, `ui/companion.ts` extracted (1177 → about 1000 lines). `useFixes` (also restored the `FIX_RESULT`/`FIXES_APPLIED` listeners lost in the hook refactor), list/issue components in `ui/components/`, `IconsPanel`/`IssuesPanel`/`SkippedPanel` in `ui/panels/`. `useFilters` reducer (`ui/hooks/useFilters.ts`, unit-tested) |
 | Arch 2 types + messages | **done** | `types/{settings,domain,fixes,messages}.ts`; one `Messages` map ties each message name to its arguments |
 | Arch 3 settings versioning | **done** | see A1 |
-| Arch 4 generators | **partly** | `Target` registry (`generators/targets.ts`) drives `buildFiles`, the overview and file ownership; helper duplication removed. **Not done:** merging the Angular modern/classic templates |
+| Arch 4 generators | **partly** | `Target` registry (`generators/targets.ts`) drives `buildFiles`, the overview and file ownership; helper duplication removed. Angular modern/classic now built from shared pieces (decorator, registry, host bindings, inputs, sprite template); output pinned byte for byte by a snapshot (`test/angular.test.ts`). **Not done:** the registry/loader logic that angular, react and webcomponent still repeat |
 | Arch 5-6 snippets | **done** | label/colour escaping; the test page now prints `core/snippets.ts` strings |
 | Arch 7 logging | **done** | `log.ts` ring buffer, `tryOr`, Settings → Copy diagnostics; empty `catch {}` in `main/` now log |
 | Arch 8 naming | **partly** | `core/hash.ts`; dead exports removed. **Not done:** renaming `main/baseline.ts` vs `core/baseline.ts` |
