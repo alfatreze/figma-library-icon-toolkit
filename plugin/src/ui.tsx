@@ -25,6 +25,10 @@ import {
 import { computeOverview, kb } from './ui/overview'
 import { useResizeHandles } from './ui/resize'
 import { InspectPanel } from './ui/Inspect'
+import { countChanges, filterIcons, groupIssues, IssueGroup, isAlert, isBlocked, presentChangeKinds } from './ui/selectors'
+import { useBaselines } from './ui/hooks/useBaselines'
+import { useScan } from './ui/hooks/useScan'
+import { useSync } from './ui/hooks/useSync'
 import { copyText, cx, download, notify, plural } from './ui/util'
 import { recentLog } from './log'
 import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
@@ -46,13 +50,6 @@ const worst = (fs: Finding[]): Severity | null =>
   fs.some((f) => f.severity === 'error') ? 'error' : fs.some((f) => f.severity === 'warn') ? 'warn' : fs.length ? 'info' : null
 const SevIcon = ({ s }: { s: Severity }) => (s === 'error' ? <BlockIcon /> : s === 'warn' ? <WarnIcon /> : <InfoIcon />)
 const sevClass = (s: Severity) => (s === 'error' ? styles.sevError : s === 'warn' ? styles.sevWarn : styles.sevInfo)
-
-interface IssueGroup {
-  ruleId: string
-  severity: Severity
-  icons: Icon[]
-  formats: FormatId[]
-}
 
 const SCOPE_INFO = (
   <span>
@@ -77,12 +74,6 @@ const USAGE_INFO = (
 function Plugin() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
-  const [raws, setRaws] = useState<RawIcon[]>([])
-  const [summary, setSummary] = useState<ScanSummary | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [phase, setPhase] = useState('')
-  const [scanError, setScanError] = useState<string | null>(null)
   const [selection, setSelection] = useState<{ count: number; names: string[] }>({ count: 0, names: [] })
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [off, setOff] = useState<Set<string>>(new Set())
@@ -98,22 +89,10 @@ function Plugin() {
   const [showSettings, setShowSettings] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOverrides, setOutlineOverrides] = useState<Record<string, boolean>>({})
-  const [fileCatalog, setFileCatalog] = useState<PreviousCatalog | null>(null)
-  const [repoCatalog, setRepoCatalog] = useState<PreviousCatalog | null>(null)
-  const [localSnap, setLocalSnap] = useState<Snapshot | null>(null)
-  const [sharedSnap, setSharedSnap] = useState<Snapshot | null>(null)
-  const [baselineChoice, setBaselineChoice] = useState<BaselineSource | 'none' | null>(null) // null = most authoritative available
-  const [baselineMsg, setBaselineMsg] = useState('')
   const [changeFilter, setChangeFilter] = useState<ChangeKind | null>(null)
-  const [prevError, setPrevError] = useState('')
   const [diffOpen, setDiffOpen] = useState<string | null>(null)
   const [configMessage, setConfigMessage] = useState('')
   const [sharedCfg, setSharedCfg] = useState<{ at: string; by: string | null; config: string } | null>(null)
-  const [syncStatus, setSyncStatus] = useState('')
-  const [syncPlan, setSyncPlan] = useState<SyncPlan | null>(null)
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
-  const [syncError, setSyncError] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [fixGroupOpen, setFixGroupOpen] = useState<Set<string>>(new Set())
   const [fixSel, setFixSel] = useState<Set<string>>(new Set())
@@ -123,15 +102,22 @@ function Plugin() {
   const [applying, setApplying] = useState(false)
   const [renameLeaves, setRenameLeaves] = useState(true)
   const defaultsFor = useRef<ScanSummary | null>(null)
-  // Batches arrive every few icons. Appending each to React state copies the whole list every time (quadratic on big libraries),
-  // so they are collected in a ref and published at most every 250 ms.
-  const rawBuf = useRef<RawIcon[]>([])
-  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flushRaws = () => {
-    if (flushTimer.current) clearTimeout(flushTimer.current)
-    flushTimer.current = null
-    setRaws(rawBuf.current.slice())
+  // reset what belongs to the previous scan (the hook resets its own rows and progress)
+  const resetForScan = () => {
+    setOff(new Set())
+    setOpen(new Set())
+    setCursor({})
+    setFixSel(new Set())
+    setFixResults({})
+    setFixAction({})
+    setFixGroupOpen(new Set())
+    setRuleFilter(null)
+    setCatFilter('')
+    setStatus('all')
+    setChangeFilter(null)
+    setLimit(PAGE_SIZE)
   }
+  const { raws, summary, scanning, progress, phase, scanError } = useScan(resetForScan)
 
   useEffect(() => {
     const offs = [
@@ -143,64 +129,9 @@ function Plugin() {
         setConfigMessage(`Dev resources: ${added} added, ${existing} already there${failed ? `, ${failed} failed${message ? ` (${message})` : ''}` : ''}.`)
       ),
       on<DiagnosticsHandler>('DIAGNOSTICS', (text) => notify(copyText(text + '\n--- recent log (ui) ---\n' + recentLog().join('\n')) ? 'Diagnostics copied' : 'Copy is blocked here', false)),
-      on<BaselinesHandler>('BASELINES', (local, shared) => {
-        setLocalSnap(decodeSnapshot(local))
-        setSharedSnap(decodeSnapshot(shared))
-      }),
-      on<BaselineSavedHandler>('BASELINE_SAVED', (target, ok, message) => {
-        if (target === 'shared' || !ok) setBaselineMsg(message)
-      }),
       on<SharedConfigHandler>('SHARED_CONFIG', (at, by, config) => setSharedCfg(at && config ? { at, by, config } : null)),
       on<ConfigPublishedHandler>('CONFIG_PUBLISHED', (ok, message) => setConfigMessage(message + (ok ? '.' : ''))),
       on<SelectionHandler>('SELECTION', (count, names) => setSelection({ count, names })),
-      on<ScanStartHandler>('SCAN_START', () => {
-        setScanning(true)
-        setProgress(0)
-        setPhase('Starting…')
-        setScanError(null)
-        rawBuf.current = []
-        setRaws([])
-        setSummary(null)
-        setOff(new Set())
-        setOpen(new Set())
-        setCursor({})
-        setFixSel(new Set())
-        setFixResults({})
-        setFixAction({})
-        setFixGroupOpen(new Set())
-        setRuleFilter(null)
-        setCatFilter('')
-        setStatus('all')
-        setChangeFilter(null)
-        setLimit(PAGE_SIZE)
-      }),
-      on<ScanPhaseHandler>('SCAN_PHASE', (t) => setPhase(t)),
-      on<FixResultHandler>('FIX_RESULT', (r) => setFixResults((prev) => ({ ...prev, [r.id]: r }))),
-      on<FixesAppliedHandler>('FIXES_APPLIED', (ok, failed) => {
-        setApplying(false)
-        setConfirmOpen(false)
-        setFixSel(new Set())
-        notify(failed ? `${ok} fixed, ${failed} failed` : `${ok} fix${ok === 1 ? '' : 'es'} applied. Cmd/Ctrl+Z undoes them.`, failed > 0)
-      }),
-      on<ScanBatchHandler>('SCAN_BATCH', (icons, p) => {
-        rawBuf.current.push(...icons)
-        if (!flushTimer.current) flushTimer.current = setTimeout(flushRaws, 250)
-        setProgress(p)
-      }),
-      on<ScanDoneHandler>('SCAN_DONE', (s) => {
-        flushRaws()
-        setSummary(s)
-        setScanning(false)
-        setProgress(1)
-        setPhase('')
-      }),
-      on<ScanErrorHandler>('SCAN_ERROR', (m) => {
-        if (/already running|being applied/.test(m)) return notify(m, true) // a second request was refused; the running one is unaffected
-        flushRaws()
-        setScanError(m)
-        setScanning(false)
-        setPhase('')
-      })
     ]
     emit<UiReadyHandler>('UI_READY')
     return () => offs.forEach((o) => o())
@@ -226,32 +157,11 @@ function Plugin() {
   const icons = processed.icons
   const g = processed.grid
 
-  const blockedIcons = useMemo(() => icons.filter((i) => i.findings.some((f) => f.severity === 'error')), [icons])
-  const alertIcons = useMemo(
-    () => icons.filter((i) => !i.findings.some((f) => f.severity === 'error') && i.findings.some((f) => f.severity === 'warn')),
-    [icons]
-  )
+  const blockedIcons = useMemo(() => icons.filter(isBlocked), [icons])
+  const alertIcons = useMemo(() => icons.filter(isAlert), [icons])
   const categories = useMemo(() => summariseCategories(icons), [icons])
 
-  const groups = useMemo<IssueGroup[]>(() => {
-    const map = new Map<string, IssueGroup>()
-    for (const icon of icons) {
-      for (const f of icon.findings) {
-        let e = map.get(f.ruleId)
-        if (!e) {
-          e = { ruleId: f.ruleId, severity: f.severity, icons: [icon], formats: [] }
-          map.set(f.ruleId, e)
-        } else {
-          if (!e.icons.includes(icon)) e.icons.push(icon)
-          if (f.severity === 'error') e.severity = 'error'
-          else if (f.severity === 'warn' && e.severity === 'info') e.severity = 'warn'
-        }
-        for (const fm of f.formats ?? []) if (!e.formats.includes(fm)) e.formats.push(fm)
-      }
-    }
-    const order: Record<Severity, number> = { error: 0, warn: 1, info: 2 }
-    return [...map.values()].sort((a, b) => order[a.severity] - order[b.severity] || b.icons.length - a.icons.length)
-  }, [icons])
+  const groups = useMemo<IssueGroup[]>(() => groupIssues(icons), [icons])
   const actionable = groups.filter((x) => x.severity !== 'info')
 
 
@@ -333,84 +243,16 @@ function Plugin() {
     setTab('icons')
   }
 
-  const baselines = useMemo<Record<BaselineSource, PreviousCatalog | null>>(
-    () => ({ repo: repoCatalog, shared: sharedSnap ? snapshotToCatalog(sharedSnap) : null, local: localSnap ? snapshotToCatalog(localSnap) : null, file: fileCatalog }),
-    [repoCatalog, sharedSnap, localSnap, fileCatalog]
+  const baseline = useBaselines(exportable, settings)
+  const { release, changes: changeMap, changeCounts } = baseline
+
+  const visible = useMemo(
+    () => filterIcons(icons, { status, ruleId: ruleFilter, category: catFilter, change: changeFilter, query }, off, changeMap),
+    [icons, query, status, ruleFilter, catFilter, changeFilter, changeMap, off]
   )
-  const baselineSource: BaselineSource | null = baselineChoice === 'none' ? null : baselineChoice && baselines[baselineChoice] ? baselineChoice : pickBaseline({ repo: repoCatalog && catalogToSnapshot(repoCatalog), shared: sharedSnap, local: localSnap, file: fileCatalog && catalogToSnapshot(fileCatalog) })
-  const prevCatalog = baselineSource ? baselines[baselineSource] : null
-  const baselineMeta = (src: BaselineSource) => {
-    const sn = src === 'local' ? localSnap : src === 'shared' ? sharedSnap : null
-    const c = baselines[src]
-    return [c ? `${c.icons.length} icons` : '', c?.libraryVersion ? `v${c.libraryVersion}` : '', sn?.at ? sn.at.slice(0, 10) : ''].filter(Boolean).join(' · ')
-  }
-
-  const release = useMemo(() => {
-    const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey, layerName: i.layerName } }))
-    const diff = prevCatalog ? diffCatalogs(prevCatalog, catalog) : null
-    const version = prevCatalog ? bumpVersion(prevCatalog.libraryVersion, diff!.bump) : '1.0.0'
-    const deprecated = nextDeprecated(prevCatalog, diff, version, new Set(catalog.map((c) => c.name)))
-    return { version, deprecated, diff }
-  }, [exportable, prevCatalog])
-
-  const changeMap = useMemo(() => changesByName(release.diff), [release.diff])
-  const changeCounts = useMemo(() => {
-    const c: Record<string, number> = {}
-    for (const set of changeMap.values()) for (const k of set) c[k] = (c[k] ?? 0) + 1
-    return c
-  }, [changeMap])
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return icons.filter((i) => {
-      if (status === 'blocked' && !blockedIcons.includes(i)) return false
-      if (status === 'alerts' && !alertIcons.includes(i)) return false
-      if (status === 'excluded' && !off.has(i.key)) return false
-      if (ruleFilter && !i.findings.some((f) => f.ruleId === ruleFilter)) return false
-      if (catFilter && i.category.join('/') !== catFilter) return false
-      if (changeFilter && !changeMap.get(i.name)?.has(changeFilter)) return false
-      if (!q) return true
-      return (i.name + ' ' + i.layerName + ' ' + i.categoryLabel + ' ' + i.tags.join(' ')).toLowerCase().includes(q)
-    })
-  }, [icons, query, status, ruleFilter, catFilter, changeFilter, changeMap, off, blockedIcons, alertIcons])
-
-  /** local snapshot is automatic and never touches the file; the shared one is an explicit Labs action */
-  const snapshotNow = (target: 'local' | 'shared') => {
-    const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey ?? null, layerName: i.layerName } }))
-    const snap = makeSnapshot(catalog, { at: new Date().toISOString(), version: release.version, namespace: settings.namespace })
-    emit<SaveBaselineHandler>('SAVE_BASELINE', encodeSnapshot(snap), target)
-  }
-  const saveSharedBaseline = () => {
-    setBaselineMsg('Saving…')
-    snapshotNow('shared')
-  }
-  const loadRepoBaseline = async () => {
-    try {
-      const out = await syncFetch(`/catalog?subdir=${encodeURIComponent(settings.sync.subdir)}`)
-      if (!out.found) {
-        setBaselineMsg(`No icons.json in “${settings.sync.subdir}” of the project folder yet.`)
-        return
-      }
-      setRepoCatalog(parseCatalog(out.catalog))
-      setBaselineChoice('repo')
-      setBaselineMsg('')
-    } catch (e) {
-      setBaselineMsg(e instanceof Error ? e.message : String(e))
-    }
-  }
 
   const makeFiles = () => buildFiles({ allIcons: included, settings, grid: processed.grid, tier: processed.tier, generatedAt: new Date().toISOString().slice(0, 10), release })
 
-  const loadPrevious = async (file: File) => {
-    try {
-      setFileCatalog(parseCatalog(await file.text()))
-      setBaselineChoice('file')
-      setPrevError('')
-    } catch (e) {
-      setFileCatalog(null)
-      setPrevError(e instanceof Error ? e.message : 'Could not read the file')
-    }
-  }
   const onImportConfig = async (file: File) => {
     try {
       const res = parseConfig(await file.text(), settings)
@@ -450,53 +292,7 @@ function Plugin() {
   }
   const onExportConfig = () => download('toolkit.config.json', exportConfig(settings), 'application/json')
 
-  // ---- project sync (Labs; local companion) ----
-  const syncFetch = async (path: string, body?: unknown) => {
-    const url = settings.sync.url.replace(/\/$/, '') + path
-    let res: Response
-    try {
-      res = await fetch(url, { method: body ? 'POST' : 'GET', headers: { 'x-toolkit-token': settings.sync.token, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
-    } catch {
-      throw new Error(`Cannot reach the companion at ${settings.sync.url}. Is it running (node tools/icon-sync.mjs --dir …)? The plugin must be loaded from this build's manifest so localhost is allowed.`)
-    }
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || `Companion error ${res.status}`)
-    return json
-  }
-  const onTestSync = async () => {
-    try {
-      const st = await syncFetch('/status')
-      setSyncStatus(`Connected: ${st.dir}${st.git?.repo ? ` · git ${st.git.branch}` : st.allowGit ? ' · not a git repo' : ' · git off'}`)
-    } catch (e) {
-      setSyncStatus(e instanceof Error ? e.message : String(e))
-    }
-  }
-  const startSync = async () => {
-    setSyncError(null)
-    setSyncResult(null)
-    try {
-      const files = makeFiles()
-      const plan = await syncFetch('/export', { files, subdir: settings.sync.subdir, dryRun: true })
-      setSyncPlan({ added: plan.added, changed: plan.changed, removed: plan.removed, unchanged: plan.unchanged })
-    } catch (e) {
-      setSyncPlan({ added: [], changed: [], removed: [], unchanged: 0 })
-      setSyncError(e instanceof Error ? e.message : String(e))
-    }
-  }
-  const sendSync = async () => {
-    setSyncing(true)
-    setSyncError(null)
-    try {
-      const out = await syncFetch('/export', { files: makeFiles(), subdir: settings.sync.subdir, dryRun: false, commit: settings.sync.commit, message: settings.sync.message, branch: settings.sync.branch || undefined })
-      setSyncResult({ committed: out.committed })
-      snapshotNow('local')
-      notify('Written to your project folder')
-    } catch (e) {
-      setSyncError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSyncing(false)
-    }
-  }
+  const sync = useSync(settings, makeFiles, () => baseline.snapshotNow('local'))
   const scanVariables = useMemo(() => {
     const seen = new Map<string, { variable: string; collection?: string }>()
     for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection })
@@ -517,7 +313,7 @@ function Plugin() {
       const files = makeFiles()
       const name = `${settings.zipName.trim() ? cleanNamespace(settings.zipName) : `${cleanNamespace(settings.namespace)}-icons`}.zip`
       download(name, zipFiles(files), 'application/zip')
-      snapshotNow('local')
+      baseline.snapshotNow('local')
       notify(`Exported ${exportable.length} icons (${Object.keys(files).length} files)`)
     } catch (e) {
       notify(`Export failed: ${e instanceof Error ? e.message : String(e)}`, true)
@@ -615,7 +411,7 @@ function Plugin() {
     <div class={styles.root}>
       {/* announced by screen readers: scan progress, results and the status lines that otherwise only change on screen */}
       <div class={styles.srOnly} role="status" aria-live="polite">
-        {scanning ? phase || 'Scanning' : summary ? `Scan finished: ${plural(icons.length, 'icon')} found` : ''} {configMessage} {baselineMsg} {syncStatus}
+        {scanning ? phase || 'Scanning' : summary ? `Scan finished: ${plural(icons.length, 'icon')} found` : ''} {configMessage} {baseline.message} {sync.status}
       </div>
       <div class={styles.header}>
         <div class={styles.scanRow}>
@@ -718,8 +514,8 @@ function Plugin() {
             {off.size > 0 && (
               <Chip active={status === 'excluded'} onClick={() => showInList({ status: 'excluded' })}>Excluded <span class={styles.muted}>{off.size}</span></Chip>
             )}
-            {release.diff && CHANGE_KINDS.filter((k) => changeCounts[k]).map((k) => (
-              <Chip key={k} active={changeFilter === k} onClick={() => { setChangeFilter(changeFilter === k ? null : k); setLimit(PAGE_SIZE) }} title={`Changed since the baseline: ${BASELINE_LABEL[baselineSource!]}`}>
+            {release.diff && presentChangeKinds(changeCounts).map((k) => (
+              <Chip key={k} active={changeFilter === k} onClick={() => { setChangeFilter(changeFilter === k ? null : k); setLimit(PAGE_SIZE) }} title={`Changed since the baseline: ${BASELINE_LABEL[baseline.source!]}`}>
                 {CHANGE_LABEL[k]} <span>{changeCounts[k]}</span>
               </Chip>
             ))}
@@ -914,22 +710,22 @@ function Plugin() {
           rows={overview}
           hasStrokeIcons={exportable.some((i) => i.hasStroke)}
           release={release}
-          prevCatalog={prevCatalog}
-          prevError={prevError}
-          onLoadPrevious={loadPrevious}
-          onClearPrevious={() => setBaselineChoice('none')}
+          prevCatalog={baseline.previous}
+          prevError={baseline.loadError}
+          onLoadPrevious={baseline.loadFile}
+          onClearPrevious={() => baseline.pick('none')}
           baseline={{
-            source: baselineSource,
-            options: (['repo', 'shared', 'local', 'file'] as BaselineSource[]).filter((k) => baselines[k]).map((k) => ({ value: k, text: `${BASELINE_LABEL[k]} · ${baselineMeta(k)}` })),
-            message: baselineMsg,
+            source: baseline.source,
+            options: (['repo', 'shared', 'local', 'file'] as BaselineSource[]).filter((k) => baseline.catalogs[k]).map((k) => ({ value: k, text: `${BASELINE_LABEL[k]} · ${baseline.meta(k)}` })),
+            message: baseline.message,
             canRepo: settings.labs && settings.sync.enabled,
             canShare: settings.labs,
-            onPick: (v) => setBaselineChoice(v),
-            onLoadRepo: loadRepoBaseline,
-            onSaveShared: saveSharedBaseline
+            onPick: baseline.pick,
+            onLoadRepo: baseline.loadRepo,
+            onSaveShared: baseline.saveShared
           }}
           onDownload={doExport}
-          onSend={settings.labs && settings.sync.enabled ? startSync : null}
+          onSend={settings.labs && settings.sync.enabled ? sync.start : null}
           onShowBlocked={() => { setExportOpen(false); showInList({ status: 'blocked' }) }}
           onClose={() => setExportOpen(false)}
         />
@@ -946,17 +742,17 @@ function Plugin() {
         />
       )}
 
-      {syncPlan && (
+      {sync.plan && (
         <SyncDialog
-          plan={syncPlan}
+          plan={sync.plan}
           subdir={settings.sync.subdir}
           commit={settings.sync.commit}
           branch={settings.sync.branch}
-          sending={syncing}
-          result={syncResult}
-          error={syncError}
-          onCancel={() => { setSyncPlan(null); setSyncResult(null); setSyncError(null) }}
-          onSend={sendSync}
+          sending={sync.sending}
+          result={sync.result}
+          error={sync.error}
+          onCancel={sync.close}
+          onSend={sync.send}
         />
       )}
       {showSettings && (
@@ -964,7 +760,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus, onTestSync }}
+          extras={{ onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus: sync.status, onTestSync: sync.test }}
         />
       )}
       <div class={styles.grip} />
