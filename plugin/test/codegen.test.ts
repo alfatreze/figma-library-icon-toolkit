@@ -66,6 +66,20 @@ describe('codegen (Dev Mode)', () => {
     expect(html).toContain('aria-label="home"')
   })
 
+  it('imports the Angular and React components from the chosen path', async () => {
+    custom = { importPath: '@/icons' }
+    const c = makeComponent(fig, 'icon/Home')
+    const r = await run(c.createInstance())
+    expect(r.find((x) => x.title === 'Angular')!.code).toContain("from '@/icons'")
+    expect(r.find((x) => x.title === 'React')!.code).toContain("from '@/icons'")
+  })
+
+  it('tells the HTML snippet to load the base CSS', async () => {
+    const c = makeComponent(fig, 'icon/Home')
+    const html = (await run(c.createInstance(), 'html')).find((x) => x.title === 'HTML (sprite)')!.code
+    expect(html).toMatch(/^<!-- load html\/.*-icons\.css once/)
+  })
+
   it('lists the icons used in a frame', async () => {
     const c = makeComponent(fig, 'icon/Home')
     const frame = new FakeNode('FRAME', 'Screen')

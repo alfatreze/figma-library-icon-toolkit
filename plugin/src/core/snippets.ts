@@ -9,6 +9,8 @@ export interface SnippetInput {
   name: string
   /** folder (or URL) that serves the sprite, e.g. "./icons/sprite/" */
   spritePath: string
+  /** module path the Angular and React components are imported from, e.g. "./icons" or "@/icons" (default "./icons") */
+  importPath?: string
   sizePx: number | null
   sizeUnit: 'px' | 'rem'
   /** css custom property → value (hex or var(--token)) */
@@ -34,6 +36,10 @@ function cssVars(i: SnippetInput): Record<string, string> {
 const q = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const js = (v: string) => v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ')
 
+/** the import path goes into generated code: only plain path characters are accepted, anything else falls back to the default */
+export const DEFAULT_IMPORT_PATH = './icons'
+const importFrom = (i: SnippetInput) => (i.importPath && /^[\w@~./-]{1,80}$/.test(i.importPath) ? i.importPath.replace(/\/+$/, '') : DEFAULT_IMPORT_PATH)
+
 const joinPath = (base: string, file: string) => (base.endsWith('/') || base === '' ? base : base + '/') + file
 
 export function spriteHref(i: SnippetInput): string {
@@ -44,7 +50,7 @@ export function htmlSnippet(i: SnippetInput): string {
   const vars = cssVars(i)
   const style = Object.entries(vars).map(([k, v]) => `${k}: ${v}`).join('; ')
   const a11y = i.label ? `role="img" aria-label="${q(i.label)}"` : 'aria-hidden="true" focusable="false"'
-  return `<svg class="${i.ns}-icon" ${a11y}${style ? ` style="${q(style)}"` : ''}>\n  <use href="${spriteHref(i)}"/>\n</svg>`
+  return `<!-- load html/${i.ns}-icons.css once: it sizes the icon and reads the colour variables -->\n<svg class="${i.ns}-icon" ${a11y}${style ? ` style="${q(style)}"` : ''}>\n  <use href="${spriteHref(i)}"/>\n</svg>`
 }
 
 export function reactSnippet(i: SnippetInput): string {
@@ -60,7 +66,7 @@ export function reactComponentSnippet(i: SnippetInput): string {
   const attrs = [`name="${i.name}"`, i.sizePx !== null ? (i.sizeUnit === 'rem' ? `size="${rem(i.sizePx)}"` : `size={${i.sizePx}}`) : '', i.color ? `color="${q(i.color)}"` : '', i.strokeWidth !== undefined ? `strokeWidth={${i.strokeWidth}}` : '', i.label ? `label="${q(i.label)}"` : '']
     .filter(Boolean)
     .join(' ')
-  return `// import { ${C} } from './icons'\n<${C} ${attrs} />`
+  return `// import { ${C} } from '${importFrom(i)}'\n<${C} ${attrs} />`
 }
 
 export function angularSnippet(i: SnippetInput): string {
@@ -68,7 +74,7 @@ export function angularSnippet(i: SnippetInput): string {
   const attrs = [`name="${i.name}"`, i.sizePx !== null ? (i.sizeUnit === 'rem' ? `size="${rem(i.sizePx)}"` : `[size]="${i.sizePx}"`) : '', i.color ? `color="${q(i.color)}"` : '', i.strokeWidth !== undefined ? `[strokeWidth]="${i.strokeWidth}"` : '', i.label ? `label="${q(i.label)}"` : '']
     .filter(Boolean)
     .join(' ')
-  return `<!-- import { ${C} } from './icons';  add ${C} to the component's imports -->\n<${i.ns}-icon ${attrs} />`
+  return `<!-- import { ${C} } from '${importFrom(i)}';  add ${C} to the component's imports -->\n<${i.ns}-icon ${attrs} />`
 }
 
 export function webComponentSnippet(i: SnippetInput): string {

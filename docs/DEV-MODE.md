@@ -24,7 +24,7 @@ Perspectives: design-systems engineer (Figma) + senior frontend developer.
 
 ### P0: make the snippets trustworthy
 1. **Shared library config in the file.** Designer publishes `toolkit.config.json` into plugin data (opt-in, one write; see [CHANGE-DETECTION.md](CHANGE-DETECTION.md)). Dev Mode reads it, so namespace/naming/tokens/stroke policy match the export for everyone. If missing, the snippet says so ("using defaults: ask your design system team to publish the config").
-2. **Codegen preferences** (native dropdown): *Output* (HTML sprite · inline SVG · Angular 17.1+ · Angular 14+ · Web Component · CSS vars), *Sprite base path*, *Size unit* (px/rem/em), *ARIA* (decorative / labelled), *Tokens* (variable names / hex).
+2. **Codegen preferences** (native dropdown): *Output* (HTML sprite · inline SVG · Angular 17.1+ · Angular 14+ · Web Component · CSS vars), *Component import path* (where the Angular and React components are imported from, default `./icons`), *Sprite base path*, *Size unit* (px/rem/em), *ARIA* (decorative / labelled), *Tokens* (variable names / hex).
 3. **Notes section** in the output: "Opacity override not supported by the Angular output: ask design for a variant." Reuses `core/overrides.ts`.
 4. **Token-aware colours**: for variable-bound overrides emit `var(--your-token)` using the configured naming.
 

@@ -1,7 +1,7 @@
 import { buildName, cleanNamespace, parseVariantName } from '../core/naming'
 import { tokenVarName } from '../core/tokens'
 import { parseStrokeTable, weightForSize } from '../core/stroke'
-import { angularSnippet, cssSnippet, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput, webComponentSnippet } from '../core/snippets'
+import { angularSnippet, cssSnippet, DEFAULT_IMPORT_PATH, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput, webComponentSnippet } from '../core/snippets'
 import { OverrideClass, Settings } from '../types'
 import { isIconish, toHex, variableInfo, VECTOR_TYPES } from './facts'
 import { newAgg, recordInstance } from './overrides'
@@ -48,10 +48,11 @@ function nameOf(main: ComponentNode, s: Settings): string {
   }).name
 }
 
-interface Pref { spritePath: string; unit: 'px' | 'rem'; a11y: 'decorative' | 'labelled'; tokens: 'names' | 'hex' }
+interface Pref { importPath: string; spritePath: string; unit: 'px' | 'rem'; a11y: 'decorative' | 'labelled'; tokens: 'names' | 'hex' }
 function prefs(): Pref {
   const c = (figma.codegen.preferences?.customSettings ?? {}) as Record<string, string>
   return {
+    importPath: c.importPath || DEFAULT_IMPORT_PATH,
     spritePath: c.spritePath || './icons/sprite/',
     unit: c.sizeUnit === 'rem' ? 'rem' : 'px',
     a11y: c.a11y === 'labelled' ? 'labelled' : 'decorative',
@@ -107,7 +108,7 @@ async function describeInstance(node: SceneNode, s: Settings, p: Pref): Promise<
   if (node.type === 'INSTANCE') await recordInstance(agg, node, main, '', async (id) => (await variableInfo(id))?.name ?? null)
   const name = nameOf(main, s)
   const label = p.a11y === 'labelled' ? name.replace(/-/g, ' ') : undefined
-  return { input: { ns, name, spritePath: p.spritePath, sizePx, sizeUnit: p.unit, vars, color, strokeWidth, label }, classes: agg.overrides, name }
+  return { input: { ns, name, importPath: p.importPath, spritePath: p.spritePath, sizePx, sizeUnit: p.unit, vars, color, strokeWidth, label }, classes: agg.overrides, name }
 }
 
 /** For frames/screens: which icons are used here (bill of materials). */
