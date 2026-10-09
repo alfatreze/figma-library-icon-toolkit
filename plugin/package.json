@@ -48,7 +48,7 @@
     "vitest": "^2.1.0"
   },
   "figma-plugin": {
-    "id": "icon-library-toolkit-dev",
+    "id": "1690450989422884632",
     "name": "Icon Library Toolkit",
     "main": "src/main.ts",
     "ui": "src/ui.tsx",

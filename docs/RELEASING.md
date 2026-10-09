@@ -33,4 +33,6 @@ Download the zip, unzip it, and in Figma use **Plugins → Development → Impor
 Use `X.Y.Z-rc.1` tags for release candidates; the workflow marks them as pre-releases.
 
 ## Community publishing (later)
-Replace the placeholder plugin id in `plugin/package.json` (`figma-plugin.id`) with the id Figma issues, review the `devAllowedDomains` entry (localhost companion), and follow Figma's plugin review guidelines.
+The plugin id in `plugin/package.json` (`figma-plugin.id`) is the id Figma issued (`1690450989422884632`); the old placeholder was `icon-library-toolkit-dev`. Still to do: review the `devAllowedDomains` entry (localhost companion), review the `inspect` capability, and follow Figma's plugin review guidelines.
+
+**Changing the id resets stored data.** Settings and baselines (`clientStorage`) and anything written into files with plugin data (published team config, shared baseline) belong to a plugin id. Copies saved under the old id are not read by the new one: re-publish the team config and export once to recreate the baselines.

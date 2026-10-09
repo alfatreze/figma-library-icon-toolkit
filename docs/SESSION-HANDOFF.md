@@ -49,7 +49,7 @@ Items 2-8 of the previous backlog are **implemented but unverified inside Figma*
 7. CI: Playwright for the Angular/React components themselves (render in a sample app), cross-OS goldens (generated on macOS, compared on Linux with tolerance), npm publish dry run of the generated packages.
 8. Intentional-duplicate aliases in `svg/` (today each name still gets its own file).
 
-Open owner decisions: adopt component-key identity? allow in-file baseline write (Labs, root + first page)? community publishing (plugin id, `devAllowedDomains`, `inspect` capability review)? Code Connect needs an Organization/Enterprise plan.
+Open owner decisions: adopt component-key identity? allow in-file baseline write (Labs, root + first page)? community publishing (plugin id is set; `devAllowedDomains` and `inspect` capability still to review)? Code Connect needs an Organization/Enterprise plan.
 
 ## 5b. Audit follow-up
 `docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: `useFixes`/filters reducer and tab-panel components in `ui.tsx`, Angular modern/classic template merge, tests for `diagnose.ts`/`facts.ts`/`codegen.ts`, action SHA pinning and release provenance, tooltip keyboard access.
