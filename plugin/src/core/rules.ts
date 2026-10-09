@@ -30,6 +30,7 @@ export const RULES: Record<string, RuleInfo> = {
   'invalid-name': { title: 'Invalid name', why: 'Names must be a-z, 0-9 and "-", starting with a letter, and not a reserved word.', fix: 'Rename the layer (or the row in the plugin).', step: 2 },
   'duplicate-name': { title: 'Duplicate name', why: 'Two icons resolve to the same name; the second would overwrite the first.', fix: 'Give each icon a unique name.', step: 2 },
   'auto-name': { title: 'Default Figma name', why: 'Names like "Frame 12" say nothing about the icon.', fix: 'Give the layer a meaningful name.', step: 2 },
+  'duplicate-resolved': { title: 'Duplicate name resolved', why: 'Two icons had the same name. The plugin renamed one for the export (category prefix or number), but the new name depends on the library layout and can change.', fix: 'Rename one of them in Figma so each icon has a unique, stable name.', step: 2 },
   'copy-name': { title: 'Looks like a copy', why: '"Copy of…" usually means a duplicate or leftover.', fix: 'Remove the suffix or delete the duplicate.', step: 2 },
   'variant-name': { title: 'Default variant property name', why: '"Property 1" is not meaningful in code.', fix: 'Rename the variant property (e.g. Style).', step: 2 },
   'off-grid': { title: 'Off the library grid', why: 'Icon size differs from the library size.', fix: 'Resize the frame to the library size.', step: 3 },

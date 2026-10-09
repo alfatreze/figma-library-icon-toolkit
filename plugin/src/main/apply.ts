@@ -11,18 +11,49 @@ async function resolveComponent(target: { componentId?: string; componentKey?: s
   throw new Error('Component not found')
 }
 
-/** copy placement + layout props from the replaced node to the new node */
-function copyPlacement(from: SceneNode, to: SceneNode) {
-  const f = from as SceneNode & LayoutMixin
-  const t = to as SceneNode & LayoutMixin
+const inAutoLayout = (parent: BaseNode & ChildrenMixin): boolean => 'layoutMode' in parent && (parent as unknown as FrameNode).layoutMode !== 'NONE'
+
+/**
+ * Copies how `from` sits in its parent onto `to`.
+ * In an auto-layout parent position is owned by the layout (setting x/y or a transform is ignored or throws), so only the
+ * sizing mode / absolute positioning is carried over; elsewhere the transform and constraints are copied.
+ */
+function carryLayout(from: SceneNode, to: SceneNode, parent: BaseNode & ChildrenMixin): void {
+  const f = from as SceneNode & Partial<LayoutMixin & ConstraintMixin>
+  const t = to as SceneNode & Partial<LayoutMixin & ConstraintMixin>
+  const auto = inAutoLayout(parent)
+  const absolute = auto && f.layoutPositioning === 'ABSOLUTE'
   try {
-    if ('layoutPositioning' in f) t.layoutPositioning = f.layoutPositioning
-    if ('layoutAlign' in f) t.layoutAlign = f.layoutAlign
-    if ('layoutGrow' in f) t.layoutGrow = f.layoutGrow
-    if ('constraints' in f && 'constraints' in t) (t as unknown as ConstraintMixin).constraints = (f as unknown as ConstraintMixin).constraints
+    // absolute first: only an absolute child of an auto-layout frame may be positioned by transform
+    if (absolute && 'layoutPositioning' in t) t.layoutPositioning = 'ABSOLUTE'
+    if (!auto || absolute) {
+      to.relativeTransform = from.relativeTransform
+      if (f.constraints && 'constraints' in t) t.constraints = f.constraints
+    }
+    if (auto && !absolute) {
+      // HUG is only valid on frames and text; an instance cannot hug
+      const h = f.layoutSizingHorizontal
+      const v = f.layoutSizingVertical
+      if (h && 'layoutSizingHorizontal' in t) t.layoutSizingHorizontal = h === 'HUG' ? 'FIXED' : h
+      if (v && 'layoutSizingVertical' in t) t.layoutSizingVertical = v === 'HUG' ? 'FIXED' : v
+    }
   } catch {
-    /* best effort */
+    /* best effort: the node is already in the right place in the tree */
   }
+}
+
+/** the properties designers set on the layer itself, not on its artwork */
+async function carryLayerProps(from: SceneNode, to: SceneNode): Promise<void> {
+  const f = from as SceneNode & Partial<MinimalBlendMixin & ReactionMixin & ExportMixin>
+  const t = to as SceneNode & Partial<MinimalBlendMixin & ReactionMixin & ExportMixin>
+  to.name = from.name // the layer name is the designer's, not the component's
+  to.visible = from.visible
+  to.locked = from.locked
+  if (f.opacity !== undefined && 'opacity' in t) t.opacity = f.opacity
+  if (f.blendMode !== undefined && 'blendMode' in t) t.blendMode = f.blendMode
+  if (f.exportSettings && 'exportSettings' in t && f.exportSettings.length) t.exportSettings = f.exportSettings
+  // prototype interactions on the old layer would be lost with it
+  if (f.reactions && f.reactions.length && 'setReactionsAsync' in t) await t.setReactionsAsync!([...f.reactions])
 }
 
 async function replaceWithInstance(node: SceneNode, req: ApplyFixRequest, target: { componentId?: string; componentKey?: string }): Promise<FixResult> {
@@ -31,29 +62,31 @@ async function replaceWithInstance(node: SceneNode, req: ApplyFixRequest, target
   const comp = await resolveComponent(target)
   const index = parent.children.indexOf(node as SceneNode)
   const inst = comp.createInstance()
-  parent.insertChild(index, inst)
-  const keepName = node.name
-  inst.relativeTransform = node.relativeTransform
-  if (Math.abs(inst.width - node.width) > 0.01 || Math.abs(inst.height - node.height) > 0.01) inst.resize(node.width, node.height)
-  copyPlacement(node, inst)
-  if ('opacity' in node) inst.opacity = node.opacity
-
-  // carry colour as fill overrides when both sides have the same number of leaves
-  const from = leavesOf(node)
-  const to = leavesOf(inst)
   let carried = 0
-  if (from.length === to.length) {
-    from.forEach((l, i) => {
-      const f = (l.node as GeometryMixin).fills
-      const t = to[i].node as GeometryMixin
-      if (Array.isArray(f) && f.length && l.hex && l.hex !== to[i].hex) {
-        t.fills = f as Paint[]
-        carried++
-      }
-    })
+  try {
+    parent.insertChild(index, inst)
+    if (Math.abs(inst.width - node.width) > 0.01 || Math.abs(inst.height - node.height) > 0.01) inst.resize(node.width, node.height)
+    carryLayout(node, inst, parent)
+    await carryLayerProps(node, inst)
+
+    // carry colour as fill overrides when both sides have the same number of leaves
+    const from = leavesOf(node)
+    const to = leavesOf(inst)
+    if (from.length === to.length) {
+      from.forEach((l, i) => {
+        const f = (l.node as GeometryMixin).fills
+        const t = to[i].node as GeometryMixin
+        if (Array.isArray(f) && f.length && l.hex && l.hex !== to[i].hex) {
+          t.fills = f as Paint[]
+          carried++
+        }
+      })
+    }
+  } catch (e) {
+    inst.remove() // never leave a half-configured copy next to the original
+    throw e
   }
   node.remove()
-  void keepName
   return { id: req.id, ok: true, newNodeId: inst.id, message: `Replaced with an instance of “${comp.name}”${carried ? ` (${carried} colour override${carried > 1 ? 's' : ''} kept)` : ''}` }
 }
 
@@ -87,17 +120,31 @@ async function convertToComponent(node: SceneNode, req: ApplyFixRequest, wrap: b
     const boxW = node.width <= w ? w : node.width
     const boxH = node.height <= h ? h : node.height
     const index = parent.children.indexOf(node as SceneNode)
+    const auto = inAutoLayout(parent)
+    const original = { x: node.x, y: node.y }
     const frame = figma.createFrame()
-    parent.insertChild(index, frame)
-    frame.name = req.name || node.name
-    frame.resize(boxW, boxH)
-    frame.relativeTransform = [[1, 0, node.x - (boxW - node.width) / 2], [0, 1, node.y - (boxH - node.height) / 2]]
-    frame.fills = []
-    frame.clipsContent = true
-    frame.appendChild(node as SceneNode)
-    node.x = (boxW - node.width) / 2
-    node.y = (boxH - node.height) / 2
-    comp = figma.createComponentFromNode(frame)
+    try {
+      parent.insertChild(index, frame)
+      frame.name = req.name || node.name
+      frame.resize(boxW, boxH)
+      if (!auto) frame.relativeTransform = [[1, 0, original.x - (boxW - node.width) / 2], [0, 1, original.y - (boxH - node.height) / 2]]
+      else carryLayout(node, frame, parent)
+      frame.fills = []
+      frame.clipsContent = true
+      frame.appendChild(node as SceneNode)
+      node.x = (boxW - node.width) / 2
+      node.y = (boxH - node.height) / 2
+      comp = figma.createComponentFromNode(frame)
+    } catch (e) {
+      // put the layer back where it was and remove the wrapper
+      if (node.parent === frame) parent.insertChild(Math.min(index, parent.children.length), node as SceneNode)
+      if (!auto && !frame.removed) {
+        node.x = original.x
+        node.y = original.y
+      }
+      if (!frame.removed) frame.remove()
+      throw e
+    }
   } else {
     comp = figma.createComponentFromNode(node)
     if (req.name) comp.name = req.name

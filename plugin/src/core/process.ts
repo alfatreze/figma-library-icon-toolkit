@@ -3,7 +3,7 @@ import { auditIcon } from './audit'
 import { hash32, normalisePath } from './fixes'
 import { detectGrid, iconTier, libraryTier, Tier } from './library'
 import { resolveCategory, pathSegments } from './categories'
-import { buildName, cleanNamespace, slugify } from './naming'
+import { buildName, cleanNamespace, resolveDuplicates, slugify } from './naming'
 import { themeSvg } from './svg'
 
 export interface Processed {
@@ -57,12 +57,23 @@ export function processIcons(
       ignoreVariantValues: settings.ignoreVariantValues
     })
   })
-  // Duplicates keep their names so the audit can flag them (export is blocked until resolved).
+  const cats = raws.map((raw) =>
+    resolveCategory(settings.categorySource, {
+      pathNames: pathSegments(raw.setName ?? raw.rawName, settings.ignoreSegments),
+      ctx: raw.categoryCtx,
+      page: raw.pageName
+    })
+  )
+  // Duplicates follow the chosen policy; whatever is still duplicated keeps its name so the audit blocks the export.
+  const resolved = resolveDuplicates(
+    raws.map((r, i) => ({ name: baseNames[i].name, category: cats[i].slug, stable: r.componentKey ?? r.nodeId, locked: overrides[r.key] !== undefined })),
+    settings.duplicateNames ?? 'block'
+  )
   const dupeNames = new Set<string>()
   const seen = new Set<string>()
-  baseNames.forEach((b) => {
-    if (seen.has(b.name)) dupeNames.add(b.name)
-    seen.add(b.name)
+  resolved.names.forEach((n) => {
+    if (seen.has(n)) dupeNames.add(n)
+    seen.add(n)
   })
 
   const icons: Icon[] = []
@@ -82,12 +93,8 @@ export function processIcons(
           paints: raw.facts.paints
         })
       : null
-    const name = baseNames[i].name
-    const cat = resolveCategory(settings.categorySource, {
-      pathNames: pathSegments(raw.setName ?? raw.rawName, settings.ignoreSegments),
-      ctx: raw.categoryCtx,
-      page: raw.pageName
-    })
+    const name = resolved.names[i]
+    const cat = cats[i]
     const icon: Icon = {
       key: raw.key,
       nodeId: raw.nodeId,
@@ -134,6 +141,9 @@ export function processIcons(
       settings
     })
     // problems with an automatic fix become findings, so Issues/Icons show one list (no second scan)
+    if (resolved.rewritten.has(i)) {
+      icon.findings.push({ ruleId: 'duplicate-resolved', severity: 'info', message: `Two icons were called “${resolved.rewritten.get(i)}”; this one is exported as “${name}”.`, fixHint: 'Give the layer a unique name in Figma so the code name is stable.' })
+    }
     for (const fix of icon.fixes) {
       if (fix.kind === 'convert-frame') continue // already reported as "not-component"; the fix hangs off that rule
       const sev: 'warn' | 'info' = 'warn'

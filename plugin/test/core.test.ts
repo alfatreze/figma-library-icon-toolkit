@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { nodeUrl } from '../src/core/generators/codeconnect'
 import { webComponentSnippet } from '../src/core/snippets'
 import { changesByName, chunkText, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline } from '../src/core/baseline'
-import { buildName, parseVariantName, slugify, validateName } from '../src/core/naming'
+import { buildName, parseVariantName, resolveDuplicates, slugify, validateName } from '../src/core/naming'
 import { prefixIds, themeSvg } from '../src/core/svg'
 import { tokenVarName, parseMapping, suggestMapping } from '../src/core/tokens'
 import { parseStrokeTable, weightForSize, validateStrokeTable } from '../src/core/stroke'
@@ -644,5 +644,39 @@ describe('code connect + snippets', () => {
   })
   it('web component snippet', () => {
     expect(webComponentSnippet({ ns: 'cmn', name: 'home', spritePath: '', sizePx: 24, sizeUnit: 'px', vars: {} })).toContain('<cmn-icon name="home" size="24px"></cmn-icon>')
+  })
+})
+
+describe('duplicate-name policy', () => {
+  const mk = (names: string[], cats: string[][] = names.map(() => [])) => names.map((name, i) => ({ name, category: cats[i], stable: `k${names.length - i}`, locked: false }))
+  it('block keeps names', () => {
+    expect(resolveDuplicates(mk(['home', 'home']), 'block').names).toEqual(['home', 'home'])
+  })
+  it('category prefixes duplicates and leaves unresolved ones alone', () => {
+    const r = resolveDuplicates(mk(['home', 'home', 'home', 'plus'], [['arrows'], ['nav'], ['nav'], ['nav']]), 'category')
+    expect(r.names).toEqual(['arrows-home', 'nav-home', 'home', 'plus'])
+  })
+  it('suffix numbers by stable key, not by position', () => {
+    const a = resolveDuplicates(mk(['home', 'home', 'home']), 'suffix')
+    // stable keys are k3,k2,k1 → index 2 (k1) keeps the plain name
+    expect(a.names).toEqual(['home-3', 'home-2', 'home'])
+    const reordered = resolveDuplicates([...mk(['home', 'home', 'home'])].reverse(), 'suffix')
+    expect(reordered.names).toEqual(['home', 'home-2', 'home-3'])
+  })
+  it('never rewrites a name the user typed', () => {
+    const slots = mk(['home', 'home'])
+    slots[1].locked = true
+    const r = resolveDuplicates(slots, 'suffix')
+    expect(r.names[1]).toBe('home')
+    expect(r.names[0]).toBe('home-2')
+  })
+  it('processIcons reports a resolved duplicate as info, not an error', () => {
+    const settings = { ...DEFAULT_SETTINGS, duplicateNames: 'suffix' as const }
+    const a = { ...raw('icon/Home', fx('stroked.svg')), key: 'a', nodeId: '1:1', componentKey: 'ka' }
+    const b2 = { ...raw('other/Home', fx('stroked.svg')), key: 'b', nodeId: '1:2', componentKey: 'kb' }
+    const p = processIcons([a, b2], { ...settings, ignoreSegments: ['icon', 'other'] }, {})
+    expect(p.icons.map((i) => i.name).sort()).toEqual(['home', 'home-2'])
+    expect(p.icons.some((i) => i.findings.some((f) => f.ruleId === 'duplicate-resolved'))).toBe(true)
+    expect(p.icons.every((i) => !i.findings.some((f) => f.ruleId === 'duplicate-name'))).toBe(true)
   })
 })

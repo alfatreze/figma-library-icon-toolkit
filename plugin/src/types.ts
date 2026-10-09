@@ -5,6 +5,7 @@ export type ScanMode = 'auto' | 'components' | 'frames' | 'loose'
 export type ScanScope = 'selection' | 'page' | 'document'
 export type CategorySource = 'auto' | 'path' | 'section' | 'frame' | 'page' | 'none'
 export type StrokePolicy = 'constant' | 'scale' | 'table'
+export type DuplicatePolicy = 'block' | 'category' | 'suffix'
 export type TokenMode = 'path' | 'collection' | 'custom' | 'none'
 
 export interface TokenNaming {
@@ -44,6 +45,8 @@ export interface Settings {
   ignoredDuplicates: string[]
   /** only icons placed as instances (library usage); aggregates usage + overrides */
   usageOnly: boolean
+  /** what to do when two icons resolve to the same name: block the export, prefix with the category, or number them (-2, -3) */
+  duplicateNames: DuplicatePolicy
   categorySource: CategorySource
   splitByCategory: boolean
   /** category segments dropped from names (e.g. "icon/Home" -> "home") */
@@ -97,6 +100,7 @@ export const DEFAULT_SETTINGS: Settings = {
   leafNameMode: 'auto',
   ignoredDuplicates: [],
   usageOnly: false,
+  duplicateNames: 'block',
   categorySource: 'auto',
   splitByCategory: false,
   ignoreSegments: ['icon', 'icons'],

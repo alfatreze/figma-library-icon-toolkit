@@ -226,6 +226,28 @@ export function SettingsPanel({ settings, patch, onClose, extras }: { settings: 
             <Textbox value={settings.leafName} onValueInput={(v) => patch({ leafName: v })} placeholder="Vector" />
           </Field>
           <Field
+            label="Duplicate names"
+            info={{
+              title: 'Duplicate names',
+              body: (
+                <span>
+                  What happens when two icons resolve to the same name (for example <code>home</code> in two folders).
+                  <ul class={styles.tipList}>
+                    <li><strong>Block</strong> (default): both are blocked until you rename one. Safest: names stay under your control.</li>
+                    <li><strong>Prefix with category</strong>: <code>arrows/home</code> and <code>nav/home</code> become <code>arrows-home</code> and <code>nav-home</code>. Still-identical names stay blocked.</li>
+                    <li><strong>Number them</strong>: <code>home</code>, <code>home-2</code>, <code>home-3</code>, ordered by component key. The numbers can change when icons are added or removed, so each affected icon gets a note.</li>
+                  </ul>
+                </span>
+              )
+            }}
+          >
+            <SegmentedControl
+              value={settings.duplicateNames}
+              onValueChange={(v) => patch({ duplicateNames: v as Settings['duplicateNames'] })}
+              options={[{ value: 'block', children: 'Block' }, { value: 'category', children: 'Category' }, { value: 'suffix', children: 'Number' }]}
+            />
+          </Field>
+          <Field
             label="Ignore folders"
             info={{ title: 'Ignore folders', body: <span>Comma-separated name segments dropped from icon names and categories. With <code>icon</code> ignored, <code>icon/Audio descricao</code> becomes <code>audio-descricao</code> instead of <code>icon-audio-descricao</code>.</span> }}
           >

@@ -108,6 +108,61 @@ export function cleanNamespace(ns: string): string {
   return s || 'icon'
 }
 
+export interface NameSlot {
+  name: string
+  /** category slug segments (used by the 'category' policy) */
+  category: string[]
+  /** stable tie-break so numbering does not depend on scan order (component key, else node id) */
+  stable: string
+  /** the user typed this name in the plugin: never rewritten */
+  locked: boolean
+}
+
+/**
+ * Resolves two icons with the same name according to the policy.
+ * - block: names stay; the audit reports every duplicate as an error.
+ * - category: a duplicate gets its category prepended ("arrows-home"); still-duplicate names stay (and are blocked).
+ * - suffix: the first (by stable key) keeps the name, the others become name-2, name-3…
+ * Returns the final names and the indexes that were rewritten.
+ */
+export function resolveDuplicates(slots: NameSlot[], policy: 'block' | 'category' | 'suffix'): { names: string[]; rewritten: Map<number, string> } {
+  const names = slots.map((s) => s.name)
+  const rewritten = new Map<number, string>()
+  if (policy === 'block') return { names, rewritten }
+  const groups = new Map<string, number[]>()
+  names.forEach((n, i) => groups.set(n, [...(groups.get(n) ?? []), i]))
+  const taken = new Set(names)
+  for (const [name, idx] of groups) {
+    if (idx.length < 2) continue
+    const movable = idx.filter((i) => !slots[i].locked)
+    if (policy === 'category') {
+      for (const i of movable) {
+        const cat = slots[i].category.join('-')
+        if (!cat || name.startsWith(cat + '-')) continue
+        const next = `${cat}-${name}`
+        if (taken.has(next)) continue
+        taken.add(next)
+        names[i] = next
+        rewritten.set(i, name)
+      }
+    } else {
+      // suffix: locked names and the first movable keep the plain name
+      const order = [...movable].sort((a, b) => slots[a].stable.localeCompare(slots[b].stable))
+      const keepsPlain = idx.some((i) => slots[i].locked) ? null : order[0]
+      let n = 2
+      for (const i of order) {
+        if (i === keepsPlain) continue
+        let next = `${name}-${n++}`
+        while (taken.has(next)) next = `${name}-${n++}`
+        taken.add(next)
+        names[i] = next
+        rewritten.set(i, name)
+      }
+    }
+  }
+  return { names, rewritten }
+}
+
 /** Makes names unique by suffixing -2, -3… Returns the final names and which were changed. */
 export function dedupeNames(names: string[]): { names: string[]; duplicates: Set<number> } {
   const seen = new Map<string, number>()
