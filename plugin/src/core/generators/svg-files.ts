@@ -20,7 +20,7 @@ function spriteOf(b: BuildInput, icons: BuildInput['icons']): string {
     ...icons.map((icon) => `<symbol id="${symbolId(b, icon)}" viewBox="${icon.viewBox}">${prefixIds(icon.body, symbolId(b, icon))}</symbol>`),
     ...aliases
   ].join('\n')
-  return `<svg xmlns="http://www.w3.org/2000/svg" data-${ns(b)}-sprite>\n${symbols}\n</svg>\n`
+  return `<svg xmlns="http://www.w3.org/2000/svg" data-${ns(b)}-sprite="">\n${symbols}\n</svg>\n`
 }
 
 export function spriteFile(b: BuildInput): string {

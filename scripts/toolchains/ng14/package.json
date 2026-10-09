@@ -1,0 +1,1 @@
+{ "name": "toolchain-ng14", "private": true, "dependencies": { "@angular/core": "~14.3.0", "@angular/common": "~14.3.0", "@angular/platform-browser": "~14.3.0", "@angular/compiler": "~14.3.0", "@angular/compiler-cli": "~14.3.0", "rxjs": "~7.5.0", "zone.js": "~0.11.4", "tslib": "^2.3.0", "typescript": "~4.8.4" } }

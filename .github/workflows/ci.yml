@@ -19,6 +19,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Size budgets (export formats + plugin bundle)
+        working-directory: .
+        run: node scripts/size-budget.mjs
+
   companion:
     runs-on: ubuntu-latest
     steps:
@@ -28,4 +32,53 @@ jobs:
           node-version: 22
       - run: git config --global user.email ci@example.com && git config --global user.name ci
       - run: node --test tools/icon-sync.test.mjs
-  # TODO (docs/TEAM-REVIEW.md §5.5): ngc compile of generated Angular (14 + latest), Playwright render + pixel diff, size budgets.
+
+  # The generated code must compile with the real toolchains, not just type-check as plain TypeScript.
+  generated-code:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: angular-classic on Angular 14, toolchain: ng14, kind: angular-classic }
+          - { name: angular-classic on latest Angular, toolchain: ng-latest, kind: angular-classic }
+          - { name: angular (signals) on Angular 17.1, toolchain: ng17, kind: angular }
+          - { name: angular (signals) on latest Angular, toolchain: ng-latest, kind: angular }
+          - { name: react on React 18, toolchain: react18, kind: react }
+          - { name: web-component, toolchain: react18, kind: web-component }
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+      - run: npm ci
+        working-directory: plugin
+      - name: Install toolchain
+        working-directory: scripts/toolchains/${{ matrix.toolchain }}
+        run: npm install --no-audit --no-fund
+      - run: node scripts/compile-check.mjs --toolchain scripts/toolchains/${{ matrix.toolchain }} --kind ${{ matrix.kind }}
+
+  # Renders the export in Chromium: inline SVG, sprite and Web Component must draw the same pixels, follow the colour variable, and match the golden images.
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: plugin
+      - run: npm install --no-audit --no-fund
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - run: npx playwright test
+        working-directory: e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: render-diffs
+          path: e2e/test-results

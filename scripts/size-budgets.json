@@ -1,0 +1,26 @@
+{
+  "export": {
+    "angular": 25500,
+    "angular-classic": 26000,
+    "code-connect": 1500,
+    "html": 37500,
+    "react": 17000,
+    "sprite": 3700,
+    "svg": 3900,
+    "web-component": 9000
+  },
+  "files": {
+    "angular": 20,
+    "angular-classic": 20,
+    "code-connect": 3,
+    "html": 3,
+    "react": 17,
+    "sprite": 1,
+    "svg": 6,
+    "web-component": 3
+  },
+  "plugin": {
+    "main.js": 60000,
+    "ui.js": 540000
+  }
+}

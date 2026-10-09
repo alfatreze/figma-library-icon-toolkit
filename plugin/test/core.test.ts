@@ -680,3 +680,21 @@ describe('duplicate-name policy', () => {
     expect(p.icons.every((i) => !i.findings.some((f) => f.ruleId === 'duplicate-name'))).toBe(true)
   })
 })
+
+describe('every generated SVG file is well-formed XML (external <use> and <img> need it)', () => {
+  const settings = { ...DEFAULT_SETTINGS, splitByCategory: true }
+  const p = processIcons([raw('icon/Home', fx('stroked.svg')), raw('nav/Pie', fx('multicolor.svg')), raw('nav/Bars', fx('bars-multipath.svg'))], settings, {})
+  const files = buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+  const svgs = Object.entries(files).filter(([k]) => k.endsWith('.svg'))
+  it('has svg, sprite and category sprites to check', () => {
+    expect(svgs.length).toBeGreaterThanOrEqual(5)
+    expect(svgs.some(([k]) => k.startsWith('sprite/'))).toBe(true)
+  })
+  for (const [path, text] of svgs) {
+    it(path, () => {
+      const doc = new DOMParser().parseFromString(text, 'image/svg+xml')
+      expect(doc.getElementsByTagName('parsererror').length, 'XML parse error').toBe(0)
+      expect(doc.documentElement.localName).toBe('svg')
+    })
+  }
+})
