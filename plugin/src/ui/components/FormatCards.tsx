@@ -4,6 +4,7 @@ import { TARGETS, TargetKey } from '../../core/generators'
 import styles from '../styles'
 import { Settings } from '../../types'
 import { OverviewRow, kb } from '../overview'
+import { plural } from '../util'
 
 /** The formats people choose first; the rest sit behind "More formats" unless one of them is already on. */
 const MAIN: TargetKey[] = ['svg', 'sprite', 'html', 'angularModern', 'react', 'webComponent']
@@ -18,7 +19,7 @@ export function FormatCards(props: { formats: Settings['formats']; onToggle: (ke
   const shown = TARGETS.filter((t) => MAIN.includes(t.key) || more)
   const size = (key: TargetKey) => {
     const r = props.rows?.find((x) => x.id === key)
-    return r && r.files ? `${r.files} ${r.files === 1 ? 'file' : 'files'} · ${kb(r.bytes)}` : ''
+    return r && r.files ? `${plural(r.files, 'file')} · ${kb(r.bytes)}` : ''
   }
   return (
     <div>

@@ -2,9 +2,11 @@ import { h } from 'preact'
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 import styles from './styles'
 import { Icon } from '../types'
+import { autoTile } from '../core/contrast'
 
 export type PreviewBg = 'auto' | 'light' | 'dark' | 'checker'
-export const bgClass = (bg: PreviewBg): string => (bg === 'light' ? styles.bgLight : bg === 'dark' ? styles.bgDark : bg === 'checker' ? styles.bgChecker : '')
+/** 'auto' picks light or dark per icon so white artwork is never invisible */
+export const bgClass = (bg: PreviewBg, icon?: Icon): string => ((bg === 'auto' && icon ? autoTile(icon.slots) : bg) === 'light' ? styles.bgLight : (bg === 'auto' && icon ? autoTile(icon.slots) : bg) === 'dark' ? styles.bgDark : bg === 'checker' ? styles.bgChecker : '')
 
 /** the exported artwork at a given pixel size (the SVG carries its own viewBox, so width/height just scale it) */
 const sized = (svg: string, px: number) => svg.replace(/<svg\b([^>]*)>/, (_m, attrs: string) => `<svg${attrs.replace(/\s(width|height)="[^"]*"/g, '')} width="${px}" height="${px}">`)
@@ -35,7 +37,7 @@ export function IconPreview(props: { icon: Icon; anchor: DOMRect; bg: PreviewBg;
   ]
   return (
     <div ref={ref} class={styles.preview} role="tooltip" style={{ left: pos ? pos.left : -9999, top: pos ? pos.top : -9999 }} onMouseEnter={props.onEnter} onMouseLeave={props.onLeave}>
-      <div class={`${styles.previewBig} ${bgClass(props.bg)}`}>
+      <div class={`${styles.previewBig} ${bgClass(props.bg, icon)}`}>
         <span class={styles.previewBgs}>
           {dots.map((d) => (
             <button key={d.id} type="button" class={`${styles.bgDot} ${props.bg === d.id ? styles.bgDotOn : ''}`} style={d.style} aria-label={d.label} aria-pressed={props.bg === d.id} onClick={() => props.onBg(props.bg === d.id ? 'auto' : d.id)} />

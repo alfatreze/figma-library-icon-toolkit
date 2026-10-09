@@ -8,7 +8,7 @@ import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
 import styles from './styles'
-import { copyText, download, notify } from './util'
+import { copyText, download, notify, plural } from './util'
 import {
   DEFAULT_SETTINGS, Icon, RawIcon, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanStartHandler, SelectionHandler,
   Settings, SettingsLoadedHandler, UiReadyHandler
@@ -90,7 +90,7 @@ export function InspectPanel() {
       <div class={styles.header}>
         <strong>Icons in your selection</strong>
         <span class={styles.muted}>
-          {selected === 0 ? 'Select an icon, or a frame that contains icons.' : busy ? 'Reading icons…' : `${icons.length} icon${icons.length === 1 ? '' : 's'} found`}
+          {selected === 0 ? 'Select an icon, or a frame that contains icons.' : busy ? 'Reading icons…' : `${plural(icons.length, 'icon')} found`}
         </span>
       </div>
       <div class={styles.list}>

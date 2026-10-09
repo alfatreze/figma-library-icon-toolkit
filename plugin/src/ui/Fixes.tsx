@@ -42,7 +42,7 @@ export function Preview({ fix, action }: { fix: FixCandidate; action: FixActionI
           <figure class={styles.pvBox}>
             <div class={cx(styles.pvStage, styles.pvResult)}>
               <Svg svg={replace && fix.target ? fix.target.svg : fix.svg} />
-              <span class={styles.pvBadge} title="Component">◆</span>
+              <span class={styles.pvBadge} data-hint="Component">◆</span>
             </div>
             <figcaption class={styles.pvCap}>
               {replace && fix.target ? `Instance of ${fix.target.name}${fix.target.remote ? ' (library)' : ''}` : 'New component'}
@@ -76,8 +76,8 @@ export function FixCard(props: {
           <div class={styles.issueTitle}>{info.title}</div>
           <div class={cx(styles.muted, styles.ellipsis)} title={fix.name}>{fix.name} · {fix.pageName || 'page'} · {fix.width}×{fix.height}</div>
         </div>
-        <span class={cx(styles.conf, styles[`conf_${fix.confidence}`])} title="Confidence">{fix.confidence}</span>
-        <button class={styles.iconBtn} onClick={props.onLocate} aria-label={`Locate ${fix.name}`} title="Locate on canvas"><LocateIcon /></button>
+        <span class={cx(styles.conf, styles[`conf_${fix.confidence}`])} data-hint="Confidence">{fix.confidence}</span>
+        <button class={styles.iconBtn} onClick={props.onLocate} aria-label={`Locate ${fix.name}`} data-hint="Locate on canvas"><LocateIcon /></button>
       </div>
 
       {fix.kind !== 'layer-names' && fix.kind !== 'duplicate-component' && <Preview fix={fix} action={props.action} />}

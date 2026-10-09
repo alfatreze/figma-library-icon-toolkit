@@ -56,6 +56,7 @@ export const RULES: Record<string, RuleInfo> = {
   'not-component': { title: 'Not a component', why: 'Without a component there is no stable key to map design ↔ code.', fix: 'Convert the frame to a component.', step: 5 },
   'not-in-set': { title: 'Standalone component', why: 'Variants (filled/outline/size) are cleaner as a component set.', fix: 'Group related versions into a component set.', step: 6 },
   'unbound-color': { title: 'Colours not bound to variables', why: 'Hard-coded colours drift from the design system.', fix: 'Bind fills/strokes to colour variables.', step: 7 },
+  'theme-contrast': { title: 'Low contrast on light or dark pages', why: 'A colour that stays fixed in code (a secondary colour or a gradient) can disappear on a light or a dark page.', fix: 'Bind it to a variable that changes with the theme, or pick a colour with at least 3:1 contrast on both.', step: 7 },
   multicolor: { title: 'Multi-colour icon', why: 'Each colour becomes a CSS slot; make sure that is intended.', fix: 'No action unless unintended.', step: 7 },
   'no-description': { title: 'No description / tags', why: 'Descriptions become search tags in the export.', fix: 'Add comma-separated aliases to the component description.', step: 8 }
 }

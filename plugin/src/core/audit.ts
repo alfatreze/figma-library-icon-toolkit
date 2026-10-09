@@ -1,5 +1,6 @@
 import { Finding, GridInfo, Profile, RawIcon, Settings, Severity } from '../types'
 import { hasCopyMarker, isAutoName, validateName } from './naming'
+import { contrastRatio } from './contrast'
 import { overrideFindings } from './overrides'
 
 export interface AuditContext {
@@ -12,10 +13,15 @@ export interface AuditContext {
   settings: Settings
 }
 
+const LIGHT_PAGE = '#ffffff'
+const DARK_PAGE = '#1e1e1e'
+const MIN_CONTRAST = 3
+
 /** Severity per rule and profile. Structure rules escalate with stricter profiles. */
 const STRUCTURE: Record<string, Record<Profile, Severity | null>> = {
   'not-component': { lenient: 'info', standard: 'warn', strict: 'error' },
   'unbound-color': { lenient: null, standard: 'info', strict: 'warn' },
+  'theme-contrast': { lenient: null, standard: 'info', strict: 'warn' },
   'no-description': { lenient: null, standard: 'info', strict: 'warn' },
   'not-in-set': { lenient: null, standard: null, strict: 'warn' },
   'auto-name': { lenient: 'warn', standard: 'error', strict: 'error' },
@@ -79,6 +85,21 @@ export function auditIcon(icon: RawIcon, ctx: AuditContext): Finding[] {
   // colour
   const hardcoded = f.paints.filter((p) => !p.variable)
   if (hardcoded.length) add('unbound-color', 'info', 'Colours are hard-coded (not bound to variables).', 'Bind fills/strokes to colour variables.')
+  // a colour that stays fixed in code (secondary slots, gradients) cannot follow the theme: check it on both a light and a dark page (WCAG 1.4.11, 3:1)
+  if (hardcoded.length && (ctx.kindColors > 1 || f.hasGradient)) {
+    const weak = new Map<string, string[]>()
+    for (const p of hardcoded) {
+      if (p.opacity <= 0.01) continue
+      const on: string[] = []
+      if ((contrastRatio(p.hex, LIGHT_PAGE) ?? 21) < MIN_CONTRAST) on.push('light')
+      if ((contrastRatio(p.hex, DARK_PAGE) ?? 21) < MIN_CONTRAST) on.push('dark')
+      if (on.length) weak.set(p.hex, on)
+    }
+    if (weak.size) {
+      const list = [...weak].map(([hex, on]) => `${hex} on ${on.join(' and ')}`).join(', ')
+      add('theme-contrast', 'info', `Fixed colour with low contrast (under ${MIN_CONTRAST}:1): ${list}.`, 'Bind it to a variable that changes with the theme, or pick a colour that works on both.')
+    }
+  }
   if (ctx.kindColors > 1) add('multicolor', 'info', `${ctx.kindColors} colours detected; exported as colour slots.`)
 
   // grid
