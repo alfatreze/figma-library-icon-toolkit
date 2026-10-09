@@ -1,5 +1,7 @@
 # Code audit of v0.2.0 (security, architecture, Figma-side correctness)
 
+> **Status (after the follow-up work on `main`, unreleased):** see the table at the end. Everything marked done has tests; nothing has been run inside Figma.
+
 Method: three independent read-only reviews (nothing was run or changed), then a spot check of the highest-impact claims.
 **Confirmed by reading the code:** A1, A2, A3 (companion `subdir`), A5. **Everything else is reported but not re-verified**; treat it as a lead and reproduce before fixing.
 Effort: S under half a day, M about a day, L several days.
@@ -82,3 +84,33 @@ plugin/src/
   ui/           App (shell), hooks/, selectors.ts, util/, panels/, components/{Dialog,Tabs,InfoTip}
   log.ts
 ```
+
+## 5. Status of the follow-up work
+
+| Item | Status | Notes |
+|---|---|---|
+| A1 config validation | **done** | `core/settingsSchema.ts` (every setting classified shared/local at compile time, enum/range checks, migrations); `parseConfig`, saved settings and `exportConfig` use it; generators also normalise the stroke policy |
+| A2 fix-preview sanitising | **done** | `sanitizeSvgString` in `ui/Fixes.tsx` |
+| A3 companion subdir/paths | **done** | plain subfolder only, no dot-segments, allowed file types, tests incl. `.git/hooks` |
+| A4 allow-list sanitiser | **done** | `core/sanitize.ts` rewritten; CDATA/comment/text nodes removed; only `url(#id)` / `#href` |
+| A5 viewBox | **done** | `safeViewBox` in `wrapSvg` and `themeSvg` |
+| A6 previous catalog | **done** | `parseCatalog` validates every field; invalid entries dropped |
+| A7 handler validation | **done** | `main/guards.ts` (+ `safe()` wrapper so no handler leaves the UI waiting) |
+| A8 baseline decode | **done** | streaming inflate with a cap, size limit, entry validation |
+| A9 companion hardening | **done** | symlink refusal, managed-list allow-list, 20 MB cap, Host check, `check-ref-format`, `pathToFileURL`, `ICON_SYNC_TOKEN` |
+| A10 CI/supply chain | **partly** | read-only token, release job scoped, lockfiles + `npm ci` for pinned toolchains, `latest` job non-blocking, notices check, release checksum. **Not done:** pin actions by SHA, build provenance attestation |
+| B1-B8, B11-B16, B18 | **done** | scan isolation/yield/cancel/busy reply, page-by-page load, parallel export, set variants, inside-instance, usage in components, stroke colour carry, rename-after-success, outline limits and render bounds, two-pass changelog + alias chains, reserved-word rule removed, codegen timeout, override lookups capped, caches cleared, precision 0, locale-independent ordering |
+| B9 duplicates | **partly** | stroke weight/cap/join in the signature, 64-bit hash, indexed lookups. Confidence is not downgraded for colour-only state variants |
+| B10 geometry hash | **done** | shapes, stroke attrs, transforms; plain filled paths keep their old hash (no false "changed" on upgrade). Strokes/non-path icons change once |
+| B17 baseline identity | **done** | first page id instead of name + all page ids; at most 20 local baselines |
+| Arch 1 `ui.tsx` | **partly** | `useScan`, `useBaselines`, `useSync`, `ui/selectors.ts`, `ui/companion.ts` extracted (1177 → about 1000 lines). **Not done:** `useFixes`, `useFilters` reducer, splitting the three tab panels into components |
+| Arch 2 types + messages | **done** | `types/{settings,domain,fixes,messages}.ts`; one `Messages` map ties each message name to its arguments |
+| Arch 3 settings versioning | **done** | see A1 |
+| Arch 4 generators | **partly** | `Target` registry (`generators/targets.ts`) drives `buildFiles`, the overview and file ownership; helper duplication removed. **Not done:** merging the Angular modern/classic templates |
+| Arch 5-6 snippets | **done** | label/colour escaping; the test page now prints `core/snippets.ts` strings |
+| Arch 7 logging | **done** | `log.ts` ring buffer, `tryOr`, Settings → Copy diagnostics; empty `catch {}` in `main/` now log |
+| Arch 8 naming | **partly** | `core/hash.ts`; dead exports removed. **Not done:** renaming `main/baseline.ts` vs `core/baseline.ts` |
+| Arch 9 performance | **done** | per-icon theme cache, only relevant settings re-run processing, throttled batches, overview not rebuilt on format toggles, ZIP toast before the blocking work, O(n²) spots removed. **Not done:** zip in a worker |
+| Arch 10 bundle | **partly** | budget now 490 KB (the bundle grew with validation); generators are not lazy-loaded because the plugin bundler emits one file |
+| Arch 11 tests | **partly** | added: scan, guards, security, hooks, dialog, selectors, baseline housekeeping. **Still untested:** `diagnose.ts`, `facts.ts`, `codegen.ts` |
+| Arch 12 accessibility | **partly** | `Dialog` (focus move, trap, Esc, restore), tab keyboard, live region. **Not done:** `tabpanel`/`aria-controls`, keyboard-accessible tooltips, dark-mode contrast check |

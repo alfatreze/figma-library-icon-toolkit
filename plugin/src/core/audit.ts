@@ -104,9 +104,3 @@ function fmt(n: number): string {
   return String(Math.round(n * 100) / 100)
 }
 
-export function worstSeverity(findings: Finding[]): Severity | null {
-  if (findings.some((f) => f.severity === 'error')) return 'error'
-  if (findings.some((f) => f.severity === 'warn')) return 'warn'
-  if (findings.length) return 'info'
-  return null
-}

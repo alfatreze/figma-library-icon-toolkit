@@ -1,7 +1,7 @@
 import { parseVariantName } from '../core/naming'
 import { CategoryContext, FixCandidate, RawIcon, ScanOptions, ScanSummary, SourceKind } from '../types'
 import { emptyFacts, gatherFacts, isIconish, resetFactCaches, variableName, VECTOR_TYPES } from './facts'
-import { Diagnoser } from './diagnose'
+import { cleanPageName, Diagnoser, pageOf } from './diagnose'
 import { outlinedSvg } from './outline'
 import { newAgg, recordInstance, toUsage, UsageAgg } from './overrides'
 import { log } from '../log'
@@ -43,17 +43,6 @@ function addCandidate(ctx: ScanContext, c: Candidate) {
   ctx.seenNodes.add(c.node.id)
   ctx.candidates.push(c)
   ctx.summary.adapters[c.sourceKind] = (ctx.summary.adapters[c.sourceKind] ?? 0) + 1
-}
-
-function pageOf(node: BaseNode): PageNode | null {
-  let p: BaseNode | null = node
-  while (p && p.type !== 'PAGE') p = p.parent
-  return p && p.type === 'PAGE' ? p : null
-}
-
-/** Pages are often named like "  ↳ Icons" as visual hierarchy; keep only the meaningful part. */
-function cleanPageName(name: string): string {
-  return name.replace(/^[\s↳→›>\-–—·•]+/u, '').trim() || name.trim()
 }
 
 function componentCandidate(node: ComponentNode, kind: SourceKind, ctx: CategoryContext): Candidate {

@@ -1,4 +1,5 @@
 import { BuildInput, escapeHtml, ns, strokeSteps, symbolId, policyOf } from './common'
+import { angularSnippet, htmlSnippet, reactComponentSnippet, webComponentSnippet } from '../snippets'
 import { inlineSprite } from './svg-files'
 
 const CSS = String.raw`
@@ -99,9 +100,7 @@ function open(name){
   state.sel=name;history.replaceState(null,'','#'+encodeURIComponent(state.q)+(name?'&'+encodeURIComponent(name):''));
   var h='<button class="close" id="close" aria-label="Close">Close</button><h2>'+esc(d.name)+'</h2><div class="count">'+esc(d.id)+' · '+d.kind+' · '+d.width+'×'+d.height+'</div>';
   h+='<h3>Preview</h3><div class="sizes">'+[16,24,32,48,64].map(function(s){return '<span style="--'+NS+'-icon-size:'+s+'px;text-align:center">'+icon(d)+'<div class="count">'+s+'</div></span>'}).join('')+'</div>';
-  h+='<h3>Code</h3>'+snip('Sprite (HTML)','<svg class="'+NS+'-icon" aria-hidden="true" focusable="false"><use href="'+NS+'-sprite.svg#'+NS+'-'+d.name+'"/></svg>');
-  if(d.mask)h+=snip('Mask class','<i class="'+NS+'-icon '+NS+'-icon--'+d.name+'" aria-hidden="true"></i>');
-  h+=snip('Angular','<'+NS+'-icon name="'+d.name+'" />')+snip('Name',d.name)+snip('File','svg/'+NS+'-'+d.name+'.svg');
+  h+='<h3>Code</h3>'+d.snippets.map(function(s){return snip(s.label,s.code)}).join('');
   if(d.slots.length){h+='<h3>Colour slots</h3>'+d.slots.map(function(s){return '<div class="slot"><span class="sw" style="background:'+s.hex+'"></span><code>'+esc(s.cssVar)+'</code>'+(s.token?'<span>→ '+esc(s.token)+'</span>':'')+(s.variable?'<span class="count">('+esc(s.variable)+')</span>':'')+'</div>'}).join('')}
   if(d.strokeWidth!==null)h+='<h3>Stroke</h3><div class="slot">drawn at '+d.strokeWidth+'px → <code>--'+NS+'-icon-stroke-width</code></div>';
   if(d.category)h+='<h3>Category</h3><div class="count">'+esc(d.category)+'</div>';
@@ -150,6 +149,16 @@ if(hash[1])open(decodeURIComponent(hash[1]));
 })();
 `
 
+function snippetsFor(b: BuildInput, i: BuildInput['icons'][number]): { label: string; code: string }[] {
+  const input = { ns: ns(b), name: i.name, spritePath: '', sizePx: null, sizeUnit: 'px' as const, vars: {} }
+  const out = [{ label: 'Sprite (HTML)', code: htmlSnippet(input) }]
+  if (i.maskSvg && b.settings.formats.mask) out.push({ label: 'Mask class', code: `<i class="${ns(b)}-icon ${ns(b)}-icon--${i.name}" aria-hidden="true"></i>` })
+  out.push({ label: 'Angular', code: angularSnippet(input) }, { label: 'React', code: reactComponentSnippet(input) })
+  if (b.settings.formats.webComponent) out.push({ label: 'Web Component', code: webComponentSnippet(input) })
+  out.push({ label: 'Name', code: i.name }, { label: 'File', code: `svg/${ns(b)}-${i.name}.svg` })
+  return out
+}
+
 export function testPage(b: BuildInput): string {
   const n = ns(b)
   const data = b.icons.map((i) => ({
@@ -165,6 +174,8 @@ export function testPage(b: BuildInput): string {
     width: i.width,
     height: i.height,
     mask: !!i.maskSvg,
+    // the same strings Dev Mode and the README print (core/snippets.ts): one source of truth for "how do I use this icon"
+    snippets: snippetsFor(b, i),
     strokeWidth: i.strokeWidth,
     slots: i.slots.map((s) => ({ cssVar: s.cssVar, hex: s.hex, token: s.token ?? null, variable: s.variable ?? null })),
     findings: i.findings.map((f) => ({ severity: f.severity, message: f.message }))

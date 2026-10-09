@@ -39,10 +39,6 @@ export interface Diff {
 
 export type Identity = 'componentKey' | 'name'
 
-export function artworkHash(body: string): string {
-  return hash32(body)
-}
-
 const SLUG = /^[a-z0-9][a-z0-9-]{0,99}$/
 const SEMVER = /^\d{1,6}\.\d{1,6}\.\d{1,6}(?:-[0-9A-Za-z.-]{1,30})?$/
 const HASH = /^[0-9a-z]{1,40}$/

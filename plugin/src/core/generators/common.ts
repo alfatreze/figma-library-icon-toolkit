@@ -24,7 +24,6 @@ export const constName = (b: BuildInput, icon: Icon) => camel(`${ns(b)}-${icon.n
 export const componentName = (b: BuildInput) => `${pascal(ns(b))}Icon`
 
 export const categoryId = (icon: Icon) => icon.category.join('/')
-export const hasCategories = (b: BuildInput) => b.icons.some((i) => i.category.length > 0)
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

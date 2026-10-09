@@ -83,4 +83,3 @@ export function summariseCategories(items: { category: string[]; categoryLabel: 
 }
 
 /** filesystem-safe folder for a category ("a/b" → "a/b") */
-export const categoryDir = (slug: string[]) => slug.join('/')

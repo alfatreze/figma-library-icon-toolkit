@@ -162,19 +162,3 @@ export function resolveDuplicates(slots: NameSlot[], policy: 'block' | 'category
   return { names, rewritten }
 }
 
-/** Makes names unique by suffixing -2, -3… Returns the final names and which were changed. */
-export function dedupeNames(names: string[]): { names: string[]; duplicates: Set<number> } {
-  const seen = new Map<string, number>()
-  const out: string[] = []
-  const duplicates = new Set<number>()
-  names.forEach((n, i) => {
-    const count = (seen.get(n) ?? 0) + 1
-    seen.set(n, count)
-    if (count === 1) out.push(n)
-    else {
-      out.push(`${n}-${count}`)
-      duplicates.add(i)
-    }
-  })
-  return { names: out, duplicates }
-}

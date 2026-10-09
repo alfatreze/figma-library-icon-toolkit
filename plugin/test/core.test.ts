@@ -781,3 +781,21 @@ describe('changelog matching is order independent', () => {
     expect(dep).toEqual(expect.arrayContaining([{ name: 'a', replacedBy: 'c', since: '1.1.0' }, { name: 'b', replacedBy: 'c', since: '2.0.0' }]))
   })
 })
+
+describe('export targets registry', () => {
+  it('has a setting, a schema entry and a checkbox-able key for every target, and every output file belongs to one target or is meta', async () => {
+    const { TARGETS } = await import('../src/core/generators')
+    const keys = TARGETS.map((t) => t.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    expect(keys.sort()).toEqual(Object.keys(DEFAULT_SETTINGS.formats).sort())
+    const all = Object.fromEntries(keys.map((k) => [k, true])) as typeof DEFAULT_SETTINGS.formats
+    const settings = { ...DEFAULT_SETTINGS, formats: all, splitByCategory: true }
+    const p = processIcons([raw('icon/Home', fx('stroked.svg')), raw('nav/Pie', fx('multicolor.svg'))], settings, {})
+    const files = buildFiles({ allIcons: p.icons, settings, grid: p.grid, tier: p.tier, generatedAt: 'x' })
+    for (const path of Object.keys(files)) {
+      const owners = TARGETS.filter((t) => t.owns(path))
+      expect(owners.length, `${path} is claimed by ${owners.map((o) => o.key).join(', ') || 'no target'}`).toBeLessThanOrEqual(1)
+    }
+    for (const t of TARGETS) expect(Object.keys(files).some((f) => t.owns(f)), t.key).toBe(true)
+  })
+})

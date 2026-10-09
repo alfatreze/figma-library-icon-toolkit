@@ -7,6 +7,28 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+### Security
+- Settings are validated against one schema (enums, ranges, lengths) wherever they enter: imported config, config published in a file, saved settings. A hostile config can no longer put text into generated code; generators also normalise the stroke policy.
+- The SVG sanitiser is now an allow-list (elements, attributes, URL values); comments, CDATA and text nodes are removed; fix previews are sanitised too; `viewBox` is validated; snippets escape labels and colours.
+- Data read from the file or the repo (`icons.json`, baselines, shared config) is validated; baselines are size-limited and inflated with a cap.
+- The main thread re-validates every message from the UI (dev-resource links must be `https`, baseline size and target, fix requests).
+- Companion: the target must be a real subfolder (not the root, no dot-folders), only plain asset file types are written, symlinks are refused, deletions are limited to generated paths, 20 MB body limit, Host check (DNS rebinding), `git check-ref-format` for branches, `ICON_SYNC_TOKEN` environment variable.
+- CI: read-only token, scoped release permissions, lockfiles for pinned toolchains, release checksum.
+
+### Fixed
+- One unreadable layer no longer aborts a scan (it becomes a blocked row); cancel and re-scan behave; documents are read page by page; instances of component-set variants are not listed twice; layers inside instances are not offered for conversion; icon instances inside components are counted in usage mode.
+- Replace-with-instance carries stroke colours; leaf renames happen only after a successful conversion; stale rename plans are skipped; fixes cannot run during a scan.
+- Duplicate detection includes stroke weight/cap/join and uses a 64-bit hash; the geometry hash covers circles, rects, lines, stroke weight and transforms; changelog matching is order independent and keeps rename chains.
+- Common names such as `delete` or `import` are no longer rejected; very long names are; `Ł đ ı` fold to ASCII; numbering no longer depends on the user's locale.
+- Stroke outlining refuses text, opacity, blend, effects and mixed paints, and uses render bounds for loose vectors.
+- Codegen always answers within its time limit; settings are saved when the plugin closes right after a change.
+
+### Changed
+- Types are split into `types/{settings,domain,fixes,messages}.ts` with one typed message map; the UI is split into hooks (`useScan`, `useBaselines`, `useSync`) and pure selectors; export targets are a registry.
+- Processing is cached per icon and only re-runs for settings that affect it; scan batches are throttled.
+- Dialogs trap focus, close on Esc and restore focus; tabs support arrow keys; scan status is announced to screen readers.
+- Settings → Copy diagnostics copies a short report (no layer content, token hidden).
+
 ## [0.2.0] - 2026-10-09
 ### Added
 - **Change detection baseline** (layered): the previous export is remembered on this computer automatically; optionally saved *in the Figma file* (Labs) so the team and Dev Mode share it; or read from the project's `icons.json` through the companion (`GET /catalog`). Priority repo > shared > local > loaded file. Icons list gets filter chips (new, renamed, drawing, colour, moved, layer name).
