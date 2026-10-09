@@ -1,6 +1,6 @@
 {
   "name": "figma-library-icon-toolkit",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Figma plugin: scan icon libraries, audit and fix them, and export themeable SVG / sprite / HTML / Angular / React packages with a developer README.",
   "license": "MIT",
