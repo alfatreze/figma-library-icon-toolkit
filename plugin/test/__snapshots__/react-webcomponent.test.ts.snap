@@ -1,0 +1,859 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generated React package > stays the same: another namespace and original colours 1`] = `
+{
+  "react/acme-icon-registry.ts": "import { useEffect, useReducer } from 'react';
+import { ACME_CATEGORY_OF, ACME_DEPRECATED, AcmeIconData } from './icon-data';
+import { ACME_LOADERS } from './loaders';
+
+const store = new Map<string, AcmeIconData>();
+const listeners = new Set<() => void>();
+const requested = new Set<string>();
+
+/**
+ * Register icons up front (synchronous, tree-shakable): registerAcmeIcons(acmeHome, acmeSearch).
+ * Icons you do not register are still found by name: their category loads on first use as a lazy chunk.
+ */
+export function registerAcmeIcons(...icons: (AcmeIconData | readonly AcmeIconData[])[]): void {
+  for (const item of icons) for (const i of Array.isArray(item) ? item : [item as AcmeIconData]) store.set(i.name, i);
+  listeners.forEach((l) => l());
+}
+
+function load(category: string): Promise<void> {
+  const loader = ACME_LOADERS[category];
+  if (!loader || requested.has(category)) return Promise.resolve();
+  requested.add(category);
+  return loader().then(
+    (icons) => registerAcmeIcons(icons),
+    () => { requested.delete(category); } // allow a retry
+  );
+}
+
+/** Warm categories ahead of use, e.g. preloadAcmeIcons('arrows'). */
+export function preloadAcmeIcons(...categories: string[]): Promise<void[]> {
+  return Promise.all(categories.map(load));
+}
+
+/** Looks an icon up by name; triggers its category chunk when missing and re-renders the caller when it arrives. */
+export function useAcmeIcon(requestedName: string | undefined): AcmeIconData | undefined {
+  const [, bump] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    listeners.add(bump);
+    return () => { listeners.delete(bump); };
+  }, []);
+  if (!requestedName) return undefined;
+  const name = (ACME_DEPRECATED as Record<string, string>)[requestedName] ?? requestedName;
+  const hit = store.get(name);
+  if (!hit) {
+    const category = ACME_CATEGORY_OF[name];
+    if (category !== undefined) void load(category);
+  }
+  return hit;
+}
+",
+  "react/acme-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
+import { AcmeIconData, AcmeIconDeprecatedName, AcmeIconName, acmeStrokeFor, acmeSvg } from './icon-data';
+import { useAcmeIcon } from './acme-icon-registry';
+
+export interface AcmeIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
+  /** typed icon name (renamed icons keep working under their old name for one major version) */
+  name?: AcmeIconName | AcmeIconDeprecatedName;
+  /** icon object imported from './icons' (synchronous, tree-shakable; wins over name) */
+  icon?: AcmeIconData;
+  /** number = px, or any CSS length */
+  size?: number | string;
+  /** primary colour (any CSS colour); default currentColor */
+  color?: string;
+  /** line icons only (px) */
+  strokeWidth?: number | string;
+  /** accessible name; omit for decorative icons */
+  label?: string;
+}
+
+/**
+ * <AcmeIcon icon={acmeHome} size={24} />   imported directly: synchronous and tree-shakable
+ * <AcmeIcon name="home" size={24} />        by name: registered icons render at once, others load their category lazily
+ * Style with CSS variables too: --acme-icon-size, --acme-icon-color, --acme-icon-color-2, --acme-icon-stroke-width.
+ */
+export const AcmeIcon = memo(function AcmeIcon({ name, icon, size, color, strokeWidth, label, style, ...rest }: AcmeIconProps) {
+  const byName = useAcmeIcon(icon ? undefined : name);
+  const data = icon ?? byName;
+  if (!data) return null;
+
+  const vars: Record<string, string | number> = {};
+  if (size !== undefined && size !== '') vars['--acme-icon-size'] = typeof size === 'number' ? size + 'px' : size;
+  if (color) vars['--acme-icon-color'] = color;
+  const weight = strokeWidth ?? acmeStrokeFor(size);
+  if (weight !== null && weight !== undefined) vars['--acme-icon-stroke-width'] = weight;
+
+  return (
+    <span
+      {...rest}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      style={{
+        display: 'inline-block',
+        width: 'var(--acme-icon-size, 1em)',
+        height: 'var(--acme-icon-size, 1em)',
+        flex: 'none',
+        lineHeight: 0,
+        verticalAlign: '-0.125em',
+        ...(vars as CSSProperties),
+        ...style,
+      }}
+      // Trusted, generated markup (not user input).
+      dangerouslySetInnerHTML={{ __html: acmeSvg(data) }}
+    />
+  );
+});
+",
+  "react/all-icons.ts": "import { ACME_ICONS } from './icons';
+import { registerAcmeIcons } from './acme-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer registerAcmeIcons(…) with the icons you use. */
+export function registerAcmeAllIcons(): void {
+  registerAcmeIcons(Object.values(ACME_ICONS));
+}
+",
+  "react/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface AcmeIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --acme-icon-* CSS variables) */
+  body: string;
+}
+
+export type AcmeIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const ACME_DEPRECATED = {} as const;
+export type AcmeIconDeprecatedName = keyof typeof ACME_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const ACME_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const ACME_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function acmeStrokeFor(size: number | string | undefined): number | null {
+  if (ACME_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of ACME_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function acmeSvg(data: AcmeIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "react/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { AcmeIconData, AcmeIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const ACME_ICONS: Readonly<Record<AcmeIconName, AcmeIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const ACME_CATEGORIES: Record<string, AcmeIconName[]> = {};
+
+export const ACME_ICON_NAMES = Object.keys(ACME_ICONS) as AcmeIconName[];
+",
+  "react/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "react/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { registerAcmeIcons, preloadAcmeIcons, useAcmeIcon } from './acme-icon-registry';
+export { AcmeIcon } from './acme-icon';
+export type { AcmeIconProps } from './acme-icon';
+",
+  "react/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { AcmeIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const ACME_LOADERS: Readonly<Record<string, () => Promise<readonly AcmeIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated React package > stays the same: default settings 1`] = `
+{
+  "react/all-icons.ts": "import { CMN_ICONS } from './icons';
+import { registerCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer registerCmnIcons(…) with the icons you use. */
+export function registerCmnAllIcons(): void {
+  registerCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "react/cmn-icon-registry.ts": "import { useEffect, useReducer } from 'react';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+const store = new Map<string, CmnIconData>();
+const listeners = new Set<() => void>();
+const requested = new Set<string>();
+
+/**
+ * Register icons up front (synchronous, tree-shakable): registerCmnIcons(cmnHome, cmnSearch).
+ * Icons you do not register are still found by name: their category loads on first use as a lazy chunk.
+ */
+export function registerCmnIcons(...icons: (CmnIconData | readonly CmnIconData[])[]): void {
+  for (const item of icons) for (const i of Array.isArray(item) ? item : [item as CmnIconData]) store.set(i.name, i);
+  listeners.forEach((l) => l());
+}
+
+function load(category: string): Promise<void> {
+  const loader = CMN_LOADERS[category];
+  if (!loader || requested.has(category)) return Promise.resolve();
+  requested.add(category);
+  return loader().then(
+    (icons) => registerCmnIcons(icons),
+    () => { requested.delete(category); } // allow a retry
+  );
+}
+
+/** Warm categories ahead of use, e.g. preloadCmnIcons('arrows'). */
+export function preloadCmnIcons(...categories: string[]): Promise<void[]> {
+  return Promise.all(categories.map(load));
+}
+
+/** Looks an icon up by name; triggers its category chunk when missing and re-renders the caller when it arrives. */
+export function useCmnIcon(requestedName: string | undefined): CmnIconData | undefined {
+  const [, bump] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    listeners.add(bump);
+    return () => { listeners.delete(bump); };
+  }, []);
+  if (!requestedName) return undefined;
+  const name = (CMN_DEPRECATED as Record<string, string>)[requestedName] ?? requestedName;
+  const hit = store.get(name);
+  if (!hit) {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void load(category);
+  }
+  return hit;
+}
+",
+  "react/cmn-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { useCmnIcon } from './cmn-icon-registry';
+
+export interface CmnIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
+  /** typed icon name (renamed icons keep working under their old name for one major version) */
+  name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (synchronous, tree-shakable; wins over name) */
+  icon?: CmnIconData;
+  /** number = px, or any CSS length */
+  size?: number | string;
+  /** primary colour (any CSS colour); default currentColor */
+  color?: string;
+  /** line icons only (px) */
+  strokeWidth?: number | string;
+  /** accessible name; omit for decorative icons */
+  label?: string;
+}
+
+/**
+ * <CmnIcon icon={cmnHome} size={24} />   imported directly: synchronous and tree-shakable
+ * <CmnIcon name="home" size={24} />        by name: registered icons render at once, others load their category lazily
+ * Style with CSS variables too: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ */
+export const CmnIcon = memo(function CmnIcon({ name, icon, size, color, strokeWidth, label, style, ...rest }: CmnIconProps) {
+  const byName = useCmnIcon(icon ? undefined : name);
+  const data = icon ?? byName;
+  if (!data) return null;
+
+  const vars: Record<string, string | number> = {};
+  if (size !== undefined && size !== '') vars['--cmn-icon-size'] = typeof size === 'number' ? size + 'px' : size;
+  if (color) vars['--cmn-icon-color'] = color;
+  const weight = strokeWidth ?? cmnStrokeFor(size);
+  if (weight !== null && weight !== undefined) vars['--cmn-icon-stroke-width'] = weight;
+
+  return (
+    <span
+      {...rest}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      style={{
+        display: 'inline-block',
+        width: 'var(--cmn-icon-size, 1em)',
+        height: 'var(--cmn-icon-size, 1em)',
+        flex: 'none',
+        lineHeight: 0,
+        verticalAlign: '-0.125em',
+        ...(vars as CSSProperties),
+        ...style,
+      }}
+      // Trusted, generated markup (not user input).
+      dangerouslySetInnerHTML={{ __html: cmnSvg(data) }}
+    />
+  );
+});
+",
+  "react/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'constant', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "react/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "react/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "react/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { registerCmnIcons, preloadCmnIcons, useCmnIcon } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon';
+export type { CmnIconProps } from './cmn-icon';
+",
+  "react/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated React package > stays the same: weight-by-size stroke policy and category split 1`] = `
+{
+  "react/all-icons.ts": "import { CMN_ICONS } from './icons';
+import { registerCmnIcons } from './cmn-icon-registry';
+
+/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer registerCmnIcons(…) with the icons you use. */
+export function registerCmnAllIcons(): void {
+  registerCmnIcons(Object.values(CMN_ICONS));
+}
+",
+  "react/cmn-icon-registry.ts": "import { useEffect, useReducer } from 'react';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_LOADERS } from './loaders';
+
+const store = new Map<string, CmnIconData>();
+const listeners = new Set<() => void>();
+const requested = new Set<string>();
+
+/**
+ * Register icons up front (synchronous, tree-shakable): registerCmnIcons(cmnHome, cmnSearch).
+ * Icons you do not register are still found by name: their category loads on first use as a lazy chunk.
+ */
+export function registerCmnIcons(...icons: (CmnIconData | readonly CmnIconData[])[]): void {
+  for (const item of icons) for (const i of Array.isArray(item) ? item : [item as CmnIconData]) store.set(i.name, i);
+  listeners.forEach((l) => l());
+}
+
+function load(category: string): Promise<void> {
+  const loader = CMN_LOADERS[category];
+  if (!loader || requested.has(category)) return Promise.resolve();
+  requested.add(category);
+  return loader().then(
+    (icons) => registerCmnIcons(icons),
+    () => { requested.delete(category); } // allow a retry
+  );
+}
+
+/** Warm categories ahead of use, e.g. preloadCmnIcons('arrows'). */
+export function preloadCmnIcons(...categories: string[]): Promise<void[]> {
+  return Promise.all(categories.map(load));
+}
+
+/** Looks an icon up by name; triggers its category chunk when missing and re-renders the caller when it arrives. */
+export function useCmnIcon(requestedName: string | undefined): CmnIconData | undefined {
+  const [, bump] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    listeners.add(bump);
+    return () => { listeners.delete(bump); };
+  }, []);
+  if (!requestedName) return undefined;
+  const name = (CMN_DEPRECATED as Record<string, string>)[requestedName] ?? requestedName;
+  const hit = store.get(name);
+  if (!hit) {
+    const category = CMN_CATEGORY_OF[name];
+    if (category !== undefined) void load(category);
+  }
+  return hit;
+}
+",
+  "react/cmn-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
+import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+import { useCmnIcon } from './cmn-icon-registry';
+
+export interface CmnIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
+  /** typed icon name (renamed icons keep working under their old name for one major version) */
+  name?: CmnIconName | CmnIconDeprecatedName;
+  /** icon object imported from './icons' (synchronous, tree-shakable; wins over name) */
+  icon?: CmnIconData;
+  /** number = px, or any CSS length */
+  size?: number | string;
+  /** primary colour (any CSS colour); default currentColor */
+  color?: string;
+  /** line icons only (px) */
+  strokeWidth?: number | string;
+  /** accessible name; omit for decorative icons */
+  label?: string;
+}
+
+/**
+ * <CmnIcon icon={cmnHome} size={24} />   imported directly: synchronous and tree-shakable
+ * <CmnIcon name="home" size={24} />        by name: registered icons render at once, others load their category lazily
+ * Style with CSS variables too: --cmn-icon-size, --cmn-icon-color, --cmn-icon-color-2, --cmn-icon-stroke-width.
+ */
+export const CmnIcon = memo(function CmnIcon({ name, icon, size, color, strokeWidth, label, style, ...rest }: CmnIconProps) {
+  const byName = useCmnIcon(icon ? undefined : name);
+  const data = icon ?? byName;
+  if (!data) return null;
+
+  const vars: Record<string, string | number> = {};
+  if (size !== undefined && size !== '') vars['--cmn-icon-size'] = typeof size === 'number' ? size + 'px' : size;
+  if (color) vars['--cmn-icon-color'] = color;
+  const weight = strokeWidth ?? cmnStrokeFor(size);
+  if (weight !== null && weight !== undefined) vars['--cmn-icon-stroke-width'] = weight;
+
+  return (
+    <span
+      {...rest}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      style={{
+        display: 'inline-block',
+        width: 'var(--cmn-icon-size, 1em)',
+        height: 'var(--cmn-icon-size, 1em)',
+        flex: 'none',
+        lineHeight: 0,
+        verticalAlign: '-0.125em',
+        ...(vars as CSSProperties),
+        ...style,
+      }}
+      // Trusted, generated markup (not user input).
+      dangerouslySetInnerHTML={{ __html: cmnSvg(data) }}
+    />
+  );
+});
+",
+  "react/icon-data.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+export interface CmnIconData {
+  /** icon name, the key used by \`name="…"\` */
+  name: string;
+  viewBox: string;
+  width: number;
+  height: number;
+  kind: 'filled' | 'stroked' | 'multicolor' | 'mixed';
+  /** category path from Figma (name path, section, frame or page), '' when none */
+  category: string;
+  /** inner SVG markup (themeable through --cmn-icon-* CSS variables) */
+  body: string;
+}
+
+export type CmnIconName = never;
+
+/** Renamed icons: the old name still works for one major version and resolves to the new one. */
+export const CMN_DEPRECATED = {} as const;
+export type CmnIconDeprecatedName = keyof typeof CMN_DEPRECATED;
+
+/** icon name → category chunk (see loaders.ts) */
+export const CMN_CATEGORY_OF: Readonly<Record<string, string>> = {};
+
+/** Stroke policy chosen in the plugin: 'constant' | 'scale' | 'table' (px weight by rendered size) */
+export const CMN_STROKE: { policy: 'constant' | 'scale' | 'table'; table: readonly (readonly [number, number])[] } = { policy: 'table', table: [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]] };
+
+/** Stroke weight for a rendered size (px), or null when the policy has no size-dependent weight. */
+export function cmnStrokeFor(size: number | string | undefined): number | null {
+  if (CMN_STROKE.policy !== 'table' || size === undefined || size === '') return null;
+  const px = typeof size === 'number' ? size : parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(String(size))) return null;
+  let w: number | null = null;
+  for (const [s, weight] of CMN_STROKE.table) { if (w === null || s <= px) w = weight; }
+  return w;
+}
+
+/** Final markup for one icon (shared by every component). */
+export function cmnSvg(data: CmnIconData): string {
+  return '<svg viewBox="' + data.viewBox + '" width="100%" height="100%" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>';
+}
+",
+  "react/icons.ts": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// Every icon in one map. Importing this file pulls ALL icons into your bundle; to ship only some, import them from './icons' one by one.
+import type { CmnIconData, CmnIconName } from './icon-data';
+export * from './icon-data';
+
+
+export const CMN_ICONS: Readonly<Record<CmnIconName, CmnIconData>> = {
+
+};
+
+/** icon names grouped by category */
+export const CMN_CATEGORIES: Record<string, CmnIconName[]> = {};
+
+export const CMN_ICON_NAMES = Object.keys(CMN_ICONS) as CmnIconName[];
+",
+  "react/icons/index.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+
+",
+  "react/index.ts": "export * from './icon-data';
+export * from './icons/index';
+export { registerCmnIcons, preloadCmnIcons, useCmnIcon } from './cmn-icon-registry';
+export { CmnIcon } from './cmn-icon';
+export type { CmnIconProps } from './cmn-icon';
+",
+  "react/loaders.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+import type { CmnIconData } from './icon-data';
+
+/** One dynamic import per category: bundlers emit a lazy chunk each, loaded the first time an icon of that category is used by name. */
+export const CMN_LOADERS: Readonly<Record<string, () => Promise<readonly CmnIconData[]>>> = {
+
+};
+",
+}
+`;
+
+exports[`generated Web Component package > stays the same: another namespace and original colours 1`] = `
+{
+  "web-component/README.md": "# acme icons — Web Component
+
+A framework-free custom element. Works in plain HTML, Vue, Svelte, Lit, Angular (with \`CUSTOM_ELEMENTS_SCHEMA\`) and React.
+
+\`\`\`html
+<script type="module" src="./acme-icon.js"></script>
+<acme-icon name="name" size="24" color="#0a7d3b" label="name"></acme-icon>
+\`\`\`
+
+Attributes: \`name\`, \`size\` (number = px or any CSS length), \`color\`, \`stroke-width\`, \`label\` (omit for decorative icons).
+CSS variables also work and cross the shadow boundary: \`--acme-icon-size\`, \`--acme-icon-color\`, \`--acme-icon-color-2…\`, \`--acme-icon-stroke-width\`.
+
+The file contains every icon (0). Need fewer? Delete entries from \`ACME_ICONS\`, or import from \`react/\` / \`angular/\` for per-icon imports.
+Typings: \`acme-icon.d.ts\`.
+",
+  "web-component/acme-icon.d.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+export type AcmeIconName = never;
+export interface AcmeIconData { viewBox: string; body: string; category?: string }
+export declare const ACME_ICONS: Record<AcmeIconName, AcmeIconData>;
+export declare const ACME_DEPRECATED: Record<string, string>;
+export declare class AcmeIconElement extends HTMLElement {
+  static register(icons: Record<string, AcmeIconData>): void;
+  name: string | null;
+}
+declare global {
+  interface HTMLElementTagNameMap { 'acme-icon': AcmeIconElement }
+}
+",
+  "web-component/acme-icon.js": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// <acme-icon name="…" size="24" color="#0a7d3b" stroke-width="1.5" label="Accessible name"></acme-icon>
+
+export const ACME_ICONS = {
+
+};
+
+// intentional duplicates share one drawing
+const ALIASES = {};
+for (const [alias, owner] of Object.entries(ALIASES)) ACME_ICONS[alias] = ACME_ICONS[owner];
+
+export const ACME_DEPRECATED = {};
+const STROKE_POLICY = 'constant';
+const STROKE_TABLE = [];
+
+const strokeFor = (size) => {
+  if (STROKE_POLICY !== 'table' || !size) return null;
+  const px = parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(size)) return null;
+  let w = null;
+  for (const [s, weight] of STROKE_TABLE) { if (w === null || s <= px) w = weight; }
+  return w;
+};
+
+const STYLE = ':host{display:inline-block;width:var(--acme-icon-size,1em);height:var(--acme-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}svg{display:block;width:100%;height:100%}';
+
+export class AcmeIconElement extends HTMLElement {
+  static get observedAttributes() { return ['name', 'size', 'color', 'stroke-width', 'label']; }
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() { this.#render(); }
+  attributeChangedCallback() { if (this.isConnected) this.#render(); }
+
+  /** add or replace icons at runtime: { 'my-icon': { viewBox: '0 0 24 24', body: '<path d="…"/>' } } */
+  static register(icons) { Object.assign(ACME_ICONS, icons); }
+
+  #render() {
+    const requested = this.getAttribute('name') || '';
+    const data = ACME_ICONS[ACME_DEPRECATED[requested] || requested];
+    const size = this.getAttribute('size');
+    const color = this.getAttribute('color');
+    const label = this.getAttribute('label');
+    const weight = this.getAttribute('stroke-width') ?? strokeFor(size);
+    if (size) this.style.setProperty('--acme-icon-size', /^[0-9.]+$/.test(size) ? size + 'px' : size); else this.style.removeProperty('--acme-icon-size');
+    if (color) this.style.setProperty('--acme-icon-color', color); else this.style.removeProperty('--acme-icon-color');
+    if (weight !== null && weight !== undefined && weight !== '') this.style.setProperty('--acme-icon-stroke-width', String(weight)); else this.style.removeProperty('--acme-icon-stroke-width');
+    if (label) { this.setAttribute('role', 'img'); this.setAttribute('aria-label', label); this.removeAttribute('aria-hidden'); }
+    else { this.removeAttribute('role'); this.removeAttribute('aria-label'); this.setAttribute('aria-hidden', 'true'); }
+    // Trusted, generated markup (not user input).
+    this.shadowRoot.innerHTML = '<style>' + STYLE + '</style>' + (data
+      ? '<svg viewBox="' + data.viewBox + '" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>'
+      : '');
+  }
+}
+
+if (!customElements.get('acme-icon')) customElements.define('acme-icon', AcmeIconElement);
+",
+}
+`;
+
+exports[`generated Web Component package > stays the same: default settings 1`] = `
+{
+  "web-component/README.md": "# cmn icons — Web Component
+
+A framework-free custom element. Works in plain HTML, Vue, Svelte, Lit, Angular (with \`CUSTOM_ELEMENTS_SCHEMA\`) and React.
+
+\`\`\`html
+<script type="module" src="./cmn-icon.js"></script>
+<cmn-icon name="name" size="24" color="#0a7d3b" label="name"></cmn-icon>
+\`\`\`
+
+Attributes: \`name\`, \`size\` (number = px or any CSS length), \`color\`, \`stroke-width\`, \`label\` (omit for decorative icons).
+CSS variables also work and cross the shadow boundary: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+The file contains every icon (0). Need fewer? Delete entries from \`CMN_ICONS\`, or import from \`react/\` / \`angular/\` for per-icon imports.
+Typings: \`cmn-icon.d.ts\`.
+",
+  "web-component/cmn-icon.d.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+export type CmnIconName = never;
+export interface CmnIconData { viewBox: string; body: string; category?: string }
+export declare const CMN_ICONS: Record<CmnIconName, CmnIconData>;
+export declare const CMN_DEPRECATED: Record<string, string>;
+export declare class CmnIconElement extends HTMLElement {
+  static register(icons: Record<string, CmnIconData>): void;
+  name: string | null;
+}
+declare global {
+  interface HTMLElementTagNameMap { 'cmn-icon': CmnIconElement }
+}
+",
+  "web-component/cmn-icon.js": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// <cmn-icon name="…" size="24" color="#0a7d3b" stroke-width="1.5" label="Accessible name"></cmn-icon>
+
+export const CMN_ICONS = {
+
+};
+
+// intentional duplicates share one drawing
+const ALIASES = {};
+for (const [alias, owner] of Object.entries(ALIASES)) CMN_ICONS[alias] = CMN_ICONS[owner];
+
+export const CMN_DEPRECATED = {};
+const STROKE_POLICY = 'constant';
+const STROKE_TABLE = [];
+
+const strokeFor = (size) => {
+  if (STROKE_POLICY !== 'table' || !size) return null;
+  const px = parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(size)) return null;
+  let w = null;
+  for (const [s, weight] of STROKE_TABLE) { if (w === null || s <= px) w = weight; }
+  return w;
+};
+
+const STYLE = ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}svg{display:block;width:100%;height:100%}';
+
+export class CmnIconElement extends HTMLElement {
+  static get observedAttributes() { return ['name', 'size', 'color', 'stroke-width', 'label']; }
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() { this.#render(); }
+  attributeChangedCallback() { if (this.isConnected) this.#render(); }
+
+  /** add or replace icons at runtime: { 'my-icon': { viewBox: '0 0 24 24', body: '<path d="…"/>' } } */
+  static register(icons) { Object.assign(CMN_ICONS, icons); }
+
+  #render() {
+    const requested = this.getAttribute('name') || '';
+    const data = CMN_ICONS[CMN_DEPRECATED[requested] || requested];
+    const size = this.getAttribute('size');
+    const color = this.getAttribute('color');
+    const label = this.getAttribute('label');
+    const weight = this.getAttribute('stroke-width') ?? strokeFor(size);
+    if (size) this.style.setProperty('--cmn-icon-size', /^[0-9.]+$/.test(size) ? size + 'px' : size); else this.style.removeProperty('--cmn-icon-size');
+    if (color) this.style.setProperty('--cmn-icon-color', color); else this.style.removeProperty('--cmn-icon-color');
+    if (weight !== null && weight !== undefined && weight !== '') this.style.setProperty('--cmn-icon-stroke-width', String(weight)); else this.style.removeProperty('--cmn-icon-stroke-width');
+    if (label) { this.setAttribute('role', 'img'); this.setAttribute('aria-label', label); this.removeAttribute('aria-hidden'); }
+    else { this.removeAttribute('role'); this.removeAttribute('aria-label'); this.setAttribute('aria-hidden', 'true'); }
+    // Trusted, generated markup (not user input).
+    this.shadowRoot.innerHTML = '<style>' + STYLE + '</style>' + (data
+      ? '<svg viewBox="' + data.viewBox + '" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>'
+      : '');
+  }
+}
+
+if (!customElements.get('cmn-icon')) customElements.define('cmn-icon', CmnIconElement);
+",
+}
+`;
+
+exports[`generated Web Component package > stays the same: weight-by-size stroke policy and category split 1`] = `
+{
+  "web-component/README.md": "# cmn icons — Web Component
+
+A framework-free custom element. Works in plain HTML, Vue, Svelte, Lit, Angular (with \`CUSTOM_ELEMENTS_SCHEMA\`) and React.
+
+\`\`\`html
+<script type="module" src="./cmn-icon.js"></script>
+<cmn-icon name="name" size="24" color="#0a7d3b" label="name"></cmn-icon>
+\`\`\`
+
+Attributes: \`name\`, \`size\` (number = px or any CSS length), \`color\`, \`stroke-width\`, \`label\` (omit for decorative icons).
+CSS variables also work and cross the shadow boundary: \`--cmn-icon-size\`, \`--cmn-icon-color\`, \`--cmn-icon-color-2…\`, \`--cmn-icon-stroke-width\`.
+
+The file contains every icon (0). Need fewer? Delete entries from \`CMN_ICONS\`, or import from \`react/\` / \`angular/\` for per-icon imports.
+Typings: \`cmn-icon.d.ts\`.
+",
+  "web-component/cmn-icon.d.ts": "// Generated by Icon Library Toolkit. Do not edit by hand.
+export type CmnIconName = never;
+export interface CmnIconData { viewBox: string; body: string; category?: string }
+export declare const CMN_ICONS: Record<CmnIconName, CmnIconData>;
+export declare const CMN_DEPRECATED: Record<string, string>;
+export declare class CmnIconElement extends HTMLElement {
+  static register(icons: Record<string, CmnIconData>): void;
+  name: string | null;
+}
+declare global {
+  interface HTMLElementTagNameMap { 'cmn-icon': CmnIconElement }
+}
+",
+  "web-component/cmn-icon.js": "// Generated by Icon Library Toolkit — 2026-01-01. Do not edit by hand.
+// <cmn-icon name="…" size="24" color="#0a7d3b" stroke-width="1.5" label="Accessible name"></cmn-icon>
+
+export const CMN_ICONS = {
+
+};
+
+// intentional duplicates share one drawing
+const ALIASES = {};
+for (const [alias, owner] of Object.entries(ALIASES)) CMN_ICONS[alias] = CMN_ICONS[owner];
+
+export const CMN_DEPRECATED = {};
+const STROKE_POLICY = 'table';
+const STROKE_TABLE = [[16,1.5],[24,2],[32,2],[48,2.5],[64,3]];
+
+const strokeFor = (size) => {
+  if (STROKE_POLICY !== 'table' || !size) return null;
+  const px = parseFloat(size);
+  if (!isFinite(px) || /em|%/.test(size)) return null;
+  let w = null;
+  for (const [s, weight] of STROKE_TABLE) { if (w === null || s <= px) w = weight; }
+  return w;
+};
+
+const STYLE = ':host{display:inline-block;width:var(--cmn-icon-size,1em);height:var(--cmn-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}svg{display:block;width:100%;height:100%}';
+
+export class CmnIconElement extends HTMLElement {
+  static get observedAttributes() { return ['name', 'size', 'color', 'stroke-width', 'label']; }
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() { this.#render(); }
+  attributeChangedCallback() { if (this.isConnected) this.#render(); }
+
+  /** add or replace icons at runtime: { 'my-icon': { viewBox: '0 0 24 24', body: '<path d="…"/>' } } */
+  static register(icons) { Object.assign(CMN_ICONS, icons); }
+
+  #render() {
+    const requested = this.getAttribute('name') || '';
+    const data = CMN_ICONS[CMN_DEPRECATED[requested] || requested];
+    const size = this.getAttribute('size');
+    const color = this.getAttribute('color');
+    const label = this.getAttribute('label');
+    const weight = this.getAttribute('stroke-width') ?? strokeFor(size);
+    if (size) this.style.setProperty('--cmn-icon-size', /^[0-9.]+$/.test(size) ? size + 'px' : size); else this.style.removeProperty('--cmn-icon-size');
+    if (color) this.style.setProperty('--cmn-icon-color', color); else this.style.removeProperty('--cmn-icon-color');
+    if (weight !== null && weight !== undefined && weight !== '') this.style.setProperty('--cmn-icon-stroke-width', String(weight)); else this.style.removeProperty('--cmn-icon-stroke-width');
+    if (label) { this.setAttribute('role', 'img'); this.setAttribute('aria-label', label); this.removeAttribute('aria-hidden'); }
+    else { this.removeAttribute('role'); this.removeAttribute('aria-label'); this.setAttribute('aria-hidden', 'true'); }
+    // Trusted, generated markup (not user input).
+    this.shadowRoot.innerHTML = '<style>' + STYLE + '</style>' + (data
+      ? '<svg viewBox="' + data.viewBox + '" fill="none" focusable="false" aria-hidden="true">' + data.body + '</svg>'
+      : '');
+  }
+}
+
+if (!customElements.get('cmn-icon')) customElements.define('cmn-icon', CmnIconElement);
+",
+}
+`;
