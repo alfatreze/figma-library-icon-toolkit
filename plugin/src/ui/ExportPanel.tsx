@@ -39,7 +39,9 @@ export interface ExportPanelProps {
     onSaveShared: () => void
   }
   onDownload: () => void
-  onSend: (() => void) | null
+  /** publish to the configured repository; null when none is set up */
+  onPublish: (() => void) | null
+  onSetupPublish: () => void
   onShowBlocked: () => void
   onClose: () => void
 }
@@ -157,7 +159,7 @@ export function ExportPanel(p: ExportPanelProps) {
           )}
           {p.baseline.source && <div class={styles.muted}>Baseline: {BASELINE_LABEL[p.baseline.source]}. Priority is repo, then shared in this file, then this computer, then a loaded file.</div>}
           <div class={styles.fieldRow}>
-            {p.baseline.canRepo && <button class={styles.linkBtn} onClick={p.baseline.onLoadRepo}>Read from project repo</button>}
+            {p.baseline.canRepo && <button class={styles.linkBtn} onClick={p.baseline.onLoadRepo}>Read from the repository</button>}
             {p.baseline.canShare && <button class={styles.linkBtn} onClick={p.baseline.onSaveShared} title="Writes one small entry into this Figma file (visible to everyone with access, including Dev Mode)">Save as shared baseline (writes to file)</button>}
           </div>
           {p.baseline.message && <div class={styles.muted}>{p.baseline.message}</div>}
@@ -195,7 +197,11 @@ export function ExportPanel(p: ExportPanelProps) {
 
       <div class={styles.footer}>
         <div class={styles.footerNote}>
-          {p.onSend && <Button secondary onClick={p.onSend} disabled={p.ready === 0 || noFormat}>Send to project folder…</Button>}
+          {p.onPublish ? (
+            <Button secondary onClick={p.onPublish} disabled={p.ready === 0 || noFormat}>Publish to repository…</Button>
+          ) : (
+            <button class={styles.linkBtn} onClick={p.onSetupPublish}>Set up publishing to GitHub or GitLab</button>
+          )}
         </div>
         <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat} title={noFormat ? 'Choose at least one format' : ''}>
           Download ZIP

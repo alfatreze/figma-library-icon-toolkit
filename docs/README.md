@@ -13,3 +13,4 @@
 | [verification.md](verification.md) | checks still to run inside Figma |
 | [RELEASING.md](RELEASING.md) | semver and the release process |
 - [ROADMAP.md](ROADMAP.md): what comes next, in order, with the principles behind it
+- [DECISIONS-v5.md](DECISIONS-v5.md): publishing to GitHub / GitLab from the plugin

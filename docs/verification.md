@@ -17,7 +17,7 @@ Create a test file with one page per case. Record results here (pass / fail / no
 | V11 **new** | `vector-effect: non-scaling-stroke` keeps weight inside `<use>` sprites (Chrome/Safari/Firefox) | test page, stroke icon, size slider | |
 | V12 **new** | "Convert strokes to paths" (`strokeGeometry`) matches Figma's own render, incl. rotated/nested layers | pixel diff vs Figma PNG | |
 | V13 **new** | Composite frames (frames of instances) behave as described in Labs | library with composite icons | |
-| V14 **new** | Companion sync: `devAllowedDomains` localhost call works from the plugin iframe | run `tools/icon-sync.mjs`, Test connection | |
+| V14 **new** | Publish to a repository: `networkAccess.allowedDomains` lets the plugin iframe call api.github.com and gitlab.com (CORS and token header) | Settings → Output → Test connection on a throwaway repo, for GitHub and GitLab | |
 | V15 **new** | Token naming modes produce the names your CSS defines | compare with your tokens | |
 
 | V16–V20 **new** | See `DECISIONS-v4.md` (manifest with vscode/preferences, shared config as viewer, branch merge, preferences, React render) | |
@@ -31,7 +31,9 @@ Create a test file with one page per case. Record results here (pass / fail / no
 | V24 | Selecting a **component** (not an instance) in Dev Mode lists it (scan treats selected components as icons even with usage-only) | select main component | |
 | V25 | `addDevResourceAsync` / `getDevResourcesAsync` on COMPONENT nodes: links appear in Dev Mode, re-running adds nothing, one undo | Labs → Dev resources → Attach | |
 | V26 | Shared baseline: written to root and first page (chunked 90 kB), survives a branch merge, readable by another user; local baseline is keyed by file identity (fileKey absent for public plugins) | export, reopen, branch, merge | |
-| V27 | Repo baseline: companion `GET /catalog?subdir=icons` from the plugin iframe | Labs → Project sync → Read from project repo | |
+| V27 | Repo baseline: reading `<folder>/icons.json` from the default branch through the host API | Export → Version → Read from the repository | |
+| V32 **new** | Publish end to end on a throwaway repo: plan matches the repo, one branch, one commit, pull / merge request opens, default branch untouched, second publish sends only changes, removed icons are deleted only if previously published | Export → Publish to repository…, GitHub and GitLab; try a repo with more than 600 icons for the chunked upload | |
+| V33 **new** | Token handling: not present in a published config, an export, diagnostics or the network log of any other host; revoking the token gives the "did not accept the token" message | Settings → Copy diagnostics; browser devtools network tab | |
 | V28 | Replace-with-instance in an **auto-layout** parent: order, sizing (FILL/FIXED), absolute children, reactions kept, name kept; no stray instance on failure | fixture screens (V6 extended) | |
 | V29 | Variable matching by order: SVG paint order equals Figma tree order for nested groups, boolean ops, mixed fills/strokes. When the sequences differ the hex fallback is used (and ambiguous hexes get no variable) | icons with 2 variables of the same hex; icons with hidden layers | |
 | V30 | Code Connect: `npx figma connect publish` accepts the generated `code-connect/` folder (Organization/Enterprise plan) | run the CLI in a test repo | |

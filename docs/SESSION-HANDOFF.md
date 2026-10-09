@@ -3,7 +3,7 @@
 Snapshot at **v0.1.0 + Unreleased** (2026-10-09; backlog items 2-8 implemented, see CHANGELOG.md `[Unreleased]`). Read this first when resuming in a fresh session. Repo: https://github.com/alfatreze/figma-library-icon-toolkit
 
 ## 1. What this is
-A Figma plugin (TypeScript, Preact, `@create-figma-plugin`) that **scans** icon libraries, **audits** them, **detects/fixes** structural problems (Labs), and **exports** themeable packages for developers (SVG, sprite, HTML preview, Angular 17.1+/14+, React, `icons.json`, README, changelog). It also generates **Dev Mode / VS Code** snippets and has an optional **local companion** (`tools/icon-sync.mjs`) that writes into a project folder and commits with git.
+A Figma plugin (TypeScript, Preact, `@create-figma-plugin`) that **scans** icon libraries, **audits** them, **detects/fixes** structural problems (Labs), and **exports** themeable packages for developers (SVG, sprite, HTML preview, Angular 17.1+/14+, React, `icons.json`, README, changelog). It also generates **Dev Mode / VS Code** snippets and can **publish the export to GitHub or GitLab** (new branch, one commit, pull / merge request) directly from the plugin with the user's own access token; no local program.
 
 Principle: **the plugin never edits a Figma file** unless Labs is enabled, the user confirms a previewed fix, and it is applied as one undo step.
 
@@ -15,7 +15,7 @@ Principle: **the plugin never edits a Figma file** unless Labs is enabled, the u
 | `plugin/src/core/` | DOM-light logic, unit-tested: `naming`, `svg` (themeing), `audit`, `rules`, `process`, `library` (grid/tier), `categories`, `tokens`, `stroke`, `overrides` (support matrix), `changelog` (identity/diff), `config`, `snippets`, `sanitize`, `pathTransform`, `fixes`, `generators/*` |
 | `plugin/src/ui.tsx`, `plugin/src/ui/` | UI: tabs (Icons / Issues / Skipped), Export panel, Settings, Fix cards, InfoTip popovers, resize handles |
 | `plugin/test/` | Vitest (happy-dom) + generic fixtures; `dump.test.ts` writes a sample export when `DUMP_DIR` is set |
-| `tools/icon-sync.mjs` | local companion (+ `icon-sync.test.mjs`) |
+| `plugin/src/core/gitHost/` | GitHub and GitLab clients behind one interface (`types.ts`), planning against the default branch and publishing (`publish.ts`), path and branch rules (`paths.ts`); tests use in-memory fake servers (`test/helpers/fakeHost.ts`) |
 | `docs/` | decisions, heuristics, Dev Mode proposals, change-detection storage, identity brief, verification checklist, releasing |
 | `scripts/generate-notices.mjs` | regenerates `THIRD_PARTY_NOTICES.md` |
 
@@ -24,7 +24,7 @@ Data flow: UI sends `SCAN` → main traverses (components, instances, frames, lo
 ## 3. Feature status (v0.1.0)
 Done: scope selector (selection/page/document), usage mode + override alerts, categories, export panel, identity/versions (compare previous `icons.json`), token naming modes, stroke policy + stroke-to-path, team config (export/import/publish to file), Issues overview with Fix-all, fixes with previews, React format, Dev Mode codegen, project sync (Labs), generated developer README, SVG sanitiser, composite-frame option, vector-layer-name auto-detection, duplicate groups with "mark as intentional".
 
-**Not verified inside Figma yet:** Labs fixes, Dev Mode codegen, shared config, companion sync, stroke-to-path accuracy, manifest keys (`capabilities`, `codegenPreferences`, `devAllowedDomains`). Checklist: `docs/verification.md` (V1-V20).
+**Not verified inside Figma yet:** Labs fixes, Dev Mode codegen, shared config, publishing to GitHub/GitLab against real accounts, stroke-to-path accuracy, manifest keys (`capabilities`, `codegenPreferences`, `networkAccess`). Checklist: `docs/verification.md` (V1-V33).
 
 ## 4. Key decisions (details in docs)
 | Topic | Decision | Doc |
@@ -73,7 +73,6 @@ Open owner decisions: adopt component-key identity? allow in-file baseline write
 ## 7. Everyday commands
 ```bash
 cd plugin && npm ci && npm test && npm run build     # tests + build (manifest.json, build/)
-node --test tools/icon-sync.test.mjs                  # companion tests
 DUMP_DIR=/tmp/sample npx vitest run test/dump.test.ts # write a sample export to inspect
 node scripts/generate-notices.mjs                     # refresh THIRD_PARTY_NOTICES.md
 node scripts/size-budget.mjs                          # export + bundle size budgets (after npm run build)

@@ -77,11 +77,11 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   labs: rule(false, bool),
   labsBranchAck: rule(false, bool),
   compositeFrames: rule(true, oneOf('ignore', 'include')),
-  sync: rule(
+  repo: rule(
     false,
-    shape<Settings['sync']>(
-      { enabled: bool, url: str(200), token: str(200), subdir: str(200), commit: bool, push: bool, message: str(300), branch: str(100) },
-      DEFAULT_SETTINGS.sync
+    shape<Settings['repo']>(
+      { provider: oneOf('github', 'gitlab'), repo: str(200), subdir: str(200), branch: str(100), token: str(400) },
+      DEFAULT_SETTINGS.repo
     )
   ),
   precision: rule(true, int(1, 6)),
@@ -111,7 +111,7 @@ export function checkSetting<K extends keyof Settings>(key: K, value: unknown): 
  * v1 → v2: `useTokens` toggle became `tokenNaming.mode`; the old default zip name "icons" produced "icons-icons.zip".
  */
 export function migrateSettings(stored: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, sync: { ...DEFAULT_SETTINGS.sync } }
+  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, repo: { ...DEFAULT_SETTINGS.repo } }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out
   const s = { ...(stored as Record<string, unknown>) }
   if (s.zipName === 'icons') s.zipName = ''

@@ -2,6 +2,7 @@ import { Button, Checkbox, Dropdown, Textbox, TextboxMultiline, Toggle } from '@
 import { FormatCards } from './components/FormatCards'
 import { Segmented } from './components/Segmented'
 import { TabBar } from './components/TabBar'
+import { HOSTS, parseRepoInput } from '../core/gitHost'
 import { OverviewRow } from './overview'
 import { Dialog } from './Dialog'
 import { ComponentChildren, Fragment, h } from 'preact'
@@ -63,12 +64,14 @@ export interface SettingsExtras {
   shared: { at: string; by: string | null; differs: boolean } | null
   onPublish: () => void
   onUseShared: () => void
-  syncStatus: string
-  onTestSync: () => void
+  repoTestMessage: string
+  onTestRepo: () => void
 }
 
 export function SettingsPanel({ settings, patch, onClose, extras, initialTab = 'output' }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras; initialTab?: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
+  const [hostNote, setHostNote] = useState('')
+  const setRepo = (p: Partial<Settings['repo']>) => patch({ repo: { ...settings.repo, ...p } })
   const f = settings.formats
   const setFormat = (k: keyof Settings['formats'], v: boolean) => patch({ formats: { ...f, [k]: v } })
   const ns = cleanNamespace(settings.namespace)
@@ -122,6 +125,41 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             </Toggle>
           </Row>
         </div>
+            <div class={styles.section}>
+              <span class={styles.sectionTitle}>Publish to a repository</span>
+              <div class={styles.muted}>Create a branch with the export and open a pull request (GitHub) or merge request (GitLab) for review. Optional.</div>
+              <Field label="Host">
+                <Segmented value={settings.repo.provider} onValueChange={(v) => setRepo({ provider: v })} label="Git host" options={[{ value: 'github', children: 'GitHub' }, { value: 'gitlab', children: 'GitLab' }]} />
+              </Field>
+              <Field label="Repository" info={{ title: 'Repository', body: <span>The repository that receives the icons: <code>owner/name</code> on GitHub, <code>group/project</code> (subgroups allowed) on gitlab.com. You can paste the repository URL.</span> }}>
+                <Textbox
+                  value={settings.repo.repo}
+                  placeholder={settings.repo.provider === 'github' ? 'owner/name' : 'group/project'}
+                  onValueInput={(v) => {
+                    const parsed = parseRepoInput(v)
+                    setHostNote(parsed?.unsupportedHost ? `${parsed.unsupportedHost} is not supported yet: only github.com and gitlab.com.` : '')
+                    if (parsed && parsed.provider) setRepo({ provider: parsed.provider, repo: parsed.repo })
+                    else setRepo({ repo: parsed ? parsed.repo : v })
+                  }}
+                />
+              </Field>
+              {hostNote && <div class={styles.sevWarn}>{hostNote}</div>}
+              <Field label="Folder in repo" info={{ title: 'Folder', body: <span>Where the export goes inside the repository, e.g. <code>icons</code> or <code>src/assets/icons</code>. Not the repository root, and not a hidden folder such as <code>.github</code>. Only files this tool published before are ever replaced or removed there.</span> }}>
+                <Textbox value={settings.repo.subdir} onValueInput={(v) => setRepo({ subdir: v })} placeholder="icons" />
+              </Field>
+              <Field label="Branch" info={{ title: 'Branch', body: <span>The new branch to create. Leave empty for <code>icons/update-&lt;date&gt;-&lt;time&gt;</code>. It always branches from the default branch and the default branch is never changed directly.</span> }}>
+                <Textbox value={settings.repo.branch} onValueInput={(v) => setRepo({ branch: v })} placeholder="icons/update-<date>-<time>" />
+              </Field>
+              <Field label="Access token" info={{ title: 'Access token', body: <span>{HOSTS[settings.repo.provider].tokenHelp} The token stays on this computer: it is not part of the team config, not in exports and not in diagnostics.</span> }}>
+                <Textbox password value={settings.repo.token} onValueInput={(v) => setRepo({ token: v.trim() })} placeholder="paste your token" />
+              </Field>
+              <div class={styles.muted}>{HOSTS[settings.repo.provider].tokenHelp}</div>
+              <div class={styles.fieldRow}>
+                <Button secondary onClick={extras.onTestRepo} disabled={!settings.repo.token || !settings.repo.repo}>Test connection</Button>
+                <span class={styles.muted}>{extras.repoTestMessage}</span>
+              </div>
+              <div class={styles.muted}>The plugin connects to {HOSTS[settings.repo.provider].domain} only when you press Test connection or Publish, and sends only the export and your token. Self-hosted GitLab and other hosts are not supported yet.</div>
+            </div>
           </Fragment>
         )}
 
@@ -451,7 +489,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               <input type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = (e.currentTarget as HTMLInputElement).files?.[0]; if (f) extras.onImportConfig(f); (e.currentTarget as HTMLInputElement).value = '' }} />
             </label>
             <InfoTip title="Team config">
-              <span>Saves the library-defining settings (namespace, naming, tokens, strokes, formats, categories…) to <code>toolkit.config.json</code> so every designer and developer exports identical output. Window size, Labs switches and the sync token stay on your computer. The same file is included in every export.</span>
+              <span>Saves the library-defining settings (namespace, naming, tokens, strokes, formats, categories…) to <code>toolkit.config.json</code> so every designer and developer exports identical output. Window size, Labs switches and the repository token stay on your computer. The same file is included in every export.</span>
             </InfoTip>
           </div>
           <div class={styles.fieldRow}>
@@ -486,7 +524,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               title: 'Labs',
               body: (
                 <span>
-                  Features that are new and have not been proven on many files. Labs can <strong>edit your Figma file</strong> (the fixes in <em>Find problems</em>) or talk to a program on your own computer (project sync). Everything stays off until you enable it here. Fixes are always previewed first and applied as one undo step.
+                  Features that are new and have not been proven on many files. Labs can <strong>edit your Figma file</strong> (the fixes in <em>Find problems</em>). Everything stays off until you enable it here. Fixes are always previewed first and applied as one undo step.
                 </span>
               )
             }}
@@ -531,44 +569,6 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
                   {!settings.labsBranchAck && <div class={styles.muted}>Confirm “I’m working in a branch or a copy” first.</div>}
                 </div>
               </Row>
-              <Row
-                info={{
-                  title: 'Project sync',
-                  body: (
-                    <span>
-                      Sends the generated files straight into a folder of your project (and can commit them with git) through a small program that runs <strong>on your computer</strong>: <code>node tools/icon-sync.mjs --dir &lt;project&gt; --git</code>. It prints a URL and a token to paste here. It only writes inside that folder, only deletes files it created before, and never pushes unless started with <code>--allow-push</code>. The plugin talks to <code>localhost</code> only.
-                    </span>
-                  )
-                }}
-              >
-                <Toggle value={settings.sync.enabled} onValueChange={(v) => patch({ sync: { ...settings.sync, enabled: v } })}>
-                  Project sync (local companion)
-                </Toggle>
-              </Row>
-              {settings.sync.enabled && (
-                <div class={styles.section}>
-                  <Field label="Companion URL"><Textbox value={settings.sync.url} onValueInput={(v) => patch({ sync: { ...settings.sync, url: v } })} placeholder="http://localhost:5199" /></Field>
-                  <Field label="Token"><Textbox value={settings.sync.token} onValueInput={(v) => patch({ sync: { ...settings.sync, token: v } })} placeholder="printed by the companion" /></Field>
-                  <Field label="Folder in project"><Textbox value={settings.sync.subdir} onValueInput={(v) => patch({ sync: { ...settings.sync, subdir: v } })} placeholder="icons" /></Field>
-                  <Row info={{ title: 'Commit with git', body: <span>After writing, stage only the icons folder and commit it. Optionally on a branch (created if missing). Needs the companion started with <code>--git</code>. It refuses to switch branches if the repo has other uncommitted changes.</span> }}>
-                    <Toggle value={settings.sync.commit} onValueChange={(v) => patch({ sync: { ...settings.sync, commit: v } })}>Commit with git</Toggle>
-                  </Row>
-                  {settings.sync.commit && (
-                    <div class={styles.section}>
-                      <Field label="Branch"><Textbox value={settings.sync.branch} onValueInput={(v) => patch({ sync: { ...settings.sync, branch: v } })} placeholder={settings.sync.push ? 'icons/update-<date>' : '(current branch)'} /></Field>
-                      {!settings.sync.push && <Field label="Message"><Textbox value={settings.sync.message} onValueInput={(v) => patch({ sync: { ...settings.sync, message: v } })} /></Field>}
-                      <Row info={{ title: 'Push the branch', body: <span>After committing, pushes the branch to <code>origin</code> with <strong>your own git credentials</strong> (SSH key or credential manager); no token is stored here. It <strong>never pushes to the default branch</strong> (main, master…) and never forces. The commit message and a pull / merge request description are generated from the changes; you get a link that opens the pull (GitHub) or merge (GitLab) request page with both filled in. Needs the companion started with <code>--git --allow-push</code>.</span> }}>
-                        <Toggle value={settings.sync.push} onValueChange={(v) => patch({ sync: { ...settings.sync, push: v } })}>Push the branch to origin</Toggle>
-                      </Row>
-                      {settings.sync.push && <div class={styles.muted}>Start the helper with <code>--git --allow-push</code>. The pull / merge request page opens from the result screen.</div>}
-                    </div>
-                  )}
-                  <div class={styles.fieldRow}>
-                    <Button secondary onClick={extras.onTestSync}>Test connection</Button>
-                    <span class={styles.muted}>{extras.syncStatus}</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -577,7 +577,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           <div class={styles.fieldRow}>
             <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics for a bug report</Button>
             <InfoTip title="Diagnostics">
-              <span>Copies a short report for bug reports: Figma mode and API version, your settings (the sync token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
+              <span>Copies a short report for bug reports: Figma mode and API version, your settings (the repository token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
             </InfoTip>
           </div>
         </div>

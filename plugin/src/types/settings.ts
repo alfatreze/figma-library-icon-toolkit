@@ -22,16 +22,16 @@ export interface TokenNaming {
   mapping: string
 }
 
-export interface SyncSettings {
-  enabled: boolean
-  url: string
-  token: string
+/** Where "Publish to a repository" sends the export. The token stays on this computer (never in the team config). */
+export interface RepoSettings {
+  provider: 'github' | 'gitlab'
+  /** owner/name (GitHub) or group/subgroup/project (gitlab.com) */
+  repo: string
+  /** folder inside the repository that holds the icons, e.g. "icons" or "src/assets/icons" */
   subdir: string
-  commit: boolean
-  /** push the committed branch to origin (never the default branch); needs commit and a helper started with --allow-push */
-  push: boolean
-  message: string
+  /** branch to create; empty = icons/update-<date-time> */
   branch: string
+  token: string
 }
 
 export type FormatId = 'svg' | 'sprite' | 'html' | 'mask' | 'angular' | 'react' | 'webComponent'
@@ -76,7 +76,7 @@ export interface Settings {
   labs: boolean
   labsBranchAck: boolean
   compositeFrames: 'ignore' | 'include'
-  sync: SyncSettings
+  repo: RepoSettings
   precision: number
   formats: {
     svg: boolean
@@ -126,7 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
   labs: false,
   labsBranchAck: false,
   compositeFrames: 'ignore',
-  sync: { enabled: false, url: 'http://localhost:5199', token: '', subdir: 'icons', commit: false, push: false, message: 'chore(icons): update from Figma', branch: '' },
+  repo: { provider: 'github', repo: '', subdir: 'icons', branch: '', token: '' },
   precision: 3,
   formats: {
     svg: true,

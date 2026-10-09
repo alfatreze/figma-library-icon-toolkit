@@ -51,7 +51,8 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | Idea | Notes | Size |
 |---|---|---|
 | **Drift check in CI**: a small CLI/GitHub Action that compares the repo's `icons.json` with the Figma file (REST API, token supplied by the team) and fails or comments on a PR | Needs a Figma token and a headless path; the plugin alone cannot run in CI | L |
-| **Create the pull / merge request from the plugin** (direct API, "option B") | Pushing a branch and opening a prefilled PR/MR page already works through the local helper (v0.4). Creating the PR itself needs a token and network permissions in the manifest, so it is the next step toward not needing the helper | M |
+| **Self-hosted GitLab, GitHub Enterprise, Bitbucket, Azure DevOps** | The manifest must list every host in advance, so each needs either a fixed domain or a way for Figma to allow a team-specific one | M each |
+| Publish from a Figma Make or CI context | Needs a headless path (see drift check) | L |
 | Visual regression between releases (render old and new, diff) | Builds on the existing render test | M |
 | Several libraries in one export (brand + product sets) with namespaces | Needs an identity and versioning model across files | L |
 | Interface translations | After the plural helper and a string catalogue | M |
@@ -67,6 +68,6 @@ Score each candidate: **impact** (how many teams hit it) × **confidence** (veri
 ## Decisions needed from you
 1. **Audience for the first Community release:** design-system teams (favours v0.5 features) or developers (favours v0.6)?
 2. **Org or Enterprise plan available?** Code Connect and any CI-side Figma API work depend on it.
-3. **CI drift check:** is a companion CLI/GitHub Action in scope, given it needs a Figma token on the team's side?
+3. **CI drift check:** is a CLI/GitHub Action in scope, given it needs a Figma token on the team's side?
 4. **Which frameworks do your developers use?** Decides Vue vs Svelte vs another target first.
 5. **Licensing and support stance** for the Community listing (free, MIT, best-effort support).

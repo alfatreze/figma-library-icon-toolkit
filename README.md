@@ -5,9 +5,9 @@ A Figma plugin that scans an icon library, audits it, finds (and optionally fixe
 - **Scan** a selection, page or whole file; or only the icons actually **in use** (library-aware), with override alerts.
 - **Audit and fix:** naming, grid, strokes, effects, detached or loose icons, layer names that break overrides. Fixes are previewed and only applied after you confirm (Labs).
 - **Export:** themeable colours via CSS variables (with design-token fallbacks), constant or size-based stroke weight, categories, versioned `icons.json`, changelog and deprecated aliases for renamed icons.
-- **Developers:** Dev Mode / Figma for VS Code snippets, a searchable preview page, and an optional local companion that writes into your project and commits with git.
+- **Developers:** Dev Mode / Figma for VS Code snippets, a searchable preview page, and **Publish to a repository**: create a branch with the export and open a pull request (GitHub) or merge request (GitLab) straight from the plugin.
 
-The plugin never edits your Figma file unless you enable Labs and confirm a fix. Network access is off (an optional localhost companion is the only exception, Labs).
+The plugin never edits your Figma file unless you enable Labs and confirm a fix. Network access is used only when you press **Test connection** or **Publish** in Settings / Export: the plugin then talks to api.github.com or gitlab.com with your own access token (kept on your computer). Nothing else leaves your machine.
 
 ## Install (from source)
 ```bash
@@ -23,7 +23,6 @@ Or download a zip from [Releases](https://github.com/alfatreze/figma-library-ico
 | Path | Contents |
 |---|---|
 | `plugin/` | the Figma plugin (TypeScript, Preact) |
-| `tools/icon-sync.mjs` | local companion for direct export to a project / git (Labs) |
 | `docs/` | decisions, heuristics, Dev Mode proposals, release process, verification checklist |
 | `scripts/` | maintenance scripts (third-party notices) |
 

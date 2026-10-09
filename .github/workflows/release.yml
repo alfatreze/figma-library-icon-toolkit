@@ -27,10 +27,6 @@ jobs:
           npm run typecheck
           npm test
           npm run build
-      - name: Companion tests
-        run: |
-          git config --global user.email ci@example.com && git config --global user.name ci
-          node --test tools/icon-sync.test.mjs
       - name: Package
         run: |
           NAME="figma-library-icon-toolkit-${GITHUB_REF_NAME}"
@@ -38,7 +34,6 @@ jobs:
           cp plugin/manifest.json dist/$NAME/
           cp -R plugin/build dist/$NAME/build
           cp LICENSE THIRD_PARTY_NOTICES.md dist/$NAME/
-          cp -R tools dist/$NAME/tools
           (cd dist && zip -r $NAME.zip $NAME && sha256sum $NAME.zip > $NAME.zip.sha256)
           echo "ASSET=dist/$NAME.zip" >> "$GITHUB_ENV"
           echo "ASSET_SUM=dist/$NAME.zip.sha256" >> "$GITHUB_ENV"

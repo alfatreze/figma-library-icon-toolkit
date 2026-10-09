@@ -8,9 +8,15 @@ While the major version is `0` (initial development) minor versions may contain 
 ## [Unreleased]
 
 ### Added
-- **Push to GitHub or GitLab through the local helper.** Project sync can now push the committed branch to `origin` with your own git credentials (SSH key or credential manager; no token in Figma). After a push the result screen offers **Open pull request page** (GitHub) or **Open merge request page** (GitLab) with the title and description prefilled, and **Copy description**. The description is generated from the changes: counts of added, renamed, removed and changed icons, a breaking-change note, the version, the changelog, the formats and how many icons still carry warnings. Works with github.com, gitlab.com and self-hosted hosts whose name contains `github` or `gitlab`; other hosts push fine and show no link.
-- Safety: the helper never pushes the default branch (it reads `origin/HEAD`, else main / master) and refuses before writing or committing anything; never forces; never waits on a credential prompt (60 s limit); push failures are reported in plain words. The branch defaults to `icons/update-<date>`.
-- Settings → Labs → Project sync: **Push the branch to origin**; **Test connection** now shows the origin host, repository and default branch, and warns when the helper was not started with `--allow-push`.
+- **Publish to a repository, self-contained.** Settings → Output → *Publish to a repository* (host, repository, folder, optional branch, access token) and Export → *Publish to repository…*. The plugin compares the export with the repository's default branch, shows what would be added, changed or removed, then creates a new branch, commits everything as one change and opens a **pull request (GitHub)** or **merge request (GitLab)** with a generated title and description (added, renamed, removed and changed icons, breaking-change note, version, changelog, formats, remaining warnings). Only files this tool published before (`<folder>/.icon-toolkit.json`) are ever deleted; the default branch is never changed; large exports are uploaded in several requests. If only the pull / merge request fails, the branch is kept and you get a link to open it by hand.
+- The token is the user's own (GitHub fine-grained: Contents and Pull requests; GitLab: `api` scope), stored on this computer only (never in the team config, exports or diagnostics) and sent only to api.github.com or gitlab.com. The plugin makes network requests only when you press Test connection or Publish.
+- *Read from the repository* in Export → Version: reads `<folder>/icons.json` from the default branch as the change baseline.
+
+### Removed
+- The local helper (`tools/icon-sync.mjs`) and Labs → Project sync. Publishing no longer needs anything installed outside Figma. Self-hosted GitLab and other git hosts are not supported yet because the manifest must list every domain in advance.
+
+### Changed
+- `networkAccess` in the manifest: api.github.com and gitlab.com (was: none, plus localhost for development).
 
 ## [0.3.1] - 2026-10-09
 

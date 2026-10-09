@@ -29,16 +29,6 @@ jobs:
         working-directory: .
         run: node scripts/size-budget.mjs
 
-  companion:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: git config --global user.email ci@example.com && git config --global user.name ci
-      - run: node --test tools/icon-sync.test.mjs
-
   # The generated code must compile with the real toolchains, not just type-check as plain TypeScript.
   generated-code:
     runs-on: ubuntu-latest

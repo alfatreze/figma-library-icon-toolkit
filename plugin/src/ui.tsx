@@ -31,13 +31,13 @@ import { InspectPanel } from './ui/Inspect'
 import { countChanges, filterIcons, groupIssues, IssueGroup, isAlert, isBlocked, presentChangeKinds } from './ui/selectors'
 import { useBaselines } from './ui/hooks/useBaselines'
 import { useScan } from './ui/hooks/useScan'
-import { pushBranch, useSync } from './ui/hooks/useSync'
+import { usePublish } from './ui/hooks/usePublish'
 import { pullRequestText } from './core/pullRequest'
 import { copyText, cx, download, notify, plural } from './ui/util'
 import { recentLog } from './log'
 import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
 import { SettingsPanel, SettingsTab } from './ui/Settings'
-import { SyncDialog, SyncPlan, SyncResult } from './ui/SyncDialog'
+import { PublishDialog } from './ui/PublishDialog'
 import {
   ApplyFixRequest, ApplyFixesHandler, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixActionId, FixCandidate, FixesAppliedHandler, FixResult, FixResultHandler,
   CancelScanHandler, DEFAULT_SETTINGS, Finding, FormatId, Icon, LocateHandler, NotifyHandler, RawIcon, ResizeHandler,
@@ -277,7 +277,7 @@ function Plugin() {
   }
   const onExportConfig = () => download('toolkit.config.json', exportConfig(settings), 'application/json')
 
-  const sync = useSync(settings, makeFiles, () => baseline.snapshotNow('local'), () =>
+  const prText = () =>
     pullRequestText({
       diff: release.diff,
       version: release.version,
@@ -286,7 +286,7 @@ function Plugin() {
       warnings: exportable.filter((i) => i.findings.some((f) => f.severity === 'warn')).length,
       date: new Date().toISOString().slice(0, 10)
     })
-  )
+  const publish = usePublish(settings, makeFiles, () => baseline.snapshotNow('local'), prText)
   const scanVariables = useMemo(() => {
     const seen = new Map<string, { variable: string; collection?: string }>()
     for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection })
@@ -429,7 +429,7 @@ function Plugin() {
     <div class={styles.root}>
       {/* announced by screen readers: scan progress, results and the status lines that otherwise only change on screen */}
       <div class={styles.srOnly} role="status" aria-live="polite">
-        {scanning ? phase || 'Scanning' : summary ? `Scan finished: ${plural(icons.length, 'icon')} found` : ''} {configMessage} {baseline.message} {sync.status}
+        {scanning ? phase || 'Scanning' : summary ? `Scan finished: ${plural(icons.length, 'icon')} found` : ''} {configMessage} {baseline.message} {publish.testMessage}
       </div>
       <div class={styles.header}>
         <div class={styles.scanRow}>
@@ -730,14 +730,15 @@ function Plugin() {
             source: baseline.source,
             options: (['repo', 'shared', 'local', 'file'] as BaselineSource[]).filter((k) => baseline.catalogs[k]).map((k) => ({ value: k, text: `${BASELINE_LABEL[k]} · ${baseline.meta(k)}` })),
             message: baseline.message,
-            canRepo: settings.labs && settings.sync.enabled,
+            canRepo: publish.configured,
             canShare: settings.labs,
             onPick: baseline.pick,
             onLoadRepo: baseline.loadRepo,
             onSaveShared: baseline.saveShared
           }}
           onDownload={doExport}
-          onSend={settings.labs && settings.sync.enabled ? sync.start : null}
+          onPublish={publish.configured ? publish.start : null}
+          onSetupPublish={() => { setExportOpen(false); setSettingsTab('output'); setShowSettings(true) }}
           onShowBlocked={() => { setExportOpen(false); showInList({ status: 'blocked' }) }}
           onClose={() => setExportOpen(false)}
         />
@@ -754,20 +755,19 @@ function Plugin() {
         />
       )}
 
-      {sync.plan && (
-        <SyncDialog
-          plan={sync.plan}
-          subdir={settings.sync.subdir}
-          commit={settings.sync.commit}
-          branch={pushBranch(settings) || settings.sync.branch}
-          push={settings.sync.push}
-          onOpen={sync.open}
+      {publish.open && (
+        <PublishDialog
+          repo={settings.repo}
+          planning={publish.planning}
+          plan={publish.plan}
+          publishing={publish.publishing}
+          result={publish.result}
+          error={publish.error}
+          description={prText()}
+          onOpen={publish.openLink}
           onCopy={(text) => notify(copyText(text) ? 'Description copied' : 'Copy is blocked here; open the details and copy it', false)}
-          sending={sync.sending}
-          result={sync.result}
-          error={sync.error}
-          onCancel={sync.close}
-          onSend={sync.send}
+          onCancel={publish.close}
+          onSend={publish.send}
         />
       )}
       {showSettings && (
@@ -776,7 +776,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, syncStatus: sync.status, onTestSync: sync.test }}
+          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, repoTestMessage: publish.testMessage, onTestRepo: publish.test }}
         />
       )}
       <div class={styles.grip} />

@@ -7,7 +7,7 @@ npm ci
 npm test          # unit tests
 npm run build     # typecheck + build (creates plugin/manifest.json and plugin/build/)
 ```
-Import `plugin/manifest.json` in Figma (Plugins → Development → Import plugin from manifest…). Companion tests: `node --test tools/icon-sync.test.mjs`.
+Import `plugin/manifest.json` in Figma (Plugins → Development → Import plugin from manifest…).
 
 ## Commits and versions
 - [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. A breaking change is marked `feat!:` / `fix!:` or a `BREAKING CHANGE:` footer.

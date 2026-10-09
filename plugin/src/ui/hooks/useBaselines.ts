@@ -5,7 +5,7 @@ import {
 } from '../../core/baseline'
 import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from '../../core/changelog'
 import { BaselinesHandler, BaselineSavedHandler, Icon, SaveBaselineHandler, Settings } from '../../types'
-import { companionFetch } from '../companion'
+import { clientFor, repoConfigured } from '../repoClient'
 import { countChanges } from '../selectors'
 
 /**
@@ -73,12 +73,18 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
   }
   const loadRepo = async () => {
     try {
-      const out = await companionFetch(settings.sync, `/catalog?subdir=${encodeURIComponent(settings.sync.subdir)}`)
-      if (!out.found) {
-        setMessage(`No icons.json in “${settings.sync.subdir}” of the project folder yet.`)
+      if (!repoConfigured(settings.repo)) {
+        setMessage('Set the repository and token in Settings → Output → Publish to a repository first.')
         return
       }
-      setRepoCatalog(parseCatalog(out.catalog))
+      const client = clientFor(settings.repo)
+      const info = await client.info()
+      const text = await client.readFile(info.defaultBranch, `${settings.repo.subdir.replace(/^\/+|\/+$/g, '')}/icons.json`)
+      if (text === null) {
+        setMessage(`No icons.json in “${settings.repo.subdir}” on ${info.defaultBranch} yet.`)
+        return
+      }
+      setRepoCatalog(parseCatalog(text))
       setChoice('repo')
       setMessage('')
     } catch (e) {

@@ -59,12 +59,10 @@
     "documentAccess": "dynamic-page",
     "networkAccess": {
       "allowedDomains": [
-        "none"
+        "https://api.github.com",
+        "https://gitlab.com"
       ],
-      "devAllowedDomains": [
-        "http://localhost:5199"
-      ],
-      "reasoning": "Optional Labs feature: send exported files to a companion program running on your own computer (localhost). No other network access."
+      "reasoning": "Optional \"Publish to a repository\": when you press Test connection or Publish, the plugin sends your export files and your own access token to GitHub (api.github.com) or GitLab (gitlab.com) to create a branch and a pull / merge request. No other network access, no analytics."
     },
     "capabilities": [
       "codegen",
