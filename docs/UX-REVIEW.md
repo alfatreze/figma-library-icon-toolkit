@@ -2,6 +2,8 @@
 
 Reviewed from the running UI (460 × 640 window, light theme) in four states: scan results (Icons tab), Issues tab, Settings and Export. Visual proposal: [`design/ux-redesign.html`](design/ux-redesign.html) (open in a browser; has a dark-mode toggle). Stage: working product, refinement.
 
+> **Implementation status (unreleased, on `main`):** steps 1 to 7 of the plan are implemented and checked in a browser harness: stable skeleton (tabs, scan button, search field and Export button keep identical coordinates across first run, scanning and results), active states and 4-point spacing, tabbed Settings with shared format cards, S / M / L previews with hover preview and grid view, show-each-fact-once copy, consolidated Issues tab. Not done: auto-contrast preview tile, plural/i18n helper, dark-mode contrast check, replacing most remaining ⓘ tooltips with hints, a brand colour decision (the plugin follows Figma's brand token). Side effect: the UI bundle dropped from 472 KB to 328 KB because the stylesheet is now bundled once instead of once per importing file.
+
 ## Who this is for and what it must do
 - **Design-system owner** (primary): scans a library, understands what is wrong, fixes it in Figma, exports a package developers trust.
 - **Developer** (secondary): opens Dev Mode, copies code, downloads icons.

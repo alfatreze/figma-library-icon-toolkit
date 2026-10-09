@@ -7,6 +7,18 @@ While the major version is `0` (initial development) minor versions may contain 
 
 ## [Unreleased]
 
+### Changed (UI redesign, see docs/UX-REVIEW.md)
+- One stable window layout: scan bar, fixed-height status row, tabs, toolbar and a sticky Export bar are always in the same place; first run, scanning and results change only the content area (controls are disabled, not hidden).
+- Settings is five tabs (Output, Style, Scan, Team, Labs) with the export formats first, as cards with real file counts and sizes; the Export dialog uses the same cards.
+- Larger icon previews (32 px icons in 52 px tiles), an S / M / L size control, a grid view with 48 px icons, and a hover / focus preview with a 16 / 24 / 32 px ladder and a white / dark / checker background switch.
+- Clearer active states (tabs, chips, segmented controls, selected rows and tiles, format cards), a 4-point spacing scale and 32 px controls.
+- Each fact is shown once: the icon count lives on the Icons tab; the footer button says "Export" (or "Export N selected"); plain-language labels and shorter messages; the Issues tab is one summary line plus cards with "How to fix".
+- "Only icons used in designs" moved from the main screen to Settings → Scan.
+
+### Fixed
+- The UI bundle contained 12 copies of the stylesheet (one per component that imported it); it is now bundled once (653 KB to 328 KB, from 472 KB before).
+
+
 ## [0.2.1] - 2026-10-09
 
 ### Security
