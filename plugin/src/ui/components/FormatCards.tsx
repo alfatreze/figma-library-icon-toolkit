@@ -1,7 +1,7 @@
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import { TARGETS, TargetKey } from '../../core/generators'
-import styles from '../../styles.css'
+import styles from '../styles'
 import { Settings } from '../../types'
 import { OverviewRow, kb } from '../overview'
 

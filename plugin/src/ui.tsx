@@ -15,7 +15,7 @@ import { hasBlockingErrors, processIcons, ThemeCache } from './core/process'
 import { SHARED_KEYS } from './core/settingsSchema'
 import { ruleInfo, STEPS } from './core/rules'
 import { zipFiles } from './core/zip'
-import styles from './styles.css'
+import styles from './ui/styles'
 import { ConfirmApply, FixCard } from './ui/Fixes'
 import { ExportPanel } from './ui/ExportPanel'
 import { InfoTip } from './ui/InfoTip'
@@ -53,26 +53,6 @@ const worst = (fs: Finding[]): Severity | null =>
   fs.some((f) => f.severity === 'error') ? 'error' : fs.some((f) => f.severity === 'warn') ? 'warn' : fs.length ? 'info' : null
 const SevIcon = ({ s }: { s: Severity }) => (s === 'error' ? <BlockIcon /> : s === 'warn' ? <WarnIcon /> : <InfoIcon />)
 const sevClass = (s: Severity) => (s === 'error' ? styles.sevError : s === 'warn' ? styles.sevWarn : styles.sevInfo)
-
-const SCOPE_INFO = (
-  <span>
-    Where the scan looks.
-    <ul class={styles.tipList}>
-      <li><strong>Selection</strong>: only the layers you have selected (frames, sections, components…).</li>
-      <li><strong>Page</strong>: everything on the current page.</li>
-      <li><strong>Document</strong>: every page in the file. It loads all pages first, so large files take a while; you can cancel.</li>
-    </ul>
-    Nothing is changed in your file in any case.
-  </span>
-)
-
-const USAGE_INFO = (
-  <span>
-    Finds the icons that are actually <em>placed</em> as instances in your designs, including components from a linked library, instead of every icon that exists. Each icon is listed once with how often it is used, which sizes are used, and which overrides (colour, stroke weight, size…) designers applied.
-    <br /><br />
-    Use it on an app/product file to export just the subset of the library that is in use. Where an override can’t be reproduced by an export format, you get an alert. The artwork is exported from the library’s main component when readable, otherwise from an instance.
-  </span>
-)
 
 function Plugin() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -196,6 +176,7 @@ function Plugin() {
   const startScan = () =>
     emit<ScanHandler>('SCAN', { mode: settings.scanMode, scope: settings.scanScope, usageOnly: settings.usageOnly, maxIconSize: settings.maxIconSize, compositeFrames: settings.labs ? settings.compositeFrames : 'ignore', leafName: settings.leafName, leafNameMode: settings.leafNameMode })
   const allFixes = useMemo(() => icons.flatMap((i) => i.fixes), [icons])
+  const totalAutoFixes = allFixes.filter((f) => f.actions.length > 0 && f.confidence !== 'low').length
   const actionOf = (f: FixCandidate): FixActionId => fixAction[f.id] ?? f.actions[0]
   const selectedFixes = allFixes.filter((f) => fixSel.has(f.id) && f.actions.length && !fixResults[f.id]?.ok)
   const fixesForRule = (ruleId: string, list: Icon[]) => {
@@ -345,6 +326,11 @@ function Plugin() {
   const tierLabel = `${processed.tier} ${TIER_LABEL[processed.tier]}`
   const health = processed.tier === 'T5' || processed.tier === 'T4' ? 'good' : processed.tier === 'T3' ? 'fair' : 'needs work'
   const skippedCount = summary?.skipped.length ?? 0
+  const errorGroups = actionable.filter((x) => x.severity === 'error').length
+  const warnGroups = actionable.length - errorGroups
+  const issueSummary = !actionable.length
+    ? ''
+    : [errorGroups ? `${plural(errorGroups, 'error')} block the export` : '', warnGroups ? plural(warnGroups, 'warning') : ''].filter(Boolean).join(' · ') + (totalAutoFixes ? '' : '. None can be fixed automatically.')
   const catIds = new Set(categories.map((c) => c.id))
 
   const hidePreview = (now = false) => {
@@ -589,10 +575,10 @@ function Plugin() {
       {tab === 'issues' && (
         <div class={styles.list}>
           <div class={styles.listHead} style={{ justifyContent: 'space-between' }}>
-            <span>{actionable.length ? `${plural(actionable.length, 'problem')} to review` : ''}</span>
-            <Button secondary onClick={doReport} disabled={icons.length === 0}>Export report (.md)</Button>
+            <span>{issueSummary}</span>
+            <Button secondary onClick={doReport} disabled={icons.length === 0}>Export report</Button>
           </div>
-          {actionable.length > 0 && (
+          {actionable.length > 0 && totalAutoFixes > 0 && (
             <IssueOverview
               groups={actionable}
               fixesFor={fixesForRule}
@@ -632,8 +618,7 @@ function Plugin() {
           )}
           {actionable.length === 0 && (
             <div class={styles.empty}>
-              <div class={styles.allClear}><CheckIcon /> No errors or alerts.</div>
-              <div>Notes below are informational.</div>
+              <div class={styles.allClear}><CheckIcon /> No errors or warnings.</div>
             </div>
           )}
           {(['error', 'warn'] as Severity[]).map((sev) => {
@@ -641,7 +626,7 @@ function Plugin() {
             if (!list.length) return null
             return (
               <div key={sev}>
-                <div class={styles.groupTitle}>{sev === 'error' ? 'Blocking export' : 'Needs attention'} · {list.length}</div>
+                <div class={styles.groupTitle}>{sev === 'error' ? 'Blocked: not exported' : 'Warnings'} · {list.length}</div>
                 {list.map((x) => (
                   <IssueCard key={x.ruleId} extra={x.ruleId === 'layer-names' && summary?.leafNames ? <LeafSchemes info={summary.leafNames} /> : undefined} group={x} cursor={cursor[x.ruleId] ?? 0} fixes={fixesForRule(x.ruleId, x.icons)} fixesOpen={fixGroupOpen.has(x.ruleId)} onToggleFixes={() => setFixGroupOpen((p) => { const n = new Set(p); if (n.has(x.ruleId)) n.delete(x.ruleId); else n.add(x.ruleId); return n })} renderFix={renderFix} onShow={() => showInList({ rule: x.ruleId })}
                     onLocate={() => {
@@ -672,9 +657,10 @@ function Plugin() {
             </div>
           )}
           {actionable.length > 0 && (
-            <div class={styles.muted} style={{ padding: '4px 0 8px' }}>
-              Fix order: {STEPS.map((s) => s.title).join(' → ')}. The plugin never edits your file; fix in Figma, then rescan.
-            </div>
+            <details class={styles.muted} style={{ padding: '4px 0 8px' }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--figma-color-text-brand)' }}>Suggested order for fixing a whole library</summary>
+              <div style={{ paddingTop: 4 }}>{STEPS.map((s) => s.title).join(' → ')}. Fix in Figma, then scan again.</div>
+            </details>
           )}
         </div>
       )}
@@ -965,8 +951,8 @@ function IssueOverview(props: {
     <div class={styles.ovw}>
       <div class={styles.fieldRow}>
         <div class={styles.grow}>
-          <strong>{plural(errors, 'blocking icon')} · {plural(warns, 'alerted icon')}</strong>
-          <div class={styles.muted}>{plural(props.groups.length, 'type')} of problem · {totalSafe} can be fixed automatically</div>
+          <strong>{totalSafe} can be fixed automatically</strong>
+          <div class={styles.muted}>{plural(errors + warns, 'icon')} affected. Fixes edit your file only after you review them (Labs).</div>
         </div>
         {totalSafe > 0 && (
           <Button onClick={props.onFixAll} title={props.labsReady ? '' : 'Enable Labs first'}>
@@ -1030,7 +1016,7 @@ function IssueCard(props: { extra?: ComponentChildren; group: IssueGroup; cursor
       </div>
       {info.why && <div class={styles.muted}>{info.why}</div>}
       {props.extra}
-      {info.fix && <div><strong>Fix:</strong> {info.fix}</div>}
+      {info.fix && <div><strong>How to fix:</strong> {info.fix}</div>}
       {group.formats.length > 0 && (
         <div class={styles.fieldRow}>
           <span class={styles.muted}>Affects:</span> <FormatChips formats={group.formats} />
@@ -1049,9 +1035,9 @@ function IssueCard(props: { extra?: ComponentChildren; group: IssueGroup; cursor
         </div>
       )}
       <div class={styles.issueActions}>
-        <Button secondary onClick={props.onShow}>Show {plural(n, 'icon')}</Button>
-        <button class={styles.iconBtn} onClick={props.onLocate} title="Select the next affected layer on the canvas">
-          <LocateIcon /> Locate {(props.cursor % n) + 1}/{n} <NextIcon />
+        <Button secondary onClick={props.onShow}>{n === 1 ? 'Show icon' : `Show ${n} icons`}</Button>
+        <button class={styles.iconBtn} onClick={props.onLocate} title="Select the affected layer in Figma">
+          <LocateIcon /> Select in Figma{n > 1 ? ` ${(props.cursor % n) + 1}/${n}` : ''} {n > 1 && <NextIcon />}
         </button>
       </div>
     </div>

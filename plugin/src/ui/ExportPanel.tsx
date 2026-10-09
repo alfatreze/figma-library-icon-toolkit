@@ -1,11 +1,12 @@
 import { Button, Checkbox, Dropdown, Toggle } from '@create-figma-plugin/ui'
 import { Dialog } from './Dialog'
+import { FormatCards } from './components/FormatCards'
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import { BASELINE_LABEL, BaselineSource } from '../core/baseline'
 import { CategorySummary } from '../core/categories'
 import { Diff, PreviousCatalog } from '../core/changelog'
-import styles from '../styles.css'
+import styles from './styles'
 import { Settings } from '../types'
 import { InfoTip } from './InfoTip'
 import { BlockIcon, CheckIcon } from './icons'
@@ -86,37 +87,17 @@ export function ExportPanel(p: ExportPanelProps) {
       </div>
 
       <div class={styles.overlayBody}>
-        <div class={styles.exportSummary}>
-          <div><strong>{p.ready}</strong><span>icons</span></div>
-          <div><strong>{p.categories.length}</strong><span>{p.categories.length === 1 ? 'category' : 'categories'}</span></div>
-          <div><strong>{files}</strong><span>files</span></div>
-          <div><strong>{kb(bytes)}</strong><span>unzipped</span></div>
-        </div>
+        <div class={styles.muted}>{plural(p.ready, 'icon')} · {plural(enabledRows.filter((r) => r.id !== 'meta').length, 'format')} · {files} files · {kb(bytes)}</div>
         {p.blocked > 0 && (
           <button class={cx(styles.iconBtn, styles.sevError)} style={{ height: 'auto', padding: '4px 6px', justifyContent: 'flex-start' }} onClick={p.onShowBlocked}>
-            <BlockIcon /> {plural(p.blocked, 'icon')} blocked by errors will be skipped: review
+            <BlockIcon /> {p.blocked} blocked, will be skipped. Review
           </button>
         )}
-        {p.excluded > 0 && <div class={styles.muted}>{plural(p.excluded, 'icon')} excluded by you.</div>}
+        {p.excluded > 0 && <div class={styles.muted}>{p.excluded} left out by you.</div>}
 
-        <Section
-          title="Formats"
-          info={{ title: 'Formats', body: <span>Pick what to generate. Each row shows the real number of files and size for your current icons. Hover the (i) on a row for what it contains. The manifest and guide are always included.</span> }}
-        >
-          {(p.rows ?? []).map((r) => (
-            <div class={cx(styles.ovRow, !fmtOn(r.id) && styles.ovOff)} key={r.id}>
-              <div class={styles.fieldRow}>
-                {r.id === 'meta' ? (
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><CheckIcon /> {r.label}</span>
-                ) : (
-                  <Checkbox value={settings.formats[r.id]} onValueChange={(v) => p.patch({ formats: { ...settings.formats, [r.id]: v } })}>{r.label}</Checkbox>
-                )}
-                <InfoTip title={r.label}><span>{r.detail}</span></InfoTip>
-              </div>
-              <span class={styles.ovMeta}>{r.files} file{r.files === 1 ? '' : 's'} · {kb(r.bytes)}</span>
-            </div>
-          ))}
-          {!p.rows && <div class={styles.muted}>Calculating…</div>}
+        <Section title="Formats">
+          <FormatCards formats={settings.formats} onToggle={(k, on) => p.patch({ formats: { ...settings.formats, [k]: on } })} rows={p.rows} />
+          <div class={styles.muted}>README, icons.json and AI guide are always included.</div>
         </Section>
 
         {(p.categories.length > 0 || p.hasStrokeIcons) && (
@@ -213,10 +194,12 @@ export function ExportPanel(p: ExportPanelProps) {
       </div>
 
       <div class={styles.footer}>
-        <Button fullWidth onClick={p.onDownload} disabled={p.ready === 0 || noFormat}>
-          {noFormat ? 'Choose at least one format' : `Download ZIP (${plural(p.ready, 'icon')} · ${files} files)`}
+        <div class={styles.footerNote}>
+          {p.onSend && <Button secondary onClick={p.onSend} disabled={p.ready === 0 || noFormat}>Send to project folder…</Button>}
+        </div>
+        <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat} title={noFormat ? 'Choose at least one format' : ''}>
+          Download ZIP
         </Button>
-        {p.onSend && <Button fullWidth secondary onClick={p.onSend} disabled={p.ready === 0 || noFormat}>Send to project folder…</Button>}
       </div>
     </Dialog>
   )

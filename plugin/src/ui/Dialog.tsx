@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from 'preact'
 import { useEffect, useRef } from 'preact/hooks'
-import styles from '../styles.css'
+import styles from './styles'
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 

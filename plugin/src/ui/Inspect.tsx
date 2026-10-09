@@ -7,7 +7,7 @@ import { processIcons, ThemeCache } from '../core/process'
 import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from '../core/snippets'
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
-import styles from '../styles.css'
+import styles from './styles'
 import { copyText, download, notify } from './util'
 import {
   DEFAULT_SETTINGS, Icon, RawIcon, ScanBatchHandler, ScanDoneHandler, ScanErrorHandler, ScanHandler, ScanStartHandler, SelectionHandler,

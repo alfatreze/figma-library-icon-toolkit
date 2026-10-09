@@ -1,7 +1,7 @@
 import { Button } from '@create-figma-plugin/ui'
 import { Dialog } from './Dialog'
 import { h } from 'preact'
-import styles from '../styles.css'
+import styles from './styles'
 import { BlockIcon, CheckIcon, WarnIcon } from './icons'
 import { plural } from './util'
 

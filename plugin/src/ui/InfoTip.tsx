@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import styles from '../styles.css'
+import styles from './styles'
 import { InfoIcon } from './icons'
 
 /** A clear (i) button that opens a popover with a longer explanation. Click, Enter/Space or focus to open; Esc or outside click closes. */

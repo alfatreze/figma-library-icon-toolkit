@@ -9,7 +9,7 @@ import { useState } from 'preact/hooks'
 import { cleanNamespace } from '../core/naming'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
 import { suggestMapping, TOKEN_MODES, tokenPreview } from '../core/tokens'
-import styles from '../styles.css'
+import styles from './styles'
 import { CategorySource, ScanMode, Settings, StrokePolicy, TokenMode } from '../types'
 import { InfoTip } from './InfoTip'
 
@@ -79,6 +79,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           <strong class={styles.grow} style={{ fontSize: 13 }}>Settings</strong>
           <Button onClick={onClose}>Done</Button>
         </div>
+        <div class={styles.muted}>Saved on this computer. Nothing is written to your Figma file.</div>
       </div>
       <TabBar label="Settings sections" tabs={SETTINGS_TABS} value={tab} onChange={setTab} />
       <div class={styles.overlayBody}>
@@ -91,7 +92,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Package</span>
           <Field
-            label="Namespace"
+            label="Name prefix"
             info={{
               title: 'Namespace',
               body: (
@@ -103,7 +104,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           >
             <Textbox value={settings.namespace} onValueInput={(v) => patch({ namespace: v })} placeholder="cmn" />
           </Field>
-          <Field label="ZIP name" info={{ title: 'ZIP name', body: <span>File name of the downloaded ZIP. Leave empty to use <code>{ns}-icons.zip</code>.</span> }}>
+          <Field label="ZIP file name" info={{ title: 'ZIP name', body: <span>File name of the downloaded ZIP. Leave empty to use <code>{ns}-icons.zip</code>.</span> }}>
             <Textbox value={settings.zipName} onValueInput={(v) => patch({ zipName: v })} placeholder={`${ns}-icons`} />
           </Field>
           <Row
@@ -127,7 +128,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         {tab === 'style' && (
           <Fragment>
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Colour & paths</span>
+          <span class={styles.sectionTitle}>Colour and paths</span>
           <Row
             info={{
               title: 'Themeable colours',
@@ -143,7 +144,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             </Toggle>
           </Row>
           <Field
-            label="Path precision"
+            label="Path detail"
             info={{ title: 'Path precision', body: <span>Decimals kept in path data. Fewer decimals = smaller files; 2–3 is visually lossless for 24px icons. Use 4 for icons that are displayed very large.</span> }}
           >
             <Dropdown
@@ -154,9 +155,9 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           </Field>
         </div>
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Design tokens (CSS variable names)</span>
+          <span class={styles.sectionTitle}>CSS variable names</span>
           <Field
-            label="Naming approach"
+            label="Names from"
             info={{
               title: 'How CSS token names are built',
               body: (
@@ -287,7 +288,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             <Textbox value={String(settings.maxIconSize)} onValueInput={(v) => patch({ maxIconSize: num(v, 128) })} />
           </Field>
           <Field
-            label="Strictness"
+            label="Audit level"
             info={{
               title: 'Strictness',
               body: (
@@ -300,11 +301,11 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             <Segmented
               value={settings.profile}
               onValueChange={(v) => patch({ profile: v as Settings['profile'] })}
-              options={[{ value: 'lenient', children: 'Lenient' }, { value: 'standard', children: 'Standard' }, { value: 'strict', children: 'Strict' }]}
+              options={[{ value: 'lenient', children: 'Relaxed' }, { value: 'standard', children: 'Standard' }, { value: 'strict', children: 'Strict' }]}
             />
           </Field>
           <Field
-            label="Vector layer name"
+            label="Layer name"
             info={{
               title: 'Standard vector layer name',
               body: (
@@ -322,14 +323,14 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             <Segmented
               value={settings.leafNameMode}
               onValueChange={(v) => patch({ leafNameMode: v as 'auto' | 'fixed' })}
-              options={[{ value: 'auto', children: 'Detect from file' }, { value: 'fixed', children: 'Fixed' }]}
+              options={[{ value: 'auto', children: 'Detect from file' }, { value: 'fixed', children: 'Always use…' }]}
             />
           </Field>
           <Field label={settings.leafNameMode === 'auto' ? 'Fallback name' : 'Name'}>
             <Textbox value={settings.leafName} onValueInput={(v) => patch({ leafName: v })} placeholder="Vector" />
           </Field>
           <Field
-            label="Duplicate names"
+            label="Same name twice"
             info={{
               title: 'Duplicate names',
               body: (
@@ -347,14 +348,14 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             <Segmented
               value={settings.duplicateNames}
               onValueChange={(v) => patch({ duplicateNames: v as Settings['duplicateNames'] })}
-              options={[{ value: 'block', children: 'Block' }, { value: 'category', children: 'Category' }, { value: 'suffix', children: 'Number' }]}
+              options={[{ value: 'block', children: 'Stop export' }, { value: 'category', children: 'Add category' }, { value: 'suffix', children: 'Add number' }]}
             />
           </Field>
           <Row info={{ title: 'Share artwork for intentional duplicates', body: <span>In <em>Issues</em> you can mark a group of components with identical artwork as <strong>intentional</strong> (two names for one drawing, like <code>close</code> and <code>dismiss</code>). With this on, the export stores the drawing once: the shortest name owns it, the others become aliases (<code>aliasOf</code> in <code>icons.json</code>, a <code>&lt;use&gt;</code> in the sprite, a shared object in the Angular/React data). Names keep working. Only icons whose drawing <em>and</em> colours are identical are shared.</span> }}>
             <Toggle value={settings.aliasDuplicates} onValueChange={(v) => patch({ aliasDuplicates: v })}>Share artwork for intentional duplicates</Toggle>
           </Row>
           <Field
-            label="Ignore folders"
+            label="Folders to ignore"
             info={{ title: 'Ignore folders', body: <span>Comma-separated name segments dropped from icon names and categories. With <code>icon</code> ignored, <code>icon/Audio descricao</code> becomes <code>audio-descricao</code> instead of <code>icon-audio-descricao</code>.</span> }}
           >
             <Textbox
@@ -364,7 +365,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             />
           </Field>
           <Field
-            label="Ignore variant values"
+            label="Leave out of names"
             info={{ title: 'Ignore variant values', body: <span>Variants become separate icons named <code>&lt;set&gt;-&lt;values&gt;</code> (e.g. <code>home-filled</code>). Values listed here (like <code>default</code>) are left out so the default variant is just <code>home</code>.</span> }}
           >
             <Textbox
@@ -377,7 +378,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Grid size</span>
           <Field
-            label="Library size"
+            label="Grid size"
             info={{
               title: 'Library size (grid)',
               body: (
@@ -390,7 +391,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             <Segmented
               value={settings.libSizeMode}
               onValueChange={(v) => patch({ libSizeMode: v as 'auto' | 'manual' })}
-              options={[{ value: 'auto', children: 'Auto-detect' }, { value: 'manual', children: 'Manual' }]}
+              options={[{ value: 'auto', children: 'Detect' }, { value: 'manual', children: 'Set manually' }]}
             />
           </Field>
           {settings.libSizeMode === 'manual' && (
@@ -405,7 +406,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Categories</span>
           <Field
-            label="Category from"
+            label="Categories from"
             info={{
               title: 'Where categories come from',
               body: (
@@ -442,7 +443,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         {tab === 'team' && (
           <Fragment>
         <div class={styles.section}>
-          <span class={styles.sectionTitle}>Team config</span>
+          <span class={styles.sectionTitle}>Share settings with your team</span>
           <div class={styles.fieldRow}>
             <Button secondary onClick={extras.onExportConfig}>Export config (.json)</Button>
             <label class={styles.fileBtn}>
@@ -464,7 +465,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           <Field label="Figma file URL" info={{ title: 'Figma file URL', body: <span>Used by Code Connect templates, e.g. <code>https://www.figma.com/design/&lt;key&gt;/&lt;name&gt;</code>. Plugins cannot read the file key themselves, so paste it once. Part of the team config.</span> }}>
             <Textbox value={settings.codeConnectUrl} onValueInput={(v) => patch({ codeConnectUrl: v })} placeholder="https://www.figma.com/design/…" />
           </Field>
-          {!settings.labs && <div class={styles.muted}>Enable Labs below to publish.</div>}
+          {!settings.labs && <div class={styles.muted}>Turn on Labs to publish.</div>}
           {extras.shared && (
             <div class={styles.release}>
               <div>This file has a published config ({extras.shared.at.slice(0, 10)}{extras.shared.by ? ` by ${extras.shared.by}` : ''}).{extras.shared.differs ? ' It differs from your current settings.' : ' It matches your settings.'}</div>
@@ -491,7 +492,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
             }}
           >
             <Toggle value={settings.labs} onValueChange={(v) => patch({ labs: v })}>
-              Enable Labs
+              Turn on Labs (can edit this file)
             </Toggle>
           </Row>
           {settings.labs && (
@@ -570,7 +571,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Support</span>
           <div class={styles.fieldRow}>
-            <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics</Button>
+            <Button secondary onClick={extras.onCopyDiagnostics}>Copy diagnostics for a bug report</Button>
             <InfoTip title="Diagnostics">
               <span>Copies a short report for bug reports: Figma mode and API version, your settings (the sync token is hidden) and the recent internal log. It contains no layer names or artwork.</span>
             </InfoTip>
@@ -578,7 +579,6 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
         </div>
           </Fragment>
         )}
-        <div class={styles.muted}>Saved on this computer. Nothing is written to your Figma file.</div>
       </div>
     </Dialog>
   )

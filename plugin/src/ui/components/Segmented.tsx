@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from 'preact'
-import styles from '../../styles.css'
+import styles from '../styles'
 
 export interface SegmentOption<T extends string> {
   value: T

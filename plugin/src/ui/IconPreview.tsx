@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
-import styles from '../styles.css'
+import styles from './styles'
 import { Icon } from '../types'
 
 export type PreviewBg = 'auto' | 'light' | 'dark' | 'checker'
