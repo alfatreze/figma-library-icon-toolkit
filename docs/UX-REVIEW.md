@@ -87,10 +87,47 @@ Measured in the running UI and in `src/styles.css`:
 1. **Tabbed Settings, Output first.** Five tabs, formats as cards with size estimates, one shared format component used by Settings and Export. Fixes the biggest usability problem and the one you named.
 2. **Visible active states and one spacing scale.** Tabs, chips, segments, selected rows and format cards as in the table above; adopt the 4-point scale. Cheap (mostly CSS) and changes how the whole product feels.
 3. **Restructure the main screen around Scan → Review → Export on one stable skeleton.** One scan row with a fixed-height status line, tabs and toolbar always present (disabled until there are results), a sticky Export bar as the only primary action. First run, scanning and results are the same layout; only the content area changes (see the layout rule above).
-4. **Plain-language copy and hints instead of tooltips** (below).
+4. **Bigger icons and show each fact once.** 32 px icons in 52 px tiles, S / M / L, hover preview with size ladder, a real grid view; then remove the duplicated counts (Icons tab owns the number, Export button says "Export"). Together with plain-language copy and hints instead of tooltips (below).
 5. **Consolidate Issues** into one summary sentence plus cards with "How to fix".
 
 ---
+
+## Icon legibility (list and grid)
+
+Today a list row has a 34 px tile with the icon drawn at **22 px** (`.thumb`, `src/styles.css`). Icons are the product's subject; they must be recognisable at a glance, including detailed or multi-colour ones.
+
+| Change | Spec |
+|---|---|
+| Bigger list thumbnails | 52 px tile, icon at **32 px** (was 34 / 22); row height 68 px. S / M / L preview-size control next to the view switch: S = 24 px icon, M = 32, L = 48 (the row grows with it) |
+| Real grid view | 3 tiles per row at 460 px, 76 px stage with the icon at **48 px**; selected tile = top bar + tint + border |
+| Hover / focus preview | After 300 ms (or on keyboard focus) a popover **below** the row (never over it, flips above near the bottom): icon at 56 px and a 16 / 24 / 32 size ladder, so you see how it holds up small, with the real size label |
+| Background switch | White · dark · checker, in the preview corner. White or very light icons are invisible on a light tile today; also auto-pick a contrasting tile when an icon's colours are too close to the tile |
+| Rendering | Draw the exported SVG (real colours for multi-colour icons, `currentColor` for single-colour ones), `shape-rendering: geometricPrecision`, no scaling of stroke width below 1 px |
+| Detail on click | Row click opens the existing detail (name, category, usage, findings); the preview is not a second source of truth |
+
+Mockup screens 1 and 8 show the list (with the preview) and the grid.
+
+## Say it once: no duplicated information
+
+In the current UI the icon count appears up to seven times on one screen (status line, tab badge, "All" chip, "Select all", search placeholder, footer text, Export button). Rule: **each fact is shown once, in the place where the user needs it; every other element shows only what is new in that context.**
+
+| Fact | Lives in | Removed from |
+|---|---|---|
+| Number of icons | Icons tab badge | status line, "All" chip, "Select all", search placeholder, footer text |
+| Number of warnings / blocked | Issues tab badge and the Warnings / Blocked chips (filters) | status line, Issues summary repeats only "nothing blocks the export" |
+| Scope (selection / page / document) | the scan control itself | helper text under it, status line |
+| Grid size, tier details | Issues and Settings → Scan | main status line |
+| Formats and sizes | Settings → Output cards; footer shows only "5 formats ▾" as a link | Export dialog title, button, footer text |
+| What will be exported | the **Export** button: "Export" when all are selected, "Export 12 selected" otherwise | separate "ready" text |
+| "Your file is never changed" | once, at first run, as a muted line | status line, helper text, every dialog |
+
+Per-state consequences:
+- **Status line** (fixed height, see the layout rule): results = "Scanned 12:04 · Library health good"; first run = "1 layer selected"; scanning = "Reading… 120 of 340" + progress; error = the error. Nothing there repeats the tabs or chips.
+- **Footer:** left = "5 formats ▾" (a link to change formats); right = **Export**. Empty left side while scanning or before a scan; the button is disabled with a tooltip.
+- **Export dialog:** title "Export", one summary line ("16 icons · 4 formats · 42 files · 41 KB"), button "Download ZIP". No second count in the title or button.
+- **Settings → Output:** per-format size on each card; no totals footer that repeats them.
+- **Tabs and chips:** counts on tabs (navigation) and on the filter chips that are subsets (Blocked, Warnings); the "All" chip carries no number.
+- **Buttons:** verbs only ("Scan", "Export", "Download ZIP"); the noun and the number are already on screen.
 
 ## Layout rule: one stable skeleton (no reflow between states)
 
@@ -115,10 +152,10 @@ A centred first-run card, a results screen and a scanning screen that each arran
 
 | State | Scan bar button | Status line | Toolbar | Content area | Footer |
 |---|---|---|---|---|---|
-| First run | **Scan selection** (primary) | "Not scanned yet · 1 layer selected · Your file is never changed" | disabled, in place | top-aligned explanation card | "Nothing to export yet" · Export disabled |
-| Scanning | **Cancel scan** (same spot) | "Reading icons… 120 of 340" + progress bar inside the fixed-height row | disabled | rows appear as they arrive, skeleton rows for the rest | "Export is available when the scan finishes" · disabled |
-| Results | **Scan again** (secondary) | "16 icons · 2 warnings · 24 × 24 grid · Library health good" | enabled | the list | "16 icons ready · 5 formats" · **Export 16 icons** |
-| Nothing found | **Scan again** | "No icons found" | disabled | explanation + next steps (below) | Export disabled |
+| First run | **Scan selection** (primary) | "1 layer selected" | disabled, in place | top-aligned note: "Press Scan selection to list its icons… Read-only: your file is never changed." | no text · Export disabled |
+| Scanning | **Cancel scan** (same spot) | "Reading… 120 of 340" + progress bar inside the fixed-height row | disabled | rows appear as they arrive, skeleton rows for the rest | no text · Export disabled |
+| Results | **Scan again** (secondary) | "Scanned 12:04 · Library health good" | enabled | the list | "5 formats ▾" · **Export** |
+| Nothing found | **Scan again** | "No icons found" | disabled | next steps: try Page or Document, or see Skipped | Export disabled |
 | Error | **Scan again** | error message in the status row (red dot) | disabled | explanation of what to try | Export disabled |
 
 Implementation rules that keep this true:
@@ -169,19 +206,20 @@ Principles: formats first; frequent before rare; each tab fits in about one scre
 ### Recommended copy
 **Scan button:** "Scan page" (first time) → "Scan again" (after)
 **Helper under scan (first run):** "Looks at every layer on this page. Your file is never changed."
-**Status line:** "16 icons · 2 warnings · 24 × 24 grid · Library health: good"
-**Select all:** "Select all 16"
-**Footer:** "16 icons ready · 5 formats" / **Export 16 icons**
+**Status line (results):** "Scanned 12:04 · Library health good" (counts live on the tabs and chips)
+**Select all:** "Select all"
+**Search:** placeholder "Search"
+**Footer:** "5 formats ▾" · **Export** (becomes **Export 12 selected** when some are deselected)
 **Warning chip:** "Warnings 2"; **Blocked chip tooltip:** "Won't be exported until fixed."
-**Issues summary:** "2 warnings affect 2 icons. Nothing blocks the export. None can be fixed automatically."
+**Issues summary:** "2 warnings. None can be fixed automatically." (status line already says nothing blocks the export)
 **Issue card:** *Shadow or blur effect* · "Effects can't be themed, so the export draws the icon without them." · **How to fix:** "Remove the effect in Figma, then scan again."
 **Fix order link:** "Suggested order for fixing a whole library"
-**First run (content area, top-aligned):** "No scan yet. Press Scan selection to list the icons in the layers you selected. Use Page or Document to look wider. Nothing in your file changes."
-**First run (status line):** "Not scanned yet · 1 layer selected · Your file is never changed"
-**Scanning:** "Reading icons… 120 of 340" · button "Cancel scan"
-**Disabled Export (footer):** "Nothing to export yet" / "Export is available when the scan finishes"
+**First run (content area, top-aligned):** "Press Scan selection to list its icons. Choose Page or Document to look wider." + muted "Read-only: your file is never changed."
+**First run (status line):** "1 layer selected"
+**Scanning:** "Reading… 120 of 340" · button "Cancel scan"
+**Disabled Export:** no extra text; tooltip "Scan first" / "Available when the scan finishes"
 **Empty state (nothing found):** "No icons found. Try Page or Document, or check Skipped for layers that were left out."
-**Export dialog title:** "Export 16 icons"; **Primary:** "Download ZIP · 16 icons, 42 files"; **Secondary:** "Send to project folder…"
+**Export dialog title:** "Export"; summary line "16 icons · 4 formats · 42 files · 41 KB"; **Primary:** "Download ZIP"; **Secondary:** "Send to project folder…"
 **Settings header note:** "Saved on this computer. Nothing is written to your Figma file."
 
 ### Alternatives for the scope helper line
@@ -214,7 +252,7 @@ Principles: formats first; frequent before rare; each tab fits in about one scre
 | Confirm fixes | "Review N fixes" | **"Apply 3 fixes?"** body: "This changes layers in this file. Undo with Cmd/Ctrl+Z." Buttons: **Apply 3 fixes** / **Cancel** |
 | Scan refused | "A scan is already running." | "A scan is already running. Wait for it to finish, or cancel it." |
 | Scan cancelled | (none) | "Scan stopped. 120 icons found so far." |
-| Export done | "Exported 16 icons (97 files)" | "Downloaded 16 icons · 97 files" |
+| Export done | "Exported 16 icons (97 files)" | "Downloaded 97 files" |
 | Send to project success | "Written to your project folder" | "Sent 97 files to icons/. Review the changes in your repo before committing." |
 | Companion unreachable | "Cannot reach the companion at … Is it running (node tools/icon-sync.mjs --dir …)?…" | "Can't reach the project helper at localhost:5199. Start it with `node tools/icon-sync.mjs --dir <project>`, then try again." |
 | Tooltips | Long paragraphs | ≤ 2 sentences; example first |
@@ -238,6 +276,7 @@ Labels name the user's task or the outcome ("What to export", "Same name twice")
 | 4 | Copy pass (labels, hints, issue cards, dialogs); hints replace most Ⓘ | S | `core/rules.ts`, `ui/*` |
 | 5 | Issues tab consolidation | S | `ui.tsx`, `ui/Fixes.tsx` |
 | 6 | Plural/i18n helper, 32 px icon buttons, contrast check in both themes | S | `ui/util.ts`, `styles.css` |
+| 7 | Icon legibility: 52 / 32 px list thumbnails, S / M / L control, grid view at 48 px, hover/focus preview with size ladder and background switch; remove duplicated counts (status line, "All" chip, "Select all", footer text, Export button) | M | `ui.tsx` (`Thumb`, `Card`), `styles.css` |
 
 Verification: re-run the browser harness (light and dark) for the five screens, and add a check that the tabs, scan button, search field and Export button keep the same coordinates across first run, scanning and results; check keyboard order and 4.5:1 contrast on the brand button and warning chips; the existing unit tests must stay green (the pure selectors and hooks are unaffected).
 
