@@ -1,6 +1,7 @@
 import { pascal } from '../naming'
 import { BuildInput, esc, Files, ns, strokeSteps, policyOf } from './common'
 import { camelNs, K } from './icondata'
+import { hostCss } from './runtime-text'
 
 /**
  * Framework-free custom element: <ds-icon name="home" size="24" color="#0a7d3b" label="Home"></ds-icon>
@@ -44,7 +45,7 @@ const strokeFor = (size) => {
   return w;
 };
 
-const STYLE = ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}svg{display:block;width:100%;height:100%}';
+const STYLE = '${hostCss(n)}svg{display:block;width:100%;height:100%}';
 
 export class ${pascal(n)}IconElement extends HTMLElement {
   static get observedAttributes() { return ['name', 'size', 'color', 'stroke-width', 'label']; }

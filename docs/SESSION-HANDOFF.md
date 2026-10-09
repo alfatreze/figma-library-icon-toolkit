@@ -54,7 +54,7 @@ See **`ROADMAP.md`** (Gate 0 = verify in Figma; v0.5 designer / system-manager w
 Open owner decisions: audience of the first Community release (design-system teams vs developers), Org/Enterprise plan (Code Connect, CI drift check), which frameworks next (Vue / Svelte), brand colour (follow Figma's token or a darker blue for text contrast).
 
 ## 5b. Audit follow-up
-`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: registry/loader text shared by angular, react and webcomponent. Angular, React and Web Component output are pinned by `test/angular.test.ts` and `test/react-webcomponent.test.ts` (update with `npx vitest run -u <file>` when a change is intended).
+`docs/AUDIT-v0.2.0.md` lists every finding of the post-0.2.0 code audit with its status. Open items: none from the audit that is not a decision; Gate 0 is the next real step. Angular, React and Web Component output are pinned by `test/angular.test.ts` and `test/react-webcomponent.test.ts` (update with `npx vitest run -u <file>` when a change is intended).
 
 ## 6. Lessons learned (avoid repeating)
 - **Manifest:** unknown keys are rejected (`editorAPI` broke loading). `@create-figma-plugin` spreads unknown `figma-plugin` keys into `manifest.json`. If Figma rejects the manifest, remove `codegenPreferences`, then `vscode`.

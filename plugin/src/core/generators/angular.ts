@@ -1,6 +1,7 @@
 import { pascal } from '../naming'
 import { BuildInput, componentName, constName, Files, ns } from './common'
 import { camelNs, iconDataFiles, K } from './icondata'
+import { allIconsDoc, hostCss, loadCategoryOfName, preloadDoc, resolveName } from './runtime-text'
 
 function names(b: BuildInput) {
   const n = ns(b)
@@ -8,7 +9,7 @@ function names(b: BuildInput) {
   return { n, P, C: componentName(b), k: K(b), c: camelNs(b), reg: `${P}IconRegistry`, tok: `${K(b)}_ICONS_TOKEN`, provide: `provide${P}Icons` }
 }
 
-const HOST_STYLE = (n: string) => `    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+const HOST_STYLE = (n: string) => `    '${hostCss(n)}',
     '.${n}-icon__inner{display:block;width:100%;height:100%}'`
 
 // ------------------------------------------------------- shared pieces
@@ -92,7 +93,7 @@ export class ${reg} {`
 function registryGet(b: BuildInput, store: string, doc = ''): string {
   const { C, k } = names(b)
   return `${doc}  get(requested: string): ${C}Data | undefined {
-    const name = (${k}_DEPRECATED as Record<string, string>)[requested] ?? requested;
+    const name = ${resolveName(b, 'requested')};
     const hit = ${store}.get(name);
     if (!hit) this.load(name);
     return hit;
@@ -100,8 +101,7 @@ function registryGet(b: BuildInput, store: string, doc = ''): string {
 }
 
 const registryLoad = (b: BuildInput) => `  private load(name: string): void {
-    const category = ${names(b).k}_CATEGORY_OF[name];
-    if (category !== undefined) void this.loadCategory(category);
+${loadCategoryOfName(b, 'this.loadCategory', '    ')}
   }`
 
 function registryModern(b: BuildInput): string {
@@ -130,7 +130,7 @@ ${registryPreamble(b)}
 
 ${registryGet(b, 'this.store()', '  /** Reads a signal: call it inside computed() or a template so the view updates when a lazy category arrives. */\n')}
 
-  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  /** ${preloadDoc("preload('arrows')")} */
   async preload(...categories: string[]): Promise<void> {
     await Promise.all(categories.map((c) => this.loadCategory(c)));
   }
@@ -176,7 +176,7 @@ ${registryPreamble(b)}
 
 ${registryGet(b, 'this.store')}
 
-  /** Warm categories ahead of use, e.g. preload('arrows'). */
+  /** ${preloadDoc("preload('arrows')")} */
   preload(...categories: string[]): Promise<void[]> {
     return Promise.all(categories.map((c) => this.loadCategory(c)));
   }
@@ -202,7 +202,7 @@ function allIcons(b: BuildInput): string {
 import { ${k}_ICONS } from './icons';
 import { ${provide} } from './${ns(b)}-icon-registry';
 
-/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer ${provide}(…) with the icons you use. */
+/** ${allIconsDoc(provide)} */
 export function provide${P}AllIcons(): Provider {
   return ${provide}(Object.values(${k}_ICONS));
 }
@@ -365,7 +365,7 @@ export class ${P}SpriteLoader {
 `
 }
 
-const SPRITE_STYLES = (n: string) => `    ':host{display:inline-block;width:var(--${n}-icon-size,1em);height:var(--${n}-icon-size,1em);flex:none;line-height:0;vertical-align:-0.125em}',
+const SPRITE_STYLES = (n: string) => `    '${hostCss(n)}',
     'svg{display:block}'`
 const spriteTemplate = (href: string) => `<svg width="100%" height="100%" fill="none" focusable="false" aria-hidden="true"><use [attr.href]="${href}"/></svg>`
 
@@ -391,7 +391,7 @@ ${MODERN_SIZE_CSS}
   protected readonly href = computed(() => {
     this.sprite.ensure();
     const requested = this.name();
-    return this.sprite.href((${k}_DEPRECATED as Record<string, string>)[requested] ?? requested);
+    return this.sprite.href(${resolveName(b, 'requested')});
   });
 }
 `
@@ -416,7 +416,7 @@ ${CLASSIC_PLAIN_INPUTS}
 
   get href(): string {
     this.sprite.ensure();
-    return this.sprite.href((${k}_DEPRECATED as Record<string, string>)[this.name] ?? this.name);
+    return this.sprite.href(${resolveName(b, 'this.name')});
   }
 ${CLASSIC_HOST_BINDINGS(n, c)}
 }

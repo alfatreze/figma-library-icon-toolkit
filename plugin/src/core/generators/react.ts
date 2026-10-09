@@ -1,6 +1,7 @@
 import { pascal } from '../naming'
 import { BuildInput, componentName, constName, Files, ns } from './common'
 import { camelNs, iconDataFiles, K } from './icondata'
+import { allIconsDoc, loadCategoryOfName, preloadDoc, resolveName } from './runtime-text'
 
 function registry(b: BuildInput): string {
   const n = ns(b)
@@ -34,7 +35,7 @@ function load(category: string): Promise<void> {
   );
 }
 
-/** Warm categories ahead of use, e.g. preload${P}Icons('arrows'). */
+/** ${preloadDoc(`preload${P}Icons('arrows')`)} */
 export function preload${P}Icons(...categories: string[]): Promise<void[]> {
   return Promise.all(categories.map(load));
 }
@@ -47,11 +48,10 @@ export function use${P}Icon(requestedName: string | undefined): ${C}Data | undef
     return () => { listeners.delete(bump); };
   }, []);
   if (!requestedName) return undefined;
-  const name = (${k}_DEPRECATED as Record<string, string>)[requestedName] ?? requestedName;
+  const name = ${resolveName(b, 'requestedName')};
   const hit = store.get(name);
   if (!hit) {
-    const category = ${k}_CATEGORY_OF[name];
-    if (category !== undefined) void load(category);
+${loadCategoryOfName(b, 'load', '    ')}
   }
   return hit;
 }
@@ -63,7 +63,7 @@ function allIcons(b: BuildInput): string {
   return `import { ${K(b)}_ICONS } from './icons';
 import { register${P}Icons } from './${ns(b)}-icon-registry';
 
-/** Synchronous access to every icon by name. Puts ALL icons in your main bundle; prefer register${P}Icons(…) with the icons you use. */
+/** ${allIconsDoc(`register${P}Icons`)} */
 export function register${P}AllIcons(): void {
   register${P}Icons(Object.values(${K(b)}_ICONS));
 }
