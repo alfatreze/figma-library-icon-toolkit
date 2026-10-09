@@ -34,6 +34,15 @@ export class FakeNode {
   devResources: { url: string; name?: string }[] = []
   log: string[] = []
   failOn: string | null = null
+  key = ''
+  remote = false
+  description = ''
+  main: FakeNode | null = null
+  overrides: unknown[] = []
+  detachedInfo: unknown = null
+  selection: FakeNode[] = []
+  absoluteBoundingBox: { x: number; y: number; width: number; height: number } | null = null
+  absoluteRenderBounds: { x: number; y: number; width: number; height: number } | null = null
 
   constructor(type: string, name = type) {
     this.type = type
@@ -79,6 +88,13 @@ export class FakeNode {
     else this.data.set(k, v)
   }
   async loadAsync() {}
+  async exportAsync(): Promise<string> {
+    if (this.failOn === 'export') throw new Error('export failed')
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}"><path d="M0 0h${this.width}v${this.height}z" fill="#111111"/></svg>`
+  }
+  async getMainComponentAsync(): Promise<FakeNode | null> {
+    return this.main
+  }
   async getDevResourcesAsync() {
     return this.devResources.map((r) => ({ ...r, nodeId: this.id }))
   }
@@ -87,6 +103,7 @@ export class FakeNode {
   }
   createInstance(): FakeNode {
     const i = new FakeNode('INSTANCE', this.name)
+    i.main = this
     i.width = this.width
     i.height = this.height
     i.children = this.children.map((c) => {
@@ -133,13 +150,17 @@ export function installFigma(opts: { fileKey?: string } = {}): FakeFigma {
       return n
     },
     getNodeByIdAsync: async (id: string) => all.get(id) ?? null,
+    loadAllPagesAsync: async () => {
+      throw new Error('loadAllPagesAsync is not used any more: pages load one at a time')
+    },
     getNodeById: () => {
       throw new Error('sync getNodeById is not allowed with dynamic-page access')
     },
     commitUndo: () => {},
     clientStorage: {
       getAsync: async (k: string) => storage.get(k),
-      setAsync: async (k: string, v: unknown) => void storage.set(k, v)
+      setAsync: async (k: string, v: unknown) => void storage.set(k, v),
+      deleteAsync: async (k: string) => void storage.delete(k)
     }
   }
   ;(globalThis as unknown as { figma: unknown }).figma = api

@@ -57,15 +57,7 @@ export const FIX_GROUPS: { id: string; label: string; kinds: FixKind[] }[] = [
   { id: 'dupes', label: 'Duplicates', kinds: ['duplicate-component'] }
 ]
 
-/** 32-bit FNV-1a, enough to bucket artwork signatures */
-export function hash32(input: string): string {
-  let h = 0x811c9dc5
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return (h >>> 0).toString(36)
-}
+export { hash32, hash64 } from './hash'
 
 /** round all numbers in path data so tiny float noise does not break matching */
 export function normalisePath(d: string, decimals = 2): string {
@@ -116,7 +108,7 @@ export interface LeafNameStat {
  * (the case where one name must be shared by every icon). Falls back to the configured name when the file has no clear winner.
  */
 export function pickDominantLeaf(histogram: Map<string, number>, configured: string): { name: string; stats: LeafNameStat[]; detected: boolean; caseVariants: number } {
-  const stats = [...histogram.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  const stats = [...histogram.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
   const top = stats[0]
   const second = stats[1]
   const total = stats.reduce((a, s) => a + s.count, 0)

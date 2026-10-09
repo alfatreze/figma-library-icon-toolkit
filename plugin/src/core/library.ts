@@ -10,6 +10,7 @@ export function detectGrid(raws: RawIcon[], settings: Settings): GridInfo {
   }
   const counts = new Map<string, { w: number; h: number; n: number }>()
   for (const r of raws) {
+    if (!(r.width > 0 && r.height > 0)) continue // unreadable layers have no size and must not vote for the grid
     const w = round(r.width)
     const h = round(r.height)
     const k = `${w}x${h}`

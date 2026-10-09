@@ -1,22 +1,17 @@
 const AUTO_NAME = /^(frame|group|vector|rectangle|ellipse|union|subtract|intersect|exclude|component|instance|line|polygon|star|boolean|image|section|slice)\s*\d*$/i
 const COPY_NAME = /\b(copy of|copy)\b|\bcopy\s*\d*$/i
-const RESERVED = new Set([
-  'abstract', 'arguments', 'await', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
-  'continue', 'debugger', 'default', 'delete', 'do', 'double', 'else', 'enum', 'eval', 'export', 'extends',
-  'false', 'final', 'finally', 'float', 'for', 'function', 'goto', 'if', 'implements', 'import', 'in',
-  'instanceof', 'int', 'interface', 'let', 'long', 'native', 'new', 'null', 'package', 'private', 'protected',
-  'public', 'return', 'short', 'static', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
-  'transient', 'true', 'try', 'typeof', 'var', 'void', 'volatile', 'while', 'with', 'yield'
-])
+
+/** icons are file names and CSS identifiers: keep them short enough for every file system and tool */
+export const MAX_NAME = 80
+
+const FOLD: Record<string, string> = { 'ß': 'ss', 'æ': 'ae', 'Æ': 'ae', 'ø': 'o', 'Ø': 'o', 'ł': 'l', 'Ł': 'l', 'đ': 'd', 'Đ': 'd', 'ı': 'i', 'þ': 'th', 'Þ': 'th', 'œ': 'oe', 'Œ': 'oe' }
 
 /** "Deficiência Visual" -> "deficiencia-visual" (ASCII fold, kebab-case, [a-z0-9-]) */
 export function slugify(input: string): string {
   return input
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .replace(/ß/g, 'ss')
-    .replace(/[æÆ]/g, 'ae')
-    .replace(/[øØ]/g, 'o')
+    .replace(/[ßæÆøØłŁđĐıþÞœŒ]/g, (c) => FOLD[c] ?? c)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -82,7 +77,8 @@ export function buildName(input: NameInput): NameResult {
 export function validateName(name: string): string | null {
   if (!name) return 'Name is empty'
   if (!/^[a-z][a-z0-9-]*$/.test(name)) return 'Must start with a letter and contain only a-z, 0-9 and "-"'
-  if (RESERVED.has(name)) return `"${name}" is a reserved word`
+  // JavaScript keywords (delete, new, import…) are fine: names are always used as string keys or behind the namespace prefix (cmnDelete), never as bare identifiers
+  if (name.length > MAX_NAME) return `Longer than ${MAX_NAME} characters`
   return null
 }
 
@@ -107,6 +103,9 @@ export function cleanNamespace(ns: string): string {
   const s = slugify(ns)
   return s || 'icon'
 }
+
+/** locale-independent order: numbering that depends on the user's language would differ between machines */
+export const codeCompare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 export interface NameSlot {
   name: string
@@ -133,7 +132,7 @@ export function resolveDuplicates(slots: NameSlot[], policy: 'block' | 'category
   names.forEach((n, i) => groups.set(n, [...(groups.get(n) ?? []), i]))
   const taken = new Set(names)
   for (const [name, idx] of groups) {
-    if (idx.length < 2) continue
+    if (idx.length < 2 || name === '') continue // an empty name is an error of its own; numbering it would produce "-2"
     const movable = idx.filter((i) => !slots[i].locked)
     if (policy === 'category') {
       for (const i of movable) {
@@ -147,7 +146,7 @@ export function resolveDuplicates(slots: NameSlot[], policy: 'block' | 'category
       }
     } else {
       // suffix: locked names and the first movable keep the plain name
-      const order = [...movable].sort((a, b) => slots[a].stable.localeCompare(slots[b].stable))
+      const order = [...movable].sort((a, b) => codeCompare(slots[a].stable, slots[b].stable))
       const keepsPlain = idx.some((i) => slots[i].locked) ? null : order[0]
       let n = 2
       for (const i of order) {

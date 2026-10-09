@@ -19,9 +19,19 @@ export function outlinedSvg(root: SceneNode): string | null {
     const shapes: string[] = []
     let ok = true
 
+    // everything that changes how the drawing looks but is not in the path data: we cannot reproduce it, so we do not pretend to
+    const unsupported = (n: SceneNode): boolean => {
+      if (n.type === 'TEXT') return true
+      if ('opacity' in n && n.opacity < 0.999) return true
+      if ('blendMode' in n && n.blendMode !== 'NORMAL' && n.blendMode !== 'PASS_THROUGH') return true
+      if ('effects' in n && n.effects.some((e) => e.visible !== false)) return true
+      const g = n as unknown as { fills?: unknown; strokes?: unknown }
+      if (g.fills === figma.mixed || g.strokes === figma.mixed) return true
+      return false
+    }
     const walk = (n: SceneNode) => {
       if (!ok || !n.visible) return
-      if ('isMask' in n && n.isMask) {
+      if (('isMask' in n && n.isMask) || unsupported(n)) {
         ok = false
         return
       }
@@ -48,9 +58,23 @@ export function outlinedSvg(root: SceneNode): string | null {
     }
     walk(root)
     if (!ok || shapes.length === 0) return null
-    const w = f(root.width)
-    const h = f(root.height)
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="none" xmlns="http://www.w3.org/2000/svg">${shapes.join('')}</svg>`
+    // frames export their own box; groups and loose vectors export their RENDER bounds (stroke overhang included)
+    const framed = root.type === 'FRAME' || root.type === 'COMPONENT' || root.type === 'INSTANCE'
+    let x = 0
+    let y = 0
+    let w = root.width
+    let h = root.height
+    if (!framed) {
+      if ('rotation' in root && Math.abs(root.rotation) > 0.01) return null
+      const rb = (root as SceneNode & { absoluteRenderBounds?: Rect | null }).absoluteRenderBounds
+      const bb = root.absoluteBoundingBox
+      if (!rb || !bb) return null
+      x = rb.x - bb.x
+      y = rb.y - bb.y
+      w = rb.width
+      h = rb.height
+    }
+    return `<svg width="${f(w)}" height="${f(h)}" viewBox="${f(x)} ${f(y)} ${f(w)} ${f(h)}" fill="none" xmlns="http://www.w3.org/2000/svg">${shapes.join('')}</svg>`
   } catch {
     return null
   }

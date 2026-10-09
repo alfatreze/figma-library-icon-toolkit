@@ -1,4 +1,5 @@
-import { compareSignatures, hash32, normalisePath, pickDominantLeaf, planRenames } from '../core/fixes'
+import { compareSignatures, normalisePath, pickDominantLeaf, planRenames } from '../core/fixes'
+import { hash32, hash64 } from '../core/hash'
 import { FixCandidate, FixKind, FixTarget, LeafNames } from '../types'
 import { IDENTITY, Matrix, invert, multiply, orientationKey } from '../core/pathTransform'
 import { toHex, VECTOR_TYPES } from './facts'
@@ -60,6 +61,14 @@ function geometryOf(n: SceneNode): string {
   return `${n.type}:${round(n.width)}x${round(n.height)}`
 }
 
+function strokeKey(n: SceneNode): string {
+  const g = n as SceneNode & Partial<GeometryMixin & { strokeWeight: number | symbol; strokeCap: unknown; strokeJoin: unknown }>
+  const strokes = g.strokes
+  if (!Array.isArray(strokes) || !strokes.some((p: Paint) => p.visible !== false)) return '~'
+  const w = typeof g.strokeWeight === 'number' ? round(g.strokeWeight, 2) : 'mixed'
+  return `~${w}/${String(g.strokeCap)}/${String(g.strokeJoin)}`
+}
+
 export interface Signature {
   geom: string // artwork + position inside the icon box
   shape: string // artwork only (ignores box size / padding)
@@ -87,10 +96,12 @@ export function signatureOf(root: SceneNode): Signature {
       /* keep the default */
     }
     const o = `@${orient}`
-    shapes.push(o)
-    placed.push(`${dx},${dy},${round(l.node.width, 1)},${round(l.node.height, 1)}${o}#${g}`)
+    // a Light / Regular / Bold family has the same outline and differs only in stroke weight: that is not a duplicate
+    const st = strokeKey(l.node)
+    shapes.push(o, st)
+    placed.push(`${dx},${dy},${round(l.node.width, 1)},${round(l.node.height, 1)}${o}${st}#${g}`)
   }
-  return { geom: hash32(placed.join('||')), shape: hash32(shapes.join('||')), leaves }
+  return { geom: hash64(placed.join('||')), shape: hash64(shapes.join('||')), leaves }
 }
 
 // ---- scan ---------------------------------------------------------------------
@@ -123,6 +134,8 @@ export class Diagnoser {
   private refs: Ref[] = []
   private byGeom = new Map<string, Ref[]>()
   private byShape = new Map<string, Ref[]>()
+  private byKey = new Map<string, Ref>()
+  private sigCache = new Map<string, Signature>()
 
   /** result of the file-wide naming analysis (set by componentFixes) */
   leafNames: LeafNames | null = null
@@ -132,6 +145,8 @@ export class Diagnoser {
   addComponent(node: ComponentNode): void {
     const ref = { node, sig: signatureOf(node) }
     this.refs.push(ref)
+    this.sigCache.set(node.id, ref.sig)
+    if (node.key) this.byKey.set(node.key, ref)
     this.byGeom.set(ref.sig.geom, [...(this.byGeom.get(ref.sig.geom) ?? []), ref])
     this.byShape.set(ref.sig.shape, [...(this.byShape.get(ref.sig.shape) ?? []), ref])
   }
@@ -167,7 +182,7 @@ export class Diagnoser {
         if (n && n.type === 'COMPONENT') ref = n
         else unresolved = true
       } else {
-        const known = this.refs.find((r) => r.node.key === detached.componentKey)
+        const known = this.byKey.get(detached.componentKey)
         if (known) ref = known.node
         else {
           try {
@@ -182,7 +197,8 @@ export class Diagnoser {
     let similarity: 'identical' | 'same-shape' | 'different' = 'different'
     let refSig: Signature | null = null
     if (ref) {
-      refSig = signatureOf(ref)
+      refSig = this.sigCache.get(ref.id) ?? signatureOf(ref)
+      this.sigCache.set(ref.id, refSig)
       similarity = compareSignatures(sig, refSig)
     } else if (!unresolved) {
       const m = (this.byGeom.get(sig.geom) ?? [])[0] ?? (this.byShape.get(sig.shape) ?? [])[0] ?? null

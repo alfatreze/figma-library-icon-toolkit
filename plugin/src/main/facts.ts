@@ -18,6 +18,12 @@ export function toHex(c: RGB): string {
 const variableInfos = new Map<string, { name: string; collection?: string } | null>()
 const collectionNames = new Map<string, string>()
 
+/** variable and collection names are cached for speed; a new scan must see renames */
+export function resetFactCaches(): void {
+  variableInfos.clear()
+  collectionNames.clear()
+}
+
 export async function variableInfo(id: string): Promise<{ name: string; collection?: string } | null> {
   if (variableInfos.has(id)) return variableInfos.get(id) ?? null
   let info: { name: string; collection?: string } | null = null

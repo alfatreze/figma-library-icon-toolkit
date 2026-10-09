@@ -22,7 +22,9 @@ export function fileIdentity(): string {
   } catch {
     /* ignore */
   }
-  return 'h' + hash32(figma.root.name + '|' + figma.root.children.map((p) => p.id).join(','))
+  // Page ids survive renaming the file and adding or removing other pages; the file name would not. A duplicated file keeps its page ids
+  // and therefore shares the baseline of the original, which is the useful behaviour for "a copy of this library".
+  return 'h' + hash32(figma.root.children[0]?.id ?? figma.root.name)
 }
 
 export async function readLocalBaseline(): Promise<string | null> {
@@ -33,8 +35,20 @@ export async function readLocalBaseline(): Promise<string | null> {
   }
 }
 
+const INDEX_KEY = 'ilt:baseline:index'
+const MAX_LOCAL_FILES = 20 // clientStorage is 5 MB for the whole plugin; keep the most recently used files and drop the rest
+
 export async function writeLocalBaseline(text: string): Promise<void> {
-  await figma.clientStorage.setAsync(LOCAL_PREFIX + fileIdentity(), text)
+  const id = fileIdentity()
+  await figma.clientStorage.setAsync(LOCAL_PREFIX + id, text)
+  try {
+    const index = (((await figma.clientStorage.getAsync(INDEX_KEY)) as string[] | undefined) ?? []).filter((x) => x !== id)
+    index.push(id)
+    while (index.length > MAX_LOCAL_FILES) await figma.clientStorage.deleteAsync(LOCAL_PREFIX + index.shift()!)
+    await figma.clientStorage.setAsync(INDEX_KEY, index)
+  } catch (e) {
+    console.warn('[icon-toolkit] could not update the baseline index', e)
+  }
 }
 
 function readChunks(node: { getPluginData(k: string): string }): string | null {

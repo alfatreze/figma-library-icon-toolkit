@@ -8,10 +8,14 @@ export interface UsageAgg {
   overrides: Partial<Record<OverrideClass, number>>
   sizes: Set<string>
   colors: Map<string, { hex: string; variable?: string }>
+  /** getNodeByIdAsync calls spent on colour overrides of this icon */
+  colorLookups: number
 }
 
+const MAX_COLOR_LOOKUPS = 60
+
 export function newAgg(remote: boolean): UsageAgg {
-  return { instances: 0, pages: new Set(), remote, overrides: {}, sizes: new Set(), colors: new Map() }
+  return { instances: 0, pages: new Set(), remote, overrides: {}, sizes: new Set(), colors: new Map(), colorLookups: 0 }
 }
 
 const round = (n: number) => Math.round(n * 100) / 100
@@ -63,7 +67,8 @@ export async function recordInstance(
       const cls = classify(String(field), isRoot)
       if (!cls) continue
       seen.add(cls)
-      if (cls === 'color' && agg.colors.size < 8 && (field === 'fills' || field === 'strokes')) {
+      if (cls === 'color' && agg.colors.size < 8 && (field === 'fills' || field === 'strokes') && agg.colorLookups < MAX_COLOR_LOOKUPS) {
+        agg.colorLookups++ // bounded per icon: repeated colours do not grow the map, but every lookup is an API round trip
         try {
           const node = await figma.getNodeByIdAsync(entry.id)
           if (node && field in node) {

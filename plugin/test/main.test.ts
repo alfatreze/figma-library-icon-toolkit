@@ -199,3 +199,23 @@ describe('effective settings (what Dev Mode uses)', () => {
     expect(r.settings.namespace).toBe('mine')
   })
 })
+
+describe('baseline housekeeping', () => {
+  it('keeps at most 20 local baselines (oldest dropped)', async () => {
+    for (let i = 0; i < 25; i++) {
+      const f = installFigma()
+      f.root.children[0].id = `9:${i}`
+      f.storage = fig.storage // one shared clientStorage across "files"
+      ;(globalThis as unknown as { figma: { clientStorage: unknown } }).figma.clientStorage = (fig as unknown as { clientStorage: unknown }).clientStorage
+      await writeLocalBaseline(`b${i}`)
+    }
+    const keys = [...fig.storage.keys()].filter((k) => k.startsWith('ilt:baseline:local:'))
+    expect(keys.length).toBe(20)
+  })
+  it('identity survives renaming the file and adding pages', () => {
+    const a = fileIdentity()
+    fig.root.name = 'Renamed'
+    fig.root.appendChild(new FakeNode('PAGE', 'Another'))
+    expect(fileIdentity()).toBe(a)
+  })
+})

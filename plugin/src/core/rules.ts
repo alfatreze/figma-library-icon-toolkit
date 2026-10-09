@@ -27,7 +27,7 @@ export const RULES: Record<string, RuleInfo> = {
   'empty-groups': { title: 'Empty groups / frames', why: 'They add noise to the export.', fix: 'Delete the empty groups.', step: 1 },
   background: { title: 'Frame has a fill', why: 'The frame background leaks into the export.', fix: 'Remove the frame fill.', step: 1 },
   'locked-layers': { title: 'Locked layers inside', why: 'Locked layers are exported but easy to forget.', fix: 'Unlock and review them.', step: 1 },
-  'invalid-name': { title: 'Invalid name', why: 'Names must be a-z, 0-9 and "-", starting with a letter, and not a reserved word.', fix: 'Rename the layer (or the row in the plugin).', step: 2 },
+  'invalid-name': { title: 'Invalid name', why: 'Names must be a-z, 0-9 and "-", starting with a letter, and at most 80 characters.', fix: 'Rename the layer (or the row in the plugin).', step: 2 },
   'duplicate-name': { title: 'Duplicate name', why: 'Two icons resolve to the same name; the second would overwrite the first.', fix: 'Give each icon a unique name.', step: 2 },
   'auto-name': { title: 'Default Figma name', why: 'Names like "Frame 12" say nothing about the icon.', fix: 'Give the layer a meaningful name.', step: 2 },
   'duplicate-resolved': { title: 'Duplicate name resolved', why: 'Two icons had the same name. The plugin renamed one for the export (category prefix or number), but the new name depends on the library layout and can change.', fix: 'Rename one of them in Figma so each icon has a unique, stable name.', step: 2 },

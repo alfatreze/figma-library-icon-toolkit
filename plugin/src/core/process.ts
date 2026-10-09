@@ -3,7 +3,7 @@ import { auditIcon } from './audit'
 import { hash32, normalisePath } from './fixes'
 import { detectGrid, iconTier, libraryTier, Tier } from './library'
 import { resolveCategory, pathSegments } from './categories'
-import { buildName, cleanNamespace, resolveDuplicates, slugify } from './naming'
+import { buildName, cleanNamespace, codeCompare, resolveDuplicates, slugify } from './naming'
 import { themeSvg } from './svg'
 
 export interface Processed {
@@ -35,8 +35,18 @@ export function geometryHash(svg: string | null): string {
   if (!svg) return ''
   const ds = [...svg.matchAll(/\sd="([^"]+)"/g)].map((m) => normalisePath(m[1], 2))
   const box = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? ''
-  return hash32(box + '|' + ds.join('|'))
+  // Everything else that defines the drawing: basic shapes (circle, rect, line…), stroke weight / caps / joins and transforms.
+  // Filled icons made of plain paths have none of these, so their hash is unchanged from earlier versions (no false "changed" on upgrade).
+  const extras: string[] = []
+  for (const m of svg.matchAll(/<(path|rect|circle|ellipse|line|polyline|polygon)\b([^>]*)>/g)) {
+    const attrs = [...m[2].matchAll(/\s([a-z-]+)="([^"]*)"/g)].filter(([, k]) => GEOMETRY_ATTRS.has(k) && !(m[1] === 'path' && k === 'd'))
+    if (m[1] !== 'path') extras.push(m[1])
+    for (const [, k, v] of attrs) extras.push(`${k}=${normalisePath(v, 2)}`)
+  }
+  return hash32(box + '|' + ds.join('|') + (extras.length ? '|' + extras.join(',') : ''))
 }
+
+const GEOMETRY_ATTRS = new Set(['points', 'x', 'y', 'width', 'height', 'rx', 'ry', 'cx', 'cy', 'r', 'x1', 'y1', 'x2', 'y2', 'transform', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray'])
 
 export function processIcons(
   raws: RawIcon[],
@@ -103,7 +113,7 @@ export function processIcons(
       sourceKind: raw.sourceKind,
       rawName: raw.rawName,
       hash: geometryHash(raw.svg),
-      colorHash: hash32(raw.facts.paints.map((p) => `${p.role}${p.hex}${p.variable ?? ''}`).join('|')),
+      colorHash: hash32(raw.facts.paints.map((p) => `${p.role}${p.hex}${p.variable ?? ''}${p.opacity < 1 ? '@' + p.opacity.toFixed(2) : ''}`).join('|')),
       hasStroke,
       canOutline: !!raw.svgOutlined,
       outlined,
@@ -176,7 +186,7 @@ export function assignAliases(raws: RawIcon[], icons: Icon[], ignoredGroups: str
       if (fix.kind !== 'duplicate-component' || !fix.groupId || !ignoredGroups.includes(fix.groupId)) continue
       const members = [fix.nodeId, ...(fix.others ?? []).map((o) => o.nodeId)].map((id) => byNode.get(id)).filter((i): i is Icon => !!i && i.svgOk && !!i.hash)
       const same = (a: Icon, b: Icon) => a.hash === b.hash && a.colorHash === b.colorHash
-      const owner = [...members].sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name))[0]
+      const owner = [...members].sort((a, b) => a.name.length - b.name.length || codeCompare(a.name, b.name))[0]
       if (!owner) continue
       for (const m of members) if (m !== owner && !m.aliasOf && same(owner, m)) m.aliasOf = owner.name
     }

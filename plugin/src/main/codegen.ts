@@ -115,7 +115,7 @@ async function iconsUsed(root: SceneNode, s: Settings): Promise<{ name: string; 
   const found = new Map<string, { name: string; count: number; sizes: Set<string> }>()
   let visited = 0
   const walk = async (n: SceneNode): Promise<void> => {
-    if (!n.visible || ++visited > 4000) return
+    if (!n.visible || ++visited > MAX_VISITED) return
     if (n.type === 'INSTANCE' && n.width <= 128 && n.height <= 128 && isIconish(n)) {
       const main = await n.getMainComponentAsync()
       if (main) {
@@ -135,55 +135,68 @@ async function iconsUsed(root: SceneNode, s: Settings): Promise<{ name: string; 
 
 /** Dev Mode: show how to use the selected icon (or the icons of a selected screen) in code. */
 export function registerCodegen(): void {
-  figma.codegen.on('generate', async ({ node, language }): Promise<Result[]> => {
-    const { settings, source, shared } = await effectiveSettings()
-    const p = prefs()
-    const ns = cleanNamespace(settings.namespace)
-    const configNote: Result | null =
-      source === 'file'
-        ? null
-        : {
-            title: 'Library config',
-            language: 'PLAINTEXT',
-            code:
-              source === 'local'
-                ? 'Using YOUR saved plugin settings. Ask the design-system owner to publish the library config into this file (plugin → Settings → Team config → Publish) so everyone gets the same output.'
-                : `No library config is published in this file, so default settings are used (namespace "${ns}"). Names may not match your project. Ask the design-system owner to publish the config (plugin → Settings → Team config → Publish).`
-          }
-
-    const info = await describeInstance(node, settings, p)
-    if (!info) {
-      const used = await iconsUsed(node, settings)
-      if (!used.length) {
-        return [{ title: 'Icon Library Toolkit', language: 'PLAINTEXT', code: 'Select an icon instance to see how to use it in code, or a frame to list the icons it uses.' }, ...(configNote ? [configNote] : [])]
-      }
-      const lines = used.map((u) => `${u.name}  ×${u.count}${u.sizes.size ? `  (${[...u.sizes].map((x) => x + 'px').join(', ')})` : ''}`)
-      const names = used.map((u) => u.name)
-      const hint =
-        language === 'angular'
-          ? `<!-- ${ns}-icon names used -->\n${names.map((n) => `<${ns}-icon name="${n}" />`).join('\n')}`
-          : names.map((n) => `${ns}-sprite.svg#${ns}-${n}`).join('\n')
-      return [
-        { title: `Icons used here (${used.length})`, language: 'PLAINTEXT', code: lines.join('\n') },
-        { title: language === 'angular' ? 'Angular' : 'Sprite ids', language: 'PLAINTEXT', code: hint },
-        ...(configNote ? [configNote] : [])
-      ]
-    }
-
-    const input = info.input
-    const all: Record<string, Result> = {
-      angular: { title: 'Angular', code: angularSnippet(input), language: 'HTML' },
-      html: { title: 'HTML (sprite)', code: htmlSnippet(input), language: 'HTML' },
-      react: { title: 'React', code: `${reactComponentSnippet(input)}\n\n// or without the component:\n${reactSnippet(input)}`, language: 'JAVASCRIPT' },
-      webcomponent: { title: 'Web Component', code: webComponentSnippet(input), language: 'HTML' },
-      css: { title: 'CSS variables', code: cssSnippet(input), language: 'CSS' }
-    }
-    const main: Result[] = language && all[language] ? [all[language]] : Object.values(all)
-    const notes = overrideNotes(info.classes, settings)
-    const extra: Result[] = []
-    if (notes.length) extra.push({ title: 'Notes: overrides', language: 'PLAINTEXT', code: notes.join('\n') })
-    if (configNote) extra.push(configNote)
-    else if (shared) extra.push({ title: 'Library config', language: 'PLAINTEXT', code: `Config published ${shared.publishedAt.slice(0, 10)}${shared.publishedBy ? ' by ' + shared.publishedBy : ''}.` })
-    return [...main, ...extra]
+  // Figma gives codegen 15 s and shows nothing useful when the handler throws or hangs: always answer, with a note when we had to give up
+  figma.codegen.on('generate', async (event): Promise<Result[]> => {
+    const timeout = new Promise<Result[]>((resolve) =>
+      setTimeout(() => resolve([{ title: 'Icon Library Toolkit', language: 'PLAINTEXT', code: 'This selection took too long to analyse. Select a single icon, or a smaller frame.' }]), 12000)
+    )
+    const work = generate(event).catch((e): Result[] => [
+      { title: 'Icon Library Toolkit', language: 'PLAINTEXT', code: `Could not generate code for this selection: ${e instanceof Error ? e.message : String(e)}` }
+    ])
+    return Promise.race([work, timeout])
   })
+}
+
+const MAX_VISITED = 4000
+
+async function generate({ node, language }: { node: SceneNode; language: string }): Promise<Result[]> {
+  const { settings, source, shared } = await effectiveSettings()
+  const p = prefs()
+  const ns = cleanNamespace(settings.namespace)
+  const configNote: Result | null =
+    source === 'file'
+      ? null
+      : {
+          title: 'Library config',
+          language: 'PLAINTEXT',
+          code:
+            source === 'local'
+              ? 'Using YOUR saved plugin settings. Ask the design-system owner to publish the library config into this file (plugin → Settings → Team config → Publish) so everyone gets the same output.'
+              : `No library config is published in this file, so default settings are used (namespace "${ns}"). Names may not match your project. Ask the design-system owner to publish the config (plugin → Settings → Team config → Publish).`
+        }
+
+  const info = await describeInstance(node, settings, p)
+  if (!info) {
+    const used = await iconsUsed(node, settings)
+    if (!used.length) {
+      return [{ title: 'Icon Library Toolkit', language: 'PLAINTEXT', code: 'Select an icon instance to see how to use it in code, or a frame to list the icons it uses.' }, ...(configNote ? [configNote] : [])]
+    }
+    const lines = used.map((u) => `${u.name}  ×${u.count}${u.sizes.size ? `  (${[...u.sizes].map((x) => x + 'px').join(', ')})` : ''}`)
+    const names = used.map((u) => u.name)
+    const hint =
+      language === 'angular'
+        ? `<!-- ${ns}-icon names used -->\n${names.map((n) => `<${ns}-icon name="${n}" />`).join('\n')}`
+        : names.map((n) => `${ns}-sprite.svg#${ns}-${n}`).join('\n')
+    return [
+      { title: `Icons used here (${used.length})`, language: 'PLAINTEXT', code: lines.join('\n') },
+      { title: language === 'angular' ? 'Angular' : 'Sprite ids', language: 'PLAINTEXT', code: hint },
+      ...(configNote ? [configNote] : [])
+    ]
+  }
+
+  const input = info.input
+  const all: Record<string, Result> = {
+    angular: { title: 'Angular', code: angularSnippet(input), language: 'HTML' },
+    html: { title: 'HTML (sprite)', code: htmlSnippet(input), language: 'HTML' },
+    react: { title: 'React', code: `${reactComponentSnippet(input)}\n\n// or without the component:\n${reactSnippet(input)}`, language: 'JAVASCRIPT' },
+    webcomponent: { title: 'Web Component', code: webComponentSnippet(input), language: 'HTML' },
+    css: { title: 'CSS variables', code: cssSnippet(input), language: 'CSS' }
+  }
+  const main: Result[] = language && all[language] ? [all[language]] : Object.values(all)
+  const notes = overrideNotes(info.classes, settings)
+  const extra: Result[] = []
+  if (notes.length) extra.push({ title: 'Notes: overrides', language: 'PLAINTEXT', code: notes.join('\n') })
+  if (configNote) extra.push(configNote)
+  else if (shared) extra.push({ title: 'Library config', language: 'PLAINTEXT', code: `Config published ${shared.publishedAt.slice(0, 10)}${shared.publishedBy ? ' by ' + shared.publishedBy : ''}.` })
+  return [...main, ...extra]
 }

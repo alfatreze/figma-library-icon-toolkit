@@ -11,6 +11,16 @@ async function resolveComponent(target: { componentId?: string; componentKey?: s
   throw new Error('Component not found')
 }
 
+/** true when the node sits anywhere inside an instance: such layers cannot be replaced, converted or renamed in place */
+const insideInstance = (node: SceneNode): boolean => {
+  let p: BaseNode | null = node.parent
+  while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') {
+    if (p.type === 'INSTANCE') return true
+    p = p.parent
+  }
+  return false
+}
+
 const inAutoLayout = (parent: BaseNode & ChildrenMixin): boolean => 'layoutMode' in parent && (parent as unknown as FrameNode).layoutMode !== 'NONE'
 
 /**
@@ -58,7 +68,7 @@ async function carryLayerProps(from: SceneNode, to: SceneNode): Promise<void> {
 
 async function replaceWithInstance(node: SceneNode, req: ApplyFixRequest, target: { componentId?: string; componentKey?: string }): Promise<FixResult> {
   const parent = node.parent
-  if (!parent || !('children' in parent) || parent.type === 'INSTANCE') return { id: req.id, ok: false, message: 'Cannot replace a layer inside an instance' }
+  if (!parent || !('children' in parent) || parent.type === 'INSTANCE' || insideInstance(node)) return { id: req.id, ok: false, message: 'Cannot replace a layer inside an instance' }
   const comp = await resolveComponent(target)
   const index = parent.children.indexOf(node as SceneNode)
   const inst = comp.createInstance()
@@ -74,12 +84,15 @@ async function replaceWithInstance(node: SceneNode, req: ApplyFixRequest, target
     const to = leavesOf(inst)
     if (from.length === to.length) {
       from.forEach((l, i) => {
-        const f = (l.node as GeometryMixin).fills
+        const src = l.node as GeometryMixin
         const t = to[i].node as GeometryMixin
-        if (Array.isArray(f) && f.length && l.hex && l.hex !== to[i].hex) {
-          t.fills = f as Paint[]
-          carried++
-        }
+        if (!l.hex || l.hex === to[i].hex) return
+        // the colour comes from the fill when there is one, otherwise from the stroke (stroke-only icons)
+        const fillOk = Array.isArray(src.fills) && src.fills.some((p) => p.type === 'SOLID' && p.visible !== false)
+        if (fillOk) t.fills = src.fills as Paint[]
+        else if (Array.isArray(src.strokes) && src.strokes.length) t.strokes = src.strokes as Paint[]
+        else return
+        carried++
       })
     }
   } catch (e) {
@@ -94,7 +107,8 @@ async function applyRenames(renames: LayerRename[]): Promise<number> {
   let n = 0
   for (const r of renames) {
     const node = await figma.getNodeByIdAsync(r.nodeId) // sync getNodeById is not allowed with dynamic-page access
-    if (node && 'name' in node && node.name !== r.to) {
+    // skip layers the designer renamed since the scan: the plan was made for the old name
+    if (node && 'name' in node && node.name !== r.to && node.name === r.from) {
       node.name = r.to
       n++
     }
@@ -104,8 +118,10 @@ async function applyRenames(renames: LayerRename[]): Promise<number> {
 
 async function convertToComponent(node: SceneNode, req: ApplyFixRequest, wrap: boolean): Promise<FixResult> {
   const parent = node.parent
-  if (!parent || !('children' in parent) || parent.type === 'INSTANCE') return { id: req.id, ok: false, message: 'Cannot convert a layer inside an instance' }
-  if (req.renameLeaves) {
+  if (!parent || !('children' in parent) || parent.type === 'INSTANCE' || insideInstance(node)) return { id: req.id, ok: false, message: 'Cannot convert a layer inside an instance' }
+  // layer renames are applied only after the conversion worked, so a failed fix leaves the layer exactly as it was
+  const applyLeafRenames = async () => {
+    if (!req.renameLeaves) return
     const leaves = leavesOf(node)
     const renames = planRenames(leaves.map((l) => ({ id: l.node.id, name: l.node.name, hex: l.hex })), req.leafName)
     for (const r of renames) {
@@ -149,7 +165,13 @@ async function convertToComponent(node: SceneNode, req: ApplyFixRequest, wrap: b
     comp = figma.createComponentFromNode(node)
     if (req.name) comp.name = req.name
   }
-  return { id: req.id, ok: true, newNodeId: comp.id, message: `Converted to component “${comp.name}”` }
+  let note = ''
+  try {
+    await applyLeafRenames()
+  } catch (e) {
+    note = ` (layer names could not all be standardised: ${e instanceof Error ? e.message : String(e)})`
+  }
+  return { id: req.id, ok: true, newNodeId: comp.id, message: `Converted to component “${comp.name}”${note}` }
 }
 
 /** Applies fixes one by one. Each fix is validated first; the caller groups them into one undo step. */

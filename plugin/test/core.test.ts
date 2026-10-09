@@ -10,7 +10,7 @@ import { parseStrokeTable, weightForSize, validateStrokeTable } from '../src/cor
 import { sanitizeSvgTree } from '../src/core/sanitize'
 import { bumpVersion, changelogMarkdown, diffCatalogs, nextDeprecated } from '../src/core/changelog'
 import { exportConfig, parseConfig } from '../src/core/config'
-import { processIcons } from '../src/core/process'
+import { geometryHash, processIcons } from '../src/core/process'
 import { buildFiles } from '../src/core/generators'
 import { DEFAULT_SETTINGS, Facts, RawIcon, UsageInfo } from '../src/types'
 import { overrideFindings } from '../src/core/overrides'
@@ -52,7 +52,9 @@ describe('naming', () => {
   })
   it('validates identifiers', () => {
     expect(validateName('3d')).not.toBeNull()
-    expect(validateName('delete')).not.toBeNull()
+    expect(validateName('delete')).toBeNull() // keywords are fine: names are string keys or sit behind the namespace prefix
+    expect(validateName('a'.repeat(81))).not.toBeNull()
+    expect(slugify('Łódź đ ı')).toBe('lodz-d-i')
     expect(validateName('ok-name')).toBeNull()
   })
 })
@@ -740,5 +742,42 @@ describe('aliases for intentional duplicates', () => {
   it('can be switched off', () => {
     const { p } = build({ ...DEFAULT_SETTINGS, ignoredDuplicates: ['g1'], aliasDuplicates: false }, mkRaws())
     expect(p.icons.some((i) => i.aliasOf)).toBe(false)
+  })
+})
+
+describe('geometryHash covers more than path data (and stays stable for plain filled paths)', () => {
+  const wrapSvg = (inner: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">${inner}</svg>`
+  it('circles of different size differ', () => {
+    expect(geometryHash(wrapSvg('<circle cx="12" cy="12" r="4" fill="#111"/>'))).not.toBe(geometryHash(wrapSvg('<circle cx="12" cy="12" r="8" fill="#111"/>')))
+  })
+  it('stroke weight changes the hash', () => {
+    expect(geometryHash(wrapSvg('<path d="M0 0L10 10" stroke="#111" stroke-width="1"/>'))).not.toBe(geometryHash(wrapSvg('<path d="M0 0L10 10" stroke="#111" stroke-width="2"/>')))
+  })
+  it('colour and fill-rule do not, and a plain filled path keeps the legacy hash', () => {
+    const a = geometryHash(wrapSvg('<path fill-rule="evenodd" d="M0 0h10v10z" fill="#111"/>'))
+    expect(geometryHash(wrapSvg('<path d="M0 0h10v10z" fill="#e00"/>'))).toBe(a)
+    expect(a).toBe(hash32('0 0 24 24|M0 0h10v10z'))
+  })
+})
+
+describe('changelog matching is order independent', () => {
+  it('duplicated names in the previous catalog are not reported as removed', () => {
+    const prev = { icons: [{ name: 'home', hash: 'a', figma: { componentKey: 'k1' } }, { name: 'home', hash: 'a', figma: { componentKey: 'k2' } }] }
+    const d = diffCatalogs(prev, [{ name: 'home', hash: 'a', figma: { componentKey: 'k1' } }, { name: 'home', hash: 'a', figma: { componentKey: 'k2' } }])
+    expect(d.removed).toEqual([])
+    expect(d.bump).toBe('none')
+    expect(d.matchedBy.key).toBe(2)
+  })
+  it('two current icons with one shared key match one previous entry only', () => {
+    const prev = { icons: [{ name: 'a', hash: '1', figma: { componentKey: 'k' } }] }
+    const d = diffCatalogs(prev, [{ name: 'a', hash: '1', figma: { componentKey: 'k' } }, { name: 'b', hash: '1', figma: { componentKey: 'k' } }])
+    expect(d.added.map((x) => x.name)).toEqual(['b'])
+  })
+  it('a rename chain keeps the oldest alias pointing at an existing name', () => {
+    const prev = { icons: [{ name: 'b', figma: { componentKey: 'k' } }], deprecated: [{ name: 'a', replacedBy: 'b', since: '1.1.0' }] }
+    const cur = [{ name: 'c', figma: { componentKey: 'k' } }]
+    const diff = diffCatalogs(prev, cur)
+    const dep = nextDeprecated(prev, diff, '2.0.0', new Set(['c']))
+    expect(dep).toEqual(expect.arrayContaining([{ name: 'a', replacedBy: 'c', since: '1.1.0' }, { name: 'b', replacedBy: 'c', since: '2.0.0' }]))
   })
 })

@@ -1,4 +1,4 @@
-import { hash32 } from './fixes'
+import { hash32 } from './hash'
 
 /** Minimal shape of an icon entry in icons.json (current or previous export) */
 export interface CatalogIcon {
@@ -98,29 +98,43 @@ export function parseCatalog(input: string): PreviousCatalog {
  * - only in current → added; only in previous → removed
  */
 export function diffCatalogs(prev: PreviousCatalog, cur: CatalogIcon[]): Diff {
-  const byKey = new Map<string, CatalogIcon>()
-  const byName = new Map<string, CatalogIcon>()
+  // Two passes so the result does not depend on list order: component keys first, then names for what is left.
+  // A previous entry is matched at most once (list-valued maps: duplicated keys or names in an old catalog no longer overwrite each other).
+  const byKey = new Map<string, CatalogIcon[]>()
+  const byName = new Map<string, CatalogIcon[]>()
   for (const p of prev.icons) {
     const k = p.figma?.componentKey
-    if (k) byKey.set(k, p)
-    byName.set(p.name, p)
+    if (k) byKey.set(k, [...(byKey.get(k) ?? []), p])
+    byName.set(p.name, [...(byName.get(p.name) ?? []), p])
   }
   const used = new Set<CatalogIcon>()
+  const take = (list: CatalogIcon[] | undefined) => list?.find((x) => !used.has(x))
+  const matched: (CatalogIcon | undefined)[] = cur.map(() => undefined)
   const diff: Diff = { added: [], removed: [], renamed: [], changed: [], recoloured: [], relabelled: [], moved: [], unchanged: 0, bump: 'none', matchedBy: { key: 0, name: 0 } }
-  for (const c of cur) {
+  cur.forEach((c, i) => {
     const k = c.figma?.componentKey
-    let p = k ? byKey.get(k) : undefined
-    if (p) diff.matchedBy.key++
-    else {
-      p = byName.get(c.name)
-      if (p && !used.has(p)) diff.matchedBy.name++
-      else p = undefined
+    const p = k ? take(byKey.get(k)) : undefined
+    if (p) {
+      used.add(p)
+      matched[i] = p
+      diff.matchedBy.key++
     }
+  })
+  cur.forEach((c, i) => {
+    if (matched[i]) return
+    const p = take(byName.get(c.name))
+    if (p) {
+      used.add(p)
+      matched[i] = p
+      diff.matchedBy.name++
+    }
+  })
+  for (const [i, c] of cur.entries()) {
+    const p = matched[i]
     if (!p) {
       diff.added.push({ name: c.name })
       continue
     }
-    used.add(p)
     let touched = false
     if (p.name !== c.name) {
       diff.renamed.push({ from: p.name, to: c.name })
@@ -165,8 +179,17 @@ export function bumpVersion(version: string | undefined, bump: Diff['bump']): st
 
 /** deprecated aliases: carries forward earlier ones and adds this release's renames */
 export function nextDeprecated(prev: PreviousCatalog | null, diff: Diff | null, version: string, currentNames: Set<string>) {
-  const out = (prev?.deprecated ?? []).filter((d) => !currentNames.has(d.name) && currentNames.has(d.replacedBy))
-  if (diff) for (const r of diff.renamed) out.push({ name: r.from, replacedBy: r.to, since: version })
+  // follow rename chains (a→b, then b→c makes a→c) so an older alias keeps pointing at a name that exists
+  const next = new Map<string, string>()
+  for (const r of diff?.renamed ?? []) next.set(r.from, r.to)
+  const resolve = (name: string) => {
+    let n = name
+    for (let hops = 0; hops < 10 && next.has(n) && !currentNames.has(n); hops++) n = next.get(n)!
+    return n
+  }
+  const out = (prev?.deprecated ?? []).map((d) => ({ ...d, replacedBy: resolve(d.replacedBy) })).filter((d) => !currentNames.has(d.name) && currentNames.has(d.replacedBy))
+  // an old name that is a live icon again (a swap) must not also be an alias
+  if (diff) for (const r of diff.renamed) if (!currentNames.has(r.from)) out.push({ name: r.from, replacedBy: r.to, since: version })
   return out
 }
 

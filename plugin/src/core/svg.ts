@@ -88,7 +88,8 @@ export function roundNumbers(value: string, precision: number): string {
   return value.replace(/-?\d*\.\d+/g, (m) => {
     const n = Number(m)
     if (!Number.isFinite(n)) return m
-    const s = n.toFixed(precision).replace(/\.?0+$/, '')
+    const fixed = n.toFixed(precision)
+    const s = fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed // never strip the zeros of a whole number (100 is not 1)
     return s === '-0' || s === '' ? '0' : s
   })
 }

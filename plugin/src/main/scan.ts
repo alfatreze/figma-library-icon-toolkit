@@ -1,6 +1,6 @@
 import { parseVariantName } from '../core/naming'
 import { CategoryContext, FixCandidate, RawIcon, ScanOptions, ScanSummary, SourceKind } from '../types'
-import { gatherFacts, isIconish, variableName, VECTOR_TYPES } from './facts'
+import { emptyFacts, gatherFacts, isIconish, resetFactCaches, variableName, VECTOR_TYPES } from './facts'
 import { Diagnoser } from './diagnose'
 import { outlinedSvg } from './outline'
 import { newAgg, recordInstance, toUsage, UsageAgg } from './overrides'
@@ -67,7 +67,8 @@ function componentCandidate(node: ComponentNode, kind: SourceKind, ctx: Category
   return { node, sourceKind: kind, rawName: node.name, variantProps: {}, componentKey: node.key, description: node.description, ctx }
 }
 
-async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext): Promise<void> {
+/** `inInstance`: the node lives inside an instance (not editable, no component of its own): it can only be counted as usage, never offered as an icon to convert */
+async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext, inInstance = false): Promise<void> {
   if (ctx.cancelled() || !node.visible) return
   const { mode, maxIconSize: maxSize, usageOnly } = ctx.opts
   const composite = ctx.opts.compositeFrames === 'include'
@@ -79,7 +80,9 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext): P
   switch (node.type) {
     case 'COMPONENT_SET': {
       if (usageOnly || mode === 'frames') {
-        break
+        // count icon instances placed inside the variants (a button's chevron) even though the variants themselves are not listed
+        for (const child of node.children) await visit(child, ctx, cat, inInstance)
+        return
       }
       for (const child of node.children) {
         if (child.type !== 'COMPONENT') continue
@@ -87,15 +90,19 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext): P
           skip(ctx, child, `larger than ${maxSize}px`)
           continue
         }
+        ctx.seenComponents.add(child.key) // instances of this variant are the same icon, not a second one
         addCandidate(ctx, componentCandidate(child, 'component-set', cat))
       }
       return
     }
     case 'COMPONENT': {
-      if (usageOnly || mode === 'frames') return
+      if (usageOnly || mode === 'frames') {
+        for (const c of node.children) await visit(c, ctx, cat, true)
+        return
+      }
       if (!fits(node, maxSize)) {
         skip(ctx, node, `larger than ${maxSize}px`)
-        for (const c of node.children) await visit(c, ctx, cat)
+        for (const c of node.children) await visit(c, ctx, cat, true)
         return
       }
       ctx.seenComponents.add(node.key)
@@ -130,12 +137,12 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext): P
         await recordInstance(g.agg, node, main, cleanPageName(page ? page.name : ''), variableName)
         return
       }
-      for (const c of node.children) await visit(c, ctx, cat)
+      for (const c of node.children) await visit(c, ctx, cat, true)
       return
     }
     case 'FRAME':
     case 'GROUP': {
-      if (!usageOnly && mode !== 'components' && fits(node, maxSize)) {
+      if (!inInstance && !usageOnly && mode !== 'components' && fits(node, maxSize)) {
         if (isIconish(node, composite)) {
           addCandidate(ctx, { node, sourceKind: 'frame', rawName: node.name, variantProps: {}, description: '', ctx: cat })
           return
@@ -145,15 +152,15 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext): P
         }
       }
       const next = node.type === 'FRAME' ? { ...cat, frame: node.name } : cat
-      for (const c of node.children) await visit(c, ctx, next)
+      for (const c of node.children) await visit(c, ctx, next, inInstance)
       return
     }
     case 'SECTION': {
-      for (const c of node.children) await visit(c, ctx, { section: node.name })
+      for (const c of node.children) await visit(c, ctx, { section: node.name }, inInstance)
       return
     }
     default: {
-      if (!usageOnly && mode === 'loose' && VECTOR_TYPES.has(node.type) && fits(node, maxSize)) {
+      if (!inInstance && !usageOnly && mode === 'loose' && VECTOR_TYPES.has(node.type) && fits(node, maxSize)) {
         addCandidate(ctx, { node, sourceKind: 'loose', rawName: node.name, variantProps: {}, description: '', ctx: cat })
       }
     }
@@ -177,12 +184,17 @@ async function load(c: Candidate): Promise<{ node: SceneNode; exportedFrom: 'mai
   }
 }
 
+/** how many candidates are exported at once: enough to hide the round-trip latency of exportAsync, few enough to bound memory */
+const EXPORT_CONCURRENCY = 6
+const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0))
+
 export async function scan(
   opts: ScanOptions,
   cancelled: () => boolean,
   phase: (text: string) => void,
   onBatch: (icons: RawIcon[], progress: number) => void
 ): Promise<ScanSummary> {
+  resetFactCaches() // renamed variables must not show their old names
   const ctx: ScanContext = {
     opts, cancelled, phase, seenNodes: new Set(), seenComponents: new Set(), candidates: [], groups: new Map(),
     summary: { scanned: 0, skipped: [], adapters: {} }, visited: 0
@@ -192,24 +204,35 @@ export async function scan(
   if (opts.scope === 'selection') {
     const sel = figma.currentPage.selection
     if (!sel.length) throw new Error('Nothing is selected. Select layers, or switch the scope to Page or Document.')
-    // a selected component is always an icon, even when only usage is being listed (Dev Mode inspect: you click the component itself)
-    const withComponents: ScanContext = { ...ctx, opts: { ...opts, usageOnly: false } }
-    for (const r of sel) await visit(r, opts.usageOnly && (r.type === 'COMPONENT' || r.type === 'COMPONENT_SET') ? withComponents : ctx, {})
+    for (const r of sel) {
+      // a selected component is always an icon, even when only usage is being listed (Dev Mode inspect: you click the component itself)
+      const asComponent = opts.usageOnly && (r.type === 'COMPONENT' || r.type === 'COMPONENT_SET')
+      const saved = ctx.opts
+      if (asComponent) ctx.opts = { ...opts, usageOnly: false }
+      try {
+        await visit(r, ctx, {})
+      } finally {
+        ctx.opts = saved
+      }
+    }
   } else if (opts.scope === 'page') {
     for (const r of figma.currentPage.children) await visit(r, ctx, {})
   } else {
-    phase('Loading all pages…')
-    await figma.loadAllPagesAsync()
+    // one page at a time: progress, cancel between pages, and only the page being read has to be loaded
     const pages = figma.root.children
     for (let i = 0; i < pages.length; i++) {
       if (cancelled()) break
       phase(`Page ${i + 1}/${pages.length}: ${cleanPageName(pages[i].name)}`)
+      await pages[i].loadAsync()
       for (const r of pages[i].children) await visit(r, ctx, {})
     }
   }
 
-  // instance groups become candidates (one per main component)
-  for (const g of ctx.groups.values()) addCandidate(ctx, g.cand)
+  // instance groups become candidates (one per main component), unless that component is itself a candidate
+  for (const [key, g] of ctx.groups) {
+    if (!opts.usageOnly && ctx.seenComponents.has(key)) continue
+    addCandidate(ctx, g.cand)
+  }
 
   // ---- 2. diagnose (detached / not a component / layer names) in the same pass ------------
   const svgCache = new Map<string, string | null>()
@@ -228,18 +251,57 @@ export async function scan(
   const componentFixes = new Map<string, FixCandidate[]>()
   if (!opts.usageOnly) {
     phase('Checking components…')
-    for (const c of ctx.candidates) if (c.node.type === 'COMPONENT') diag.addComponent(c.node)
-    for (const f of await diag.componentFixes()) componentFixes.set(f.nodeId, [...(componentFixes.get(f.nodeId) ?? []), f])
+    let n = 0
+    for (const c of ctx.candidates) {
+      if (cancelled()) break
+      if (c.node.type !== 'COMPONENT') continue
+      try {
+        diag.addComponent(c.node)
+      } catch (e) {
+        console.warn('[icon-toolkit] could not read component', c.node.name, e) // one unreadable component must not end the scan
+      }
+      if (++n % 200 === 0) await yieldToUi()
+    }
+    try {
+      for (const f of await diag.componentFixes()) componentFixes.set(f.nodeId, [...(componentFixes.get(f.nodeId) ?? []), f])
+    } catch (e) {
+      console.warn('[icon-toolkit] component checks failed; icons are still exported', e)
+    }
     if (diag.leafNames) ctx.summary.leafNames = diag.leafNames
   }
 
-  // ---- 3. facts + SVG per candidate ---------------------------------------
-  let batch: RawIcon[] = []
-  let done = 0
+  // ---- 3. facts + SVG per candidate, a few at a time ---------------------------------------
   const total = ctx.candidates.length
   phase(total ? `Reading ${total} icons…` : 'No icons found')
-  for (const c of ctx.candidates) {
+  let done = 0
+  for (let start = 0; start < total; start += EXPORT_CONCURRENCY) {
     if (cancelled()) break
+    const chunk = ctx.candidates.slice(start, start + EXPORT_CONCURRENCY)
+    const batch = await Promise.all(chunk.map((c) => readCandidate(c, diag, componentFixes, svgCache, opts)))
+    done += chunk.length
+    ctx.summary.scanned = done
+    onBatch(batch, total ? done / total : 1)
+    await yieldToUi()
+  }
+  return ctx.summary
+}
+
+/** One icon's facts, SVG and fixes. Never throws: a layer that cannot be read becomes an icon with an `exportError` (blocked, visible in the list). */
+async function readCandidate(
+  c: Candidate,
+  diag: Diagnoser,
+  componentFixes: Map<string, FixCandidate[]>,
+  svgCache: Map<string, string | null>,
+  opts: ScanOptions
+): Promise<RawIcon> {
+  const page = pageOf(c.node)
+  const fallback = (message: string): RawIcon => ({
+    key: c.node.id, nodeId: c.node.id, pageId: page ? page.id : figma.currentPage.id, pageName: cleanPageName(page ? page.name : figma.currentPage.name),
+    sourceKind: c.sourceKind, rawName: c.rawName, setName: c.setName, variantProps: c.variantProps, componentKey: c.componentKey, description: c.description,
+    width: 0, height: 0, padding: null, facts: emptyFacts(), svg: null, exportError: message, categoryCtx: c.ctx
+  })
+  try {
+    if (c.node.removed) return fallback('The layer was removed while scanning')
     const target = await load(c)
     let facts, padding
     try {
@@ -251,11 +313,10 @@ export async function scan(
     let exportError: string | undefined
     try {
       if (svg === null) svg = await target.node.exportAsync(EXPORT)
-      svgCache.set(target.node.id, svg)
     } catch (e) {
       exportError = e instanceof Error ? e.message : String(e)
     }
-    const page = pageOf(c.node)
+    svgCache.delete(target.node.id) // the SVG now lives in the RawIcon; do not keep a second copy for the whole scan
     const svgOutlined = facts.paints.some((p) => p.role === 'stroke') ? outlinedSvg(target.node) : undefined
     const fixes: FixCandidate[] = [...(componentFixes.get(c.node.id) ?? [])]
     if (!c.instance && (c.sourceKind === 'frame' || c.sourceKind === 'loose')) {
@@ -266,7 +327,7 @@ export async function scan(
         /* diagnosis is best effort; the icon is still exported */
       }
     }
-    batch.push({
+    return {
       key: c.node.id,
       nodeId: c.node.id,
       pageId: page ? page.id : figma.currentPage.id,
@@ -287,15 +348,8 @@ export async function scan(
       exportError,
       categoryCtx: c.ctx,
       usage: c.instance ? toUsage(c.instance.agg, target.exportedFrom === 'main' ? 'main' : 'instance') : undefined
-    })
-    done++
-    ctx.summary.scanned = done
-    if (batch.length >= 15) {
-      onBatch(batch, total ? done / total : 1)
-      batch = []
-      await new Promise((r) => setTimeout(r, 0))
     }
+  } catch (e) {
+    return fallback(e instanceof Error ? e.message : String(e))
   }
-  if (batch.length) onBatch(batch, 1)
-  return ctx.summary
 }

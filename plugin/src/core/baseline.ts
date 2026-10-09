@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, Unzlib, zlibSync } from 'fflate'
 import { CatalogIcon, Diff, PreviousCatalog } from './changelog'
-import { hash32 } from './fixes'
+import { hash32 } from './hash'
 
 /**
  * Baseline = the snapshot "changed since" is measured against.
