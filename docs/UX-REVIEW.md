@@ -31,7 +31,7 @@ The product is capable and honest (nothing writes to the file without consent, r
 | **Jargon**: "T4 Componentised", "Strictness: Lenient", "Fix order: Remove blockers → Normalise names → …", "Include all" | 🟡 Moderate | See UX copy below |
 | **Labs mixed into the flow** (the "Enable Labs" toggle sits between Team config and formats; fix actions appear in Issues) | 🟡 Moderate | Labs gets its own tab with the consequences stated once ("Can edit this file. Use a branch or a copy.") |
 | Icon row meta line has up to five fragments ("Icons · used ×1 · Icon home · filled") | 🟢 Minor | One line: category · usage. Layer name and kind move to the detail view / hover |
-| Empty / first-run state is just the controls | 🟢 Minor | A short explanation and one button (mockup 6) |
+| Empty / first-run state is just the controls | 🟢 Minor | Keep the same skeleton and explain in the content area, top-aligned; do not move or hide existing controls (mockups 6 and 7) |
 
 ### Visual hierarchy
 - **What draws the eye first:** the top blue button. **Should be:** the library status ("16 icons · 2 warnings"), then the list.
@@ -86,11 +86,48 @@ Measured in the running UI and in `src/styles.css`:
 ### Priority recommendations
 1. **Tabbed Settings, Output first.** Five tabs, formats as cards with size estimates, one shared format component used by Settings and Export. Fixes the biggest usability problem and the one you named.
 2. **Visible active states and one spacing scale.** Tabs, chips, segments, selected rows and format cards as in the table above; adopt the 4-point scale. Cheap (mostly CSS) and changes how the whole product feels.
-3. **Restructure the main screen around Scan → Review → Export.** One scan row with a status line, a sticky Export bar as the only primary action, a real first-run state.
+3. **Restructure the main screen around Scan → Review → Export on one stable skeleton.** One scan row with a fixed-height status line, tabs and toolbar always present (disabled until there are results), a sticky Export bar as the only primary action. First run, scanning and results are the same layout; only the content area changes (see the layout rule above).
 4. **Plain-language copy and hints instead of tooltips** (below).
 5. **Consolidate Issues** into one summary sentence plus cards with "How to fix".
 
 ---
+
+## Layout rule: one stable skeleton (no reflow between states)
+
+A centred first-run card, a results screen and a scanning screen that each arrange the window differently would make people re-find every control. Rule: **the window has one skeleton; states change content, never position.**
+
+```
+┌────────────────────────────────────────┐  fixed zones, top to bottom
+│ Scan bar    [scope ▾────] [Scan/Cancel] ⚙│  1. right-anchored button, same y in every state
+│ Status line (fixed 34 px)              │  2. text, or text + progress bar, same height
+├────────────────────────────────────────┤
+│ Icons n │ Issues n │ Skipped n         │  3. tabs always visible, counts 0 / – when unknown
+├────────────────────────────────────────┤
+│ Search · view switch                   │  4. toolbar always rendered; disabled until results
+│ Chips: All · Blocked · Warnings · Cat  │
+│ Select all                             │
+│ ── content area (the only thing that   │  5. empty explanation, skeleton rows, or the list
+│    changes between states) ──          │     starts at the top of the area, never centred
+├────────────────────────────────────────┤
+│ Status        [Export n icons]         │  6. sticky bar, same place; button disabled until ready
+└────────────────────────────────────────┘
+```
+
+| State | Scan bar button | Status line | Toolbar | Content area | Footer |
+|---|---|---|---|---|---|
+| First run | **Scan selection** (primary) | "Not scanned yet · 1 layer selected · Your file is never changed" | disabled, in place | top-aligned explanation card | "Nothing to export yet" · Export disabled |
+| Scanning | **Cancel scan** (same spot) | "Reading icons… 120 of 340" + progress bar inside the fixed-height row | disabled | rows appear as they arrive, skeleton rows for the rest | "Export is available when the scan finishes" · disabled |
+| Results | **Scan again** (secondary) | "16 icons · 2 warnings · 24 × 24 grid · Library health good" | enabled | the list | "16 icons ready · 5 formats" · **Export 16 icons** |
+| Nothing found | **Scan again** | "No icons found" | disabled | explanation + next steps (below) | Export disabled |
+| Error | **Scan again** | error message in the status row (red dot) | disabled | explanation of what to try | Export disabled |
+
+Implementation rules that keep this true:
+- Reserve space instead of adding rows: the status line has a fixed height; progress is drawn inside it, not below it.
+- Anchor the scan button to the right edge; its width may change with the label but nothing to its left shifts (the scope control is the flexible element).
+- Disable, don't hide: tabs, toolbar and the Export button always exist. Disabled controls use 45 % opacity and `not-allowed`, and a tooltip says why ("Scan first").
+- Content that arrives later (rows, counts) fills reserved space; skeleton rows show where it will appear.
+- Messages replace text in an existing slot; they never push content down. Transient messages use the status line or a toast, not a new banner.
+- Mockup screens 1, 6 and 7 are the same layout in three states; measured in the browser, the tabs, scan button, search field and Export button sit at identical coordinates in all three.
 
 ## Proposed information architecture
 
@@ -139,7 +176,10 @@ Principles: formats first; frequent before rare; each tab fits in about one scre
 **Issues summary:** "2 warnings affect 2 icons. Nothing blocks the export. None can be fixed automatically."
 **Issue card:** *Shadow or blur effect* · "Effects can't be themed, so the export draws the icon without them." · **How to fix:** "Remove the effect in Figma, then scan again."
 **Fix order link:** "Suggested order for fixing a whole library"
-**Empty state (first run):** "Find and export your icons. Choose where to look, then scan. Your file is never changed."
+**First run (content area, top-aligned):** "No scan yet. Press Scan selection to list the icons in the layers you selected. Use Page or Document to look wider. Nothing in your file changes."
+**First run (status line):** "Not scanned yet · 1 layer selected · Your file is never changed"
+**Scanning:** "Reading icons… 120 of 340" · button "Cancel scan"
+**Disabled Export (footer):** "Nothing to export yet" / "Export is available when the scan finishes"
 **Empty state (nothing found):** "No icons found. Try Page or Document, or check Skipped for layers that were left out."
 **Export dialog title:** "Export 16 icons"; **Primary:** "Download ZIP · 16 icons, 42 files"; **Secondary:** "Send to project folder…"
 **Settings header note:** "Saved on this computer. Nothing is written to your Figma file."
@@ -194,12 +234,12 @@ Labels name the user's task or the outcome ("What to export", "Same name twice")
 |---|---|---|---|
 | 1 | Spacing tokens + active/hover/pressed/focus states (CSS only) | S | `styles.css` |
 | 2 | `SettingsTabs` component and the five-tab regrouping; shared `FormatCards` used by Settings and Export | M | `ui/Settings.tsx` split into `ui/settings/*`, `ui/ExportPanel.tsx` |
-| 3 | Main screen: one scan row, status line, sticky export bar, first-run state | M | `ui.tsx`, `ui/` |
+| 3 | Main screen on the stable skeleton: one scan row, fixed-height status line, always-present tabs/toolbar, sticky export bar, first-run and scanning content states | M | `ui.tsx`, `ui/` |
 | 4 | Copy pass (labels, hints, issue cards, dialogs); hints replace most Ⓘ | S | `core/rules.ts`, `ui/*` |
 | 5 | Issues tab consolidation | S | `ui.tsx`, `ui/Fixes.tsx` |
 | 6 | Plural/i18n helper, 32 px icon buttons, contrast check in both themes | S | `ui/util.ts`, `styles.css` |
 
-Verification: re-run the browser harness (light and dark) for the five screens; check keyboard order and 4.5:1 contrast on the brand button and warning chips; the existing unit tests must stay green (the pure selectors and hooks are unaffected).
+Verification: re-run the browser harness (light and dark) for the five screens, and add a check that the tabs, scan button, search field and Export button keep the same coordinates across first run, scanning and results; check keyboard order and 4.5:1 contrast on the brand button and warning chips; the existing unit tests must stay green (the pure selectors and hooks are unaffected).
 
 ## Open questions for you
 1. Should formats be editable in **both** Settings and the Export dialog (proposed, one shared component), or only in Settings?

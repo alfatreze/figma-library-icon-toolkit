@@ -96,6 +96,9 @@ button{font:inherit;color:inherit}
 /* sticky action bar: the one primary action once there are results */
 .foot{border-top:1px solid var(--line);padding:var(--s3) var(--s4);display:flex;align-items:center;gap:var(--s3);background:var(--bg)}
 .status{display:flex;gap:var(--s2);align-items:center;color:var(--muted)}
+/* fixed height: a progress bar or a longer message must never push the tabs down */
+.top .status{height:34px}
+.top .status.progress{flex-direction:column;align-items:stretch;justify-content:center;gap:6px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
 
 /* cards and settings */
@@ -123,12 +126,18 @@ button{font:inherit;color:inherit}
 .step{display:flex;gap:var(--s2);align-items:center;color:var(--muted);font-size:11px}
 .step b{color:var(--text)}
 svg{display:block}
+.empty{border:1px dashed var(--line);border-radius:8px;padding:var(--s4);display:flex;flex-direction:column;gap:var(--s2)}
+.empty p{margin:0}
+.bar-track{height:4px;border-radius:2px;background:var(--bg3);overflow:hidden}
+.bar-fill{height:100%;background:var(--brand)}
+.skel .thumb,.sk{background:var(--bg3);border-radius:4px}
+.sk{height:10px}
 </style>
 </head>
 <body>
 <div class="page">
   <h1>Icon Library Toolkit: proposed UI</h1>
-  <p class="lead">Mockup of the redesign proposed in <code>docs/UX-REVIEW.md</code>. Same 460 × 640 window. Changes: one scan row, Export as the single primary action, tabbed Settings with output formats first, a 4 / 8 / 12 / 16 spacing scale, and clearly visible active states (tabs, chips, segments, selected rows, format cards). Use the toggle to check dark mode.</p>
+  <p class="lead">Mockup of the redesign proposed in <code>docs/UX-REVIEW.md</code>. <b>Design rule: one stable skeleton.</b> Screens 1, 6 and 7 are the same layout in three states (results, first run, scanning); no element changes position between them. Same 460 × 640 window. Changes: one scan row, Export as the single primary action, tabbed Settings with output formats first, a 4 / 8 / 12 / 16 spacing scale, and clearly visible active states (tabs, chips, segments, selected rows, format cards). Use the toggle to check dark mode.</p>
   <div class="bar"><button id="theme">Toggle dark mode</button></div>
 
   <div class="frames">
@@ -328,24 +337,96 @@ svg{display:block}
     </div>
   </figure>
 
-  <!-- 6. Empty / first run -->
+  <!-- 6. First run: same skeleton, only the content area changes -->
   <figure>
-    <figcaption>6 · First run (empty state)<span>Says what happens, what will not happen, and the next step. No results chrome until there are results.</span></figcaption>
+    <figcaption>6 · First run (before any scan)<span>Identical skeleton to screen 1: nothing moves when results arrive. Unavailable controls stay in place, disabled. The explanation lives in the list area, top-aligned.</span></figcaption>
     <div class="win">
       <div class="top">
-        <div class="row"><div class="title grow">Icon Library Toolkit</div><button class="icon-btn">⚙</button></div>
-      </div>
-      <div class="body"><div class="scroll" style="display:flex;flex-direction:column;justify-content:center;gap:16px">
-        <div class="card" style="gap:16px">
-          <h3 style="font-size:14px">Find and export your icons</h3>
-          <p>Choose where to look, then scan. Your file is never changed.</p>
-          <div class="seg"><button aria-pressed="true">Selection</button><button aria-pressed="false">Page</button><button aria-pressed="false">Document</button></div>
-          <div class="notice"><span>ℹ</span><span>1 layer selected: <b>Icons / Navigation</b>. Selection scans only what you picked.</span></div>
-          <button class="btn primary" style="height:36px">Scan selection</button>
-          <div class="row"><span class="switch"></span><span>Only icons used in designs (instances)</span></div>
+        <div class="row">
+          <div class="seg grow" role="group" aria-label="Scan scope">
+            <button aria-pressed="true">Selection</button><button aria-pressed="false">Page</button><button aria-pressed="false">Document</button>
+          </div>
+          <button class="btn primary">Scan selection</button>
+          <button class="icon-btn" aria-label="Settings">⚙</button>
         </div>
-        <p class="muted" style="text-align:center">Then: review warnings → export SVG, sprite, Angular, React and more.</p>
-      </div></div>
+        <div class="status"><span class="dot" style="background:var(--bg3)"></span><span>Not scanned yet · 1 layer selected · Your file is never changed</span></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">Icons <span class="badge">0</span></button>
+        <button class="tab" role="tab" aria-selected="false">Issues <span class="badge">0</span></button>
+        <button class="tab" role="tab" aria-selected="false">Skipped <span class="badge">0</span></button>
+      </div>
+      <div class="body">
+        <div class="scroll">
+          <div class="row" style="margin-bottom:12px">
+            <div class="field grow" style="opacity:.55"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search icons</div>
+            <div class="seg" style="width:104px;opacity:.55"><button aria-pressed="true">☰</button><button aria-pressed="false">▦</button></div>
+          </div>
+          <div class="chips" style="margin-bottom:12px">
+            <button class="chip" aria-pressed="true" disabled>All 0</button>
+            <button class="chip" aria-pressed="false" disabled>Blocked 0</button>
+            <button class="chip" aria-pressed="false" disabled>Warnings 0</button>
+            <button class="chip" aria-pressed="false" disabled>Category ▾</button>
+          </div>
+          <div class="row" style="padding:0 12px 8px 15px;opacity:.45"><span class="cb"></span><span class="muted">Select all</span></div>
+          <div class="empty">
+            <b>No scan yet</b>
+            <p>Press <b>Scan selection</b> to list the icons in the layers you selected. Use <b>Page</b> or <b>Document</b> to look wider. Nothing in your file changes.</p>
+            <p class="muted">After a scan: review warnings, then export SVG, sprite, Angular, React and more.</p>
+          </div>
+        </div>
+        <div class="foot">
+          <div class="status grow"><span class="dot" style="background:var(--bg3)"></span>Nothing to export yet</div>
+          <button class="btn primary" disabled style="opacity:.45;cursor:not-allowed">Export</button>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- 7. Scanning -->
+  <figure>
+    <figcaption>7 · Scanning<span>Same skeleton again. The scan button becomes “Cancel” in the same spot, progress replaces the status text in the same row, and rows appear in the list as they arrive.</span></figcaption>
+    <div class="win">
+      <div class="top">
+        <div class="row">
+          <div class="seg grow" role="group" aria-label="Scan scope" style="opacity:.55">
+            <button aria-pressed="false">Selection</button><button aria-pressed="true">Page</button><button aria-pressed="false">Document</button>
+          </div>
+          <button class="btn">Cancel scan</button>
+          <button class="icon-btn" aria-label="Settings">⚙</button>
+        </div>
+        <div class="status progress"><div class="row"><span class="dot" style="background:var(--brand)"></span><span><b style="color:var(--text)">Reading icons…</b> 120 of 340</span></div><div class="bar-track"><div class="bar-fill" style="width:35%"></div></div></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true">Icons <span class="badge">120</span></button>
+        <button class="tab" role="tab" aria-selected="false">Issues <span class="badge">–</span></button>
+        <button class="tab" role="tab" aria-selected="false">Skipped <span class="badge">–</span></button>
+      </div>
+      <div class="body">
+        <div class="scroll">
+          <div class="row" style="margin-bottom:12px">
+            <div class="field grow" style="opacity:.55">Search icons</div>
+            <div class="seg" style="width:104px;opacity:.55"><button aria-pressed="true">☰</button><button aria-pressed="false">▦</button></div>
+          </div>
+          <div class="chips" style="margin-bottom:12px">
+            <button class="chip" aria-pressed="true" disabled>All 120</button>
+            <button class="chip" aria-pressed="false" disabled>Blocked</button>
+            <button class="chip" aria-pressed="false" disabled>Warnings</button>
+            <button class="chip" aria-pressed="false" disabled>Category ▾</button>
+          </div>
+          <div class="row" style="padding:0 12px 8px 15px;opacity:.45"><span class="cb"></span><span class="muted">Select all</span></div>
+          <div class="list">
+            <div class="item"><span class="cb"></span><span class="thumb">⌂</span><div><div class="name">home</div><div class="muted">Navigation · used 4×</div></div><span></span><span class="muted">…</span></div>
+            <div class="item"><span class="cb"></span><span class="thumb">⌕</span><div><div class="name">search</div><div class="muted">Navigation · used 2×</div></div><span></span><span class="muted">…</span></div>
+            <div class="item skel"><span class="cb"></span><span class="thumb"></span><div><div class="sk" style="width:90px"></div><div class="sk" style="width:140px;margin-top:6px"></div></div><span></span><span></span></div>
+            <div class="item skel"><span class="cb"></span><span class="thumb"></span><div><div class="sk" style="width:70px"></div><div class="sk" style="width:120px;margin-top:6px"></div></div><span></span><span></span></div>
+          </div>
+        </div>
+        <div class="foot">
+          <div class="status grow"><span class="dot" style="background:var(--bg3)"></span>Export is available when the scan finishes</div>
+          <button class="btn primary" disabled style="opacity:.45;cursor:not-allowed">Export</button>
+        </div>
+      </div>
     </div>
   </figure>
 
