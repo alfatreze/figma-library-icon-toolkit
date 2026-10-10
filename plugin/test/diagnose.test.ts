@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { cleanPageName, leavesOf, signatureOf } from '../src/main/diagnose'
-import { emptyFacts, gatherFacts, isIconish, toHex } from '../src/main/facts'
+import { emptyFacts, gatherFacts, isIconish, resetFactCaches, toHex } from '../src/main/facts'
 import { FakeFigma, FakeNode, installFigma, makeComponent, makeFrame } from './helpers/fakeFigma'
 
 let fig: FakeFigma
 beforeEach(() => {
   fig = installFigma()
+  resetFactCaches()
 })
 const asScene = (n: FakeNode) => n as unknown as SceneNode
 
@@ -68,5 +69,30 @@ describe('diagnose helpers', () => {
     const c = makeFrame(fig, fig.page as unknown as FakeNode, 'h other', ['#111111', '#111111'])
     expect(signatureOf(asScene(a)).geom).toBe(signatureOf(asScene(b)).geom)
     expect(signatureOf(asScene(a)).geom).not.toBe(signatureOf(asScene(c)).geom)
+  })
+})
+
+describe('facts: variable modes', () => {
+  const rgb = (r: number, g: number, b: number) => ({ r, g, b })
+  const bind = (hex: string, id: string) => ({ type: 'SOLID', color: { r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255, b: parseInt(hex.slice(5, 7), 16) / 255 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id } } })
+
+  it('reads the colour of a variable in every mode, following aliases', async () => {
+    fig.variables.collections.set('c1', { id: 'c1', name: 'Semantic', defaultModeId: 'm1', modes: [{ modeId: 'm1', name: 'Light' }, { modeId: 'm2', name: 'Dark' }] })
+    fig.variables.collections.set('c0', { id: 'c0', name: 'Primitives', defaultModeId: 'p1', modes: [{ modeId: 'p1', name: 'Value' }] })
+    fig.variables.store.set('V:base', { id: 'V:base', name: 'neutral/900', resolvedType: 'COLOR', variableCollectionId: 'c0', valuesByMode: { p1: rgb(0.1, 0.1, 0.1) } })
+    fig.variables.store.set('V:icon', { id: 'V:icon', name: 'color/icon/primary', resolvedType: 'COLOR', variableCollectionId: 'c1', valuesByMode: { m1: { type: 'VARIABLE_ALIAS', id: 'V:base' }, m2: rgb(1, 1, 1) } })
+    const c = makeComponent(fig, 'icon/Home')
+    c.children[0].fills = [bind('#1a1a1a', 'V:icon')]
+    const { facts } = await gatherFacts(asScene(c))
+    expect(facts.paints[0]).toMatchObject({ variable: 'color/icon/primary', collection: 'Semantic', modes: { Light: '#1a1a1a', Dark: '#ffffff' } })
+  })
+
+  it('has no modes for a variable of a single-mode collection', async () => {
+    fig.variables.collections.set('c0', { id: 'c0', name: 'Primitives', defaultModeId: 'p1', modes: [{ modeId: 'p1', name: 'Value' }] })
+    fig.variables.store.set('V:base', { id: 'V:base', name: 'neutral/900', resolvedType: 'COLOR', variableCollectionId: 'c0', valuesByMode: { p1: rgb(0.1, 0.1, 0.1) } })
+    const c = makeComponent(fig, 'icon/Home')
+    c.children[0].fills = [bind('#1a1a1a', 'V:base')]
+    const { facts } = await gatherFacts(asScene(c))
+    expect(facts.paints[0].modes).toBeUndefined()
   })
 })

@@ -18,6 +18,7 @@ import { useFilters } from './ui/hooks/useFilters'
 import { useDescriptions } from './ui/hooks/useDescriptions'
 import { DescriptionsDialog } from './ui/DescriptionsDialog'
 import { ReportDialog } from './ui/ReportDialog'
+import { MappingDialog } from './ui/MappingDialog'
 import { BulkRenameDialog } from './ui/BulkRenameDialog'
 import { useBulkRename } from './ui/hooks/useBulkRename'
 import { buildHealth, healthHtml, healthMarkdown } from './core/report'
@@ -244,12 +245,13 @@ function Plugin() {
       warnings: exportable.filter((i) => i.findings.some((f) => f.severity === 'warn')).length,
       date: new Date().toISOString().slice(0, 10)
     })
+  const [mappingOpen, setMappingOpen] = useState(false)
   const bulkRename = useBulkRename(icons, visible)
   const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
   const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
   const scanVariables = useMemo(() => {
-    const seen = new Map<string, { variable: string; collection?: string }>()
-    for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection })
+    const seen = new Map<string, { variable: string; collection?: string; modes?: Record<string, string> }>()
+    for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection, ...(p.modes ? { modes: p.modes } : {}) })
     return [...seen.values()]
   }, [raws])
   const exampleVariable = useMemo(() => {
@@ -632,8 +634,11 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, testMessages: publish.testMessages, onTestRepo: publish.test, outputProblems: publish.problems }}
+          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onOpenMapping: () => setMappingOpen(true), onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, testMessages: publish.testMessages, onTestRepo: publish.test, outputProblems: publish.problems }}
         />
+      )}
+      {mappingOpen && (
+        <MappingDialog naming={settings.tokenNaming} variables={scanVariables} onChange={(mapping) => patch({ tokenNaming: { ...settings.tokenNaming, mapping } })} onClose={() => setMappingOpen(false)} />
       )}
       <div class={styles.grip} />
     </div>

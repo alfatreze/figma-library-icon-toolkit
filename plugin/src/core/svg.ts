@@ -9,12 +9,12 @@ export interface ThemeOptions {
   strokePolicy: StrokePolicy
   precision: number
   /** resolved hex (#rrggbb) -> Figma variable (name + collection) */
-  variableByHex: Map<string, { name: string; collection?: string }>
+  variableByHex: Map<string, { name: string; collection?: string; modes?: Record<string, string> }>
   /** paints in Figma tree order; when they line up 1:1 with the SVG's colours, variables are matched by order instead of by hex */
   paints?: PaintFact[]
 }
 
-type VarRef = { name: string; collection?: string }
+type VarRef = { name: string; collection?: string; modes?: Record<string, string> }
 
 /**
  * Match each SVG colour to the Figma variable bound to the same layer, by order, not by colour value.
@@ -27,7 +27,7 @@ export function alignVariables(drawables: { attr: 'fill' | 'stroke'; hex: string
   for (let i = 0; i < drawables.length; i++) {
     const p = paints[i]
     if (p.role !== drawables[i].attr || p.hex !== drawables[i].hex) return null
-    out.push(p.variable ? { name: p.variable, collection: p.collection } : undefined)
+    out.push(p.variable ? { name: p.variable, collection: p.collection, ...(p.modes ? { modes: p.modes } : {}) } : undefined)
   }
   return out
 }
@@ -180,6 +180,7 @@ export function themeSvg(svgText: string, opts: ThemeOptions): ThemedSvg {
       hex,
       uses: s.uses,
       variable: variable?.name,
+      ...(variable?.modes ? { modes: variable.modes } : {}),
       token: variable ? tokenVarName(variable.name, variable.collection, opts.tokenNaming) ?? undefined : undefined
     }
   })

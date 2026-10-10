@@ -135,7 +135,7 @@ export interface FakeFigma {
   nodes: Map<string, FakeNode>
   storage: Map<string, unknown>
   notify: (m: string) => void
-  variables: { store: Map<string, { id: string; name: string }> }
+  variables: { store: Map<string, Record<string, unknown> & { id: string; name: string }>; collections: Map<string, Record<string, unknown>> }
   [k: string]: unknown
 }
 
@@ -172,7 +172,9 @@ export function installFigma(opts: { fileKey?: string } = {}): FakeFigma {
     },
     commitUndo: () => {},
     variables: {
-      store: new Map<string, { id: string; name: string }>(),
+      store: new Map<string, Record<string, unknown> & { id: string; name: string }>(),
+      collections: new Map<string, Record<string, unknown>>(),
+      getVariableCollectionByIdAsync: async (id: string) => api.variables.collections.get(id) ?? null,
       getVariableByIdAsync: async (id: string) => api.variables.store.get(id) ?? null,
       setBoundVariableForPaint: (paint: Record<string, unknown>, field: string, v: { id: string }) => ({ ...paint, boundVariables: { [field]: { type: 'VARIABLE_ALIAS', id: v.id } } })
     },

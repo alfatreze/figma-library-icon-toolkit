@@ -20,7 +20,7 @@
     "web-component": 3
   },
   "plugin": {
-    "main.js": 66000,
+    "main.js": 72000,
     "ui.js": 400000
   }
 }

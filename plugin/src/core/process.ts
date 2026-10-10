@@ -14,9 +14,9 @@ export interface Processed {
   tierCounts: Record<Tier, number>
 }
 
-function variableMap(raw: RawIcon): Map<string, { name: string; collection?: string }> {
-  const m = new Map<string, { name: string; collection?: string }>()
-  for (const p of raw.facts.paints) if (p.variable && !m.has(p.hex)) m.set(p.hex, { name: p.variable, collection: p.collection })
+function variableMap(raw: RawIcon): Map<string, { name: string; collection?: string; modes?: Record<string, string> }> {
+  const m = new Map<string, { name: string; collection?: string; modes?: Record<string, string> }>()
+  for (const p of raw.facts.paints) if (p.variable && !m.has(p.hex)) m.set(p.hex, { name: p.variable, collection: p.collection, ...(p.modes ? { modes: p.modes } : {}) })
   return m
 }
 

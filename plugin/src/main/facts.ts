@@ -16,7 +16,8 @@ export function toHex(c: RGB): string {
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`
 }
 
-const variableInfos = new Map<string, { name: string; collection?: string } | null>()
+type VariableInfo = { name: string; collection?: string; modes?: Record<string, string> }
+const variableInfos = new Map<string, VariableInfo | null>()
 const collectionNames = new Map<string, string>()
 
 /** variable and collection names are cached for speed; a new scan must see renames */
@@ -25,9 +26,38 @@ export function resetFactCaches(): void {
   collectionNames.clear()
 }
 
-export async function variableInfo(id: string): Promise<{ name: string; collection?: string } | null> {
+const MAX_MODES = 8
+
+/** a colour variable's value in one mode, following aliases (an alias is read in the same mode of its own collection when it has one, else that collection's default) */
+async function colourIn(v: Variable, modeId: string, depth = 0): Promise<string | null> {
+  const value = v.valuesByMode[modeId]
+  if (!value || typeof value !== 'object') return null
+  if ('type' in value && value.type === 'VARIABLE_ALIAS') {
+    if (depth > 5) return null
+    const target = await figma.variables.getVariableByIdAsync(value.id)
+    if (!target) return null
+    const coll = await figma.variables.getVariableCollectionByIdAsync(target.variableCollectionId)
+    return colourIn(target, coll && coll.modes.some((m) => m.modeId === modeId) ? modeId : coll?.defaultModeId ?? modeId, depth + 1)
+  }
+  return 'r' in value ? toHex(value as RGB) : null
+}
+
+/** the colour in every mode of the variable's collection (Light, Dark…), only when there is more than one mode */
+async function colourModes(v: Variable): Promise<Record<string, string> | undefined> {
+  if (v.resolvedType !== 'COLOR') return undefined
+  const coll = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId)
+  if (!coll || coll.modes.length < 2) return undefined
+  const out: Record<string, string> = {}
+  for (const m of coll.modes.slice(0, MAX_MODES)) {
+    const hex = await colourIn(v, m.modeId)
+    if (hex) out[m.name] = hex
+  }
+  return Object.keys(out).length > 1 ? out : undefined
+}
+
+export async function variableInfo(id: string): Promise<VariableInfo | null> {
   if (variableInfos.has(id)) return variableInfos.get(id) ?? null
-  let info: { name: string; collection?: string } | null = null
+  let info: VariableInfo | null = null
   try {
     const v = await figma.variables.getVariableByIdAsync(id)
     if (v) {
@@ -37,7 +67,8 @@ export async function variableInfo(id: string): Promise<{ name: string; collecti
         collection = c ? c.name : ''
         collectionNames.set(v.variableCollectionId, collection)
       }
-      info = { name: v.name, collection: collection || undefined }
+      const modes = await colourModes(v)
+      info = { name: v.name, collection: collection || undefined, ...(modes ? { modes } : {}) }
     }
   } catch (e) {
     log.debug('facts', 'ignored', e)
@@ -65,7 +96,8 @@ async function collectPaints(node: SceneNode, facts: Facts): Promise<void> {
           hex: toHex(paint.color),
           opacity: paint.opacity ?? 1,
           variable: info?.name,
-          collection: info?.collection
+          collection: info?.collection,
+          ...(info?.modes ? { modes: info.modes } : {})
         }
         facts.paints.push(p)
       } else if (paint.type === 'IMAGE') facts.hasImage = true

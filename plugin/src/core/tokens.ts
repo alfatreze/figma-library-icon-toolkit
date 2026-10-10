@@ -99,3 +99,45 @@ export function suggestMapping(vars: { variable: string; collection?: string }[]
 export function tokenPreview(example: { variable: string; collection?: string }, cfg: TokenNaming): string {
   return tokenVarName(example.variable, example.collection, cfg) ?? '(none)'
 }
+
+// ---- the mapping table as data ---------------------------------------------------------------------------------------------------
+// The text of the custom mapping stays the single source of truth (it is what the team config carries); the visual table edits it line by line.
+
+export const mappingKey = (variable: string, collection?: string) => (collection ? `${collection}::${variable}` : variable)
+
+/** a CSS custom property name as the mapping accepts it: starts with --, letters digits _ - only */
+export function normaliseCssVar(input: string): string {
+  const t = input.trim()
+  if (!t) return ''
+  return t.startsWith('--') ? t : '--' + t
+}
+export const validCssVar = (v: string) => /^--[A-Za-z0-9_-]+$/.test(v)
+
+/** the CSS name written for this variable in the mapping text (a line for exactly this variable, not a wildcard), or '' */
+export function explicitMapping(mapping: string, variable: string, collection?: string): string {
+  return parseMapping(mapping).get(mappingKey(variable, collection)) ?? ''
+}
+
+/** the mapping text with this variable's line set to `cssVar` (added, replaced) or removed when `cssVar` is empty; other lines and comments are kept */
+export function setMappingEntry(mapping: string, variable: string, collection: string | undefined, cssVar: string): string {
+  const key = mappingKey(variable, collection)
+  const to = normaliseCssVar(cssVar)
+  const lines = mapping.split(/\r?\n/)
+  let found = false
+  const out: string[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    const i = line.indexOf('=')
+    if (line && !line.startsWith('#') && !line.startsWith('//') && i > 0 && line.slice(0, i).trim() === key) {
+      if (!found && to) out.push(`${key} = ${to}`)
+      found = true
+      continue
+    }
+    out.push(raw)
+  }
+  if (!found && to) {
+    while (out.length && out[out.length - 1].trim() === '') out.pop()
+    out.push(`${key} = ${to}`)
+  }
+  return out.join('\n')
+}

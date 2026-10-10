@@ -14,6 +14,8 @@ export interface PaintFact {
   opacity: number
   variable?: string // Figma variable name, e.g. "color/icon/primary"
   collection?: string // name of the variable collection
+  /** the variable's colour in each mode of its collection (mode name -> #rrggbb), when it has more than one mode */
+  modes?: Record<string, string>
 }
 
 /** Plain, serialisable facts gathered from the Figma node tree (main thread). */
@@ -123,6 +125,8 @@ export interface SlotInfo {
   hex: string
   token?: string
   variable?: string
+  /** the colour in each mode of the variable's collection (e.g. Light / Dark), when the variable has several */
+  modes?: Record<string, string>
   uses: number
 }
 

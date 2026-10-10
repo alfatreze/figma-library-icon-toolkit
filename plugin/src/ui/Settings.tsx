@@ -37,7 +37,8 @@ export interface SettingsExtras {
   overview: OverviewRow[] | null
   exampleVariable: { variable: string; collection?: string }
   /** every distinct Figma variable bound in the last scan */
-  scanVariables: { variable: string; collection?: string }[]
+  scanVariables: { variable: string; collection?: string; modes?: Record<string, string> }[]
+  onOpenMapping: () => void
   onAttachDevResources: () => void
   onCopyDiagnostics: () => void
   scannedComponents: number
@@ -195,6 +196,9 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               <div class={styles.fieldRow}>
                 <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} data-hint={extras.scanVariables.length ? '' : 'Scan first: the table is built from the variables your icons use'} onClick={() => patch({ tokenNaming: { ...settings.tokenNaming, mapping: suggestMapping(extras.scanVariables, settings.tokenNaming) } })}>
                   Fill from scan ({plural(extras.scanVariables.length, 'variable')})
+                </button>
+                <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} data-hint={extras.scanVariables.length ? 'See every variable with its colours per mode and name it in a table' : 'Scan first: the table is built from the variables your icons use'} onClick={extras.onOpenMapping}>
+                  Open as table…
                 </button>
               </div>
               <TextboxMultiline rows={8} value={settings.tokenNaming.mapping} onValueInput={(v) => patch({ tokenNaming: { ...settings.tokenNaming, mapping: v } })} placeholder={'color/icon/default = --icon-color\ncolor/icon/muted = --icon-muted'} />
