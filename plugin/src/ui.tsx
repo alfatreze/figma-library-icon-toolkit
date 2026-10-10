@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { summariseCategories } from './core/categories'
 import { buildFiles, TARGETS } from './core/generators'
 import { fixesReportMarkdown, fixPlanMarkdown } from './core/generators/manifest'
-import { BASELINE_LABEL, BaselineSource, ChangeKind } from './core/baseline'
+import { BASELINE_LABEL, BaselineSource } from './core/baseline'
 import { exportConfig, parseConfig, serializeShared } from './core/config'
 import { TIER_LABEL } from './core/library'
 import { cleanNamespace } from './core/naming'
@@ -19,6 +19,7 @@ import { useDescriptions } from './ui/hooks/useDescriptions'
 import { DescriptionsDialog } from './ui/DescriptionsDialog'
 import { ReportDialog } from './ui/ReportDialog'
 import { MappingDialog } from './ui/MappingDialog'
+import { IconDetail } from './ui/IconDetail'
 import { BulkRenameDialog } from './ui/BulkRenameDialog'
 import { useBulkRename } from './ui/hooks/useBulkRename'
 import { buildHealth, healthHtml, healthMarkdown } from './core/report'
@@ -62,7 +63,7 @@ function Plugin() {
   const { filters, dispatch: filter } = useFilters(PAGE_SIZE)
   const { status, rule: ruleFilter, category: catFilter, query, change: changeFilter, limit } = filters
   const [view, setView] = useState<View>('list')
-  const [open, setOpen] = useState<Set<string>>(new Set())
+  const [detailKey, setDetailKey] = useState<string | null>(null)
   const [cursor, setCursor] = useState<Record<string, number>>({})
   const [showNotes, setShowNotes] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -81,7 +82,7 @@ function Plugin() {
   // reset what belongs to the previous scan (the hook resets its own rows and progress)
   const resetForScan = () => {
     setOff(new Set())
-    setOpen(new Set())
+    setDetailKey(null)
     setCursor({})
     resetFixes.current()
     filter({ type: 'reset' })
@@ -160,12 +161,6 @@ function Plugin() {
   resetFixes.current = fixes.reset
   const { actionOf } = fixes
   const locate = (nodeId: string) => emit<LocateHandler>('LOCATE', nodeId)
-  const toggle = (set: Set<string>, k: string) => {
-    const n = new Set(set)
-    if (n.has(k)) n.delete(k)
-    else n.add(k)
-    return n
-  }
   const setIncluded = (keys: string[], v: boolean) =>
     setOff((prev) => {
       const n = new Set(prev)
@@ -246,6 +241,8 @@ function Plugin() {
       date: new Date().toISOString().slice(0, 10)
     })
   const [mappingOpen, setMappingOpen] = useState(false)
+  const detail = detailKey ? icons.find((i) => i.key === detailKey) ?? null : null
+  const detailIndex = detail ? Math.max(0, visible.findIndex((i) => i.key === detail.key)) : 0
   const bulkRename = useBulkRename(icons, visible)
   const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
   const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
@@ -331,12 +328,10 @@ function Plugin() {
     onPreview: showPreview,
     onPreviewEnd: () => hidePreview(),
     included: !off.has(i.key),
-    expanded: open.has(i.key),
+    selected: detailKey === i.key,
     onInclude: (v: boolean) => setIncluded([i.key], v),
-    onExpand: () => setOpen((p) => toggle(p, i.key)),
-    onRename: (v: string) => rename(i, v),
-    onLocate: () => locate(i.nodeId),
-    onOutline: (v: boolean) => setOutlineOverrides((p) => ({ ...p, [i.key]: v }))
+    onExpand: () => setDetailKey(i.key),
+    onLocate: () => locate(i.nodeId)
   })
 
   const renderRows = (list: Icon[]) => list.map((i) => <Row key={i.key} {...rowProps(i)} />)
@@ -494,7 +489,7 @@ function Plugin() {
           onSelectAll={(v) => setOff(v ? new Set() : new Set(icons.map((i) => i.key)))}
           onInclude={(key, v) => setIncluded([key], v)}
           onLocate={locate}
-          onExpand={(i) => { setView('list'); setOpen((p) => new Set(p).add(i.key)); filter({ type: 'query', value: i.name }) }}
+          onExpand={(i) => setDetailKey(i.key)}
           onScroll={() => hidePreview(true)}
           renderRows={renderRows}
           renderGrouped={renderGrouped}
@@ -595,6 +590,23 @@ function Plugin() {
           onCancel={fixes.closeConfirm}
           onApply={fixes.apply}
           applying={fixes.applying}
+        />
+      )}
+
+      {detail && (
+        <IconDetail
+          icon={detail}
+          settings={settings}
+          included={!off.has(detail.key)}
+          changes={[...(changeMap.get(detail.name) ?? [])]}
+          index={detailIndex}
+          count={visible.length}
+          onInclude={(v) => setIncluded([detail.key], v)}
+          onRename={(v) => rename(detail, v)}
+          onOutline={(v) => setOutlineOverrides((p) => ({ ...p, [detail.key]: v }))}
+          onLocate={() => locate(detail.nodeId)}
+          onStep={(d) => { const n = visible[detailIndex + d]; if (n) setDetailKey(n.key) }}
+          onClose={() => setDetailKey(null)}
         />
       )}
 

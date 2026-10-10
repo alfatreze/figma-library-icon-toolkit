@@ -113,14 +113,12 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .pillWarn { background: var(--figma-color-bg-warning-tertiary); color: var(--figma-color-text-warning); }
 .pillInfo { background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary); }
 .pillOk { background: transparent; color: var(--figma-color-text-success); cursor: default; }
-.details { padding: 0 8px 12px 82px; display: flex; flex-direction: column; gap: 8px; }
 .finding { display: grid; grid-template-columns: 14px 1fr; gap: 6px; align-items: start; }
 .finding svg { width: 14px; height: 14px; margin-top: 1px; }
 .sevError { color: var(--figma-color-text-danger); }
 .sevWarn { color: var(--figma-color-text-warning); }
 .sevInfo { color: var(--figma-color-text-secondary); }
 .fieldRow { display: flex; gap: 8px; align-items: center; }
-.slots { display: flex; flex-wrap: wrap; gap: 6px; }
 .slot { display: inline-flex; gap: 5px; align-items: center; padding: 2px 6px; border-radius: 4px; background: var(--figma-color-bg-secondary); }
 .swatch { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--figma-color-border); }
 
@@ -188,7 +186,6 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 
 /* groups */
 .groupHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0 2px; padding: 4px 0; font-weight: 600; position: sticky; top: 0; background: var(--figma-color-bg); z-index: 2; border-bottom: 1px solid var(--figma-color-border); }
-.usage { color: var(--figma-color-text-brand); }
 .fmtChips { display: flex; gap: 4px; flex-wrap: wrap; }
 .fmtChip { padding: 0 6px; border-radius: 4px; background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary); font-size: 10px; }
 
@@ -311,3 +308,8 @@ body > [class*='_menu_'] { z-index: 2600; }
 .footer [data-hint]:not([data-hint='']):focus-visible::after { top: auto; bottom: calc(100% + 6px); }
 .footerNote [data-hint]:not([data-hint='']):hover::after,
 .footerNote [data-hint]:not([data-hint='']):focus-visible::after { right: auto; left: 0; }
+
+/* icon detail panel */
+.detailTile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 104px; border-radius: 8px; border: 1px solid var(--figma-color-border); }
+.detailTile svg { shape-rendering: geometricPrecision; }
+.detailLadder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
