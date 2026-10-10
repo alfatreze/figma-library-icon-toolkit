@@ -46,6 +46,41 @@ describe('scan: what becomes an icon', () => {
     expect(icons.every((i) => i.sourceKind !== 'instance')).toBe(true)
   })
 
+  it('counts where each component is placed in what was scanned, so unused ones are known', async () => {
+    const used = makeComponent(fig, 'icon/Used')
+    const unused = makeComponent(fig, 'icon/Unused')
+    const screen = makeFrame(fig, fig.page, 'Screen', [])
+    screen.width = 400
+    screen.height = 400
+    screen.appendChild(used.createInstance())
+    screen.appendChild(used.createInstance())
+    const { icons } = await run()
+    const by = (n: string) => icons.find((i) => i.rawName === n)!
+    expect(by('icon/Used').placements).toBe(2)
+    expect(by('icon/Unused').placements).toBe(0)
+    void unused
+  })
+
+  it('counts an instance met before its component, and one inside a large component or variant (a button\'s chevron)', async () => {
+    const screen = makeFrame(fig, fig.page, 'Screen', [])
+    screen.width = 400
+    screen.height = 400
+    const icon = makeComponent(fig, 'icon/Chevron') // created after the screen in the tree order below
+    const early = icon.createInstance()
+    fig.page.insertChild(0, screen)
+    screen.appendChild(early)
+    const set = track(new FakeNode('COMPONENT_SET', 'Button'))
+    fig.page.appendChild(set)
+    const variant = track(new FakeNode('COMPONENT', 'State=Default'))
+    variant.key = 'k-btn'
+    variant.width = 200
+    variant.height = 48
+    variant.appendChild(icon.createInstance())
+    set.appendChild(variant)
+    const { icons } = await run()
+    expect(icons.find((i) => i.rawName === 'icon/Chevron')!.placements).toBe(2)
+  })
+
   it('does not offer frames that live inside an instance (they cannot be converted)', async () => {
     const card = track(new FakeNode('COMPONENT', 'Card'))
     card.width = 300

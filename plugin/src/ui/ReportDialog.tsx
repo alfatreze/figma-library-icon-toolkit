@@ -1,6 +1,6 @@
 import { Button } from '@create-figma-plugin/ui'
 import { h } from 'preact'
-import { HealthReport } from '../core/report'
+import { HealthReport, UNUSED_NOTE } from '../core/report'
 import { Dialog } from './Dialog'
 import styles from './styles'
 import { cx, plural } from './util'
@@ -48,6 +48,14 @@ export function ReportDialog(props: { report: HealthReport; onHtml: () => void; 
             </div>
           ))}
         </div>
+
+        {r.unused.of > 0 && (
+          <div class={styles.section}>
+            <span class={styles.sectionTitle}>Unused</span>
+            <div>{r.unused.count} of {plural(r.unused.of, 'component')} are not placed in the scanned pages.</div>
+            <div class={styles.muted}>{UNUSED_NOTE}</div>
+          </div>
+        )}
 
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Changes</span>

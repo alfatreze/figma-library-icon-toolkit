@@ -25,6 +25,8 @@ interface ScanContext {
   phase: (text: string) => void
   seenNodes: Set<string>
   seenComponents: Set<string>
+  /** instances placed in the scanned pages, per main component key (for components that are themselves icons of this scan) */
+  placements: Map<string, number>
   candidates: Candidate[]
   groups: Map<string, { cand: Candidate; agg: UsageAgg }>
   summary: ScanSummary
@@ -78,6 +80,8 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext, in
         if (child.type !== 'COMPONENT') continue
         if (!fits(child, maxSize)) {
           skip(ctx, child, `larger than ${maxSize}px`)
+          // icons placed inside a large variant (a button's chevron) still count as used
+          for (const c of child.children) await visit(c, ctx, cat, true)
           continue
         }
         ctx.seenComponents.add(child.key) // instances of this variant are the same icon, not a second one
@@ -114,7 +118,10 @@ async function visit(node: SceneNode, ctx: ScanContext, cat: CategoryContext, in
 main = null
         }
         const key = main ? main.key || main.id : node.id
-        if (!usageOnly && ctx.seenComponents.has(key)) return // the master component is already a candidate
+        if (!usageOnly && ctx.seenComponents.has(key)) {
+          ctx.placements.set(key, (ctx.placements.get(key) ?? 0) + 1) // the master component is already a candidate: only count where it is placed
+          return
+        }
         let g = ctx.groups.get(key)
         if (!g) {
           const base: Candidate = main
@@ -188,7 +195,7 @@ export async function scan(
 ): Promise<ScanSummary> {
   resetFactCaches() // renamed variables must not show their old names
   const ctx: ScanContext = {
-    opts, cancelled, phase, seenNodes: new Set(), seenComponents: new Set(), candidates: [], groups: new Map(),
+    opts, cancelled, phase, seenNodes: new Set(), seenComponents: new Set(), placements: new Map(), candidates: [], groups: new Map(),
     summary: { scanned: 0, skipped: [], adapters: {} }, visited: 0
   }
 
@@ -271,6 +278,12 @@ svg = null
     if (cancelled()) break
     const chunk = ctx.candidates.slice(start, start + EXPORT_CONCURRENCY)
     const batch = await Promise.all(chunk.map((c) => readCandidate(c, diag, componentFixes, svgCache, opts)))
+    // how often each component is placed in what was scanned (instances met before the component was seen sit in their own group)
+    chunk.forEach((c, i) => {
+      if (c.sourceKind !== 'component' && c.sourceKind !== 'component-set') return
+      const key = c.node.type === 'COMPONENT' ? c.node.key || c.node.id : c.node.id
+      batch[i].placements = (ctx.placements.get(key) ?? 0) + (ctx.groups.get(key)?.agg.instances ?? 0)
+    })
     done += chunk.length
     ctx.summary.scanned = done
     onBatch(batch, total ? done / total : 1)

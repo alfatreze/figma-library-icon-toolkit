@@ -31,13 +31,13 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 ## Next: v0.6 "designer and system-manager workflow" (about 4 to 6 weeks)
 | Feature | Value | Size |
 |---|---|---|
-| **Icon detail panel** (replaces the inline expander): all sizes, colour slots, usage and overrides, findings, history | One place to understand an icon | M |
+| ~~**Icon detail panel**~~ done (unreleased, not yet run in Figma): click an icon to open one panel with the preview in any variable mode and background, all sizes, export name, source, colours with variable and mode values, usage, findings, the change since the baseline and copy buttons; previous / next through the list | One place to understand an icon | M |
 | ~~**Library health report**~~ done (unreleased, not yet run in Figma): Issues → Report… previews the summary and downloads a self-contained HTML page (light/dark, printable), Markdown, or the per-icon fix plan: verdict, ready %, coverage (components, descriptions, bound colours), the 8 areas, changes since the baseline, most common issues, blocked icons | Lets a system manager show progress without opening Figma | M |
-| **Unused-icons report**: icons never placed as instances in the scanned files | Pruning decisions backed by data | M |
+| ~~**Unused-icons report**~~ done with a stated limit (unreleased): the scan counts where each component is placed in the pages it scanned; Icons gets an *Unused* chip and the library report an *unused* section. A plugin cannot see other files, so it says so and points to the library analytics in Figma | Pruning decisions backed by data | M |
 | ~~**Bulk rename with preview** and a naming-pattern check~~ done (unreleased, not yet run in Figma): Issues → Rename… with find and replace (text or regular expression), case style, add/remove prefix and suffix, scope (all or the filtered list), a live preview with blocked rows (duplicates, taken names, empty), the kebab-case check, and a Labs write that skips layers renamed since the scan, variants and instances. Not done: verb-noun and category-prefix checks | The most common cleanup job; Labs for writes, report-only otherwise | M |
 | ~~**Descriptions and tags helper**~~ done (unreleased, not yet run in Figma): Issues → Descriptions… downloads a CSV template (only without a description, or all), reads the filled one back, shows what would change with the parsed tags, and writes in Labs (checked in the main thread too, skips descriptions changed since the scan, one undo step) | Feeds the searchable preview page and AI guide | S |
-| Variable mapping by collection and mode (Light/Dark) with a visual table | Today it is per-variable lines and wildcards | M |
-| Dark/light preview of themeable colours in the detail panel and the HTML preview | Shows what developers will get | S |
+| ~~Variable mapping by collection and mode (Light/Dark) with a visual table~~ done (unreleased): the scan reads each variable's colour per mode (aliases followed); Settings → Style → Open as table… lists every variable by collection with its modes and a field to name it, editing the mapping text line by line | Today it is per-variable lines and wildcards | M |
+| ~~Dark/light preview of themeable colours in the detail panel and the HTML preview~~ done (unreleased): a Mode switch in both; a slot whose variable has no such mode keeps following the page | Shows what developers will get | S |
 
 ## Next: v0.7 "developer experience" (about 4 to 6 weeks, can overlap)
 | Feature | Value | Size |

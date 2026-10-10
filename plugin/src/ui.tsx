@@ -37,7 +37,7 @@ import { IconPreview, PreviewBg } from './ui/IconPreview'
 import { Segmented } from './ui/components/Segmented'
 import { TabBar, TabPanel } from './ui/components/TabBar'
 import { InspectPanel } from './ui/Inspect'
-import { filterIcons, groupIssues, IssueGroup, isAlert, isBlocked } from './ui/selectors'
+import { filterIcons, groupIssues, IssueGroup, isAlert, isBlocked, isUnused } from './ui/selectors'
 import { useBaselines } from './ui/hooks/useBaselines'
 import { useScan } from './ui/hooks/useScan'
 import { usePublish } from './ui/hooks/usePublish'
@@ -132,6 +132,7 @@ function Plugin() {
 
   const blockedIcons = useMemo(() => icons.filter(isBlocked), [icons])
   const alertIcons = useMemo(() => icons.filter(isAlert), [icons])
+  const unusedIcons = useMemo(() => icons.filter(isUnused), [icons])
   const categories = useMemo(() => summariseCategories(icons), [icons])
 
   const groups = useMemo<IssueGroup[]>(() => groupIssues(icons), [icons])
@@ -477,6 +478,7 @@ function Plugin() {
           baselineSource={baseline.source}
           blockedCount={blockedIcons.length}
           alertCount={alertIcons.length}
+          unusedCount={unusedIcons.length}
           off={off}
           onQuery={(value) => filter({ type: 'query', value })}
           onView={setView}

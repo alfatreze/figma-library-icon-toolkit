@@ -13,6 +13,8 @@ export interface IssueGroup {
 const hasSeverity = (i: Icon, s: Severity) => i.findings.some((f) => f.severity === s)
 
 export const isBlocked = (i: Icon) => hasSeverity(i, 'error')
+/** a component that no instance in the scanned pages uses (usage in other files is not visible to a plugin) */
+export const isUnused = (i: Icon) => i.placements === 0
 /** warnings only: still exported, but worth a look */
 export const isAlert = (i: Icon) => !hasSeverity(i, 'error') && hasSeverity(i, 'warn')
 
@@ -51,7 +53,7 @@ export function countChanges(changes: Map<string, Set<ChangeKind>>): Partial<Rec
 export const presentChangeKinds = (counts: Partial<Record<ChangeKind, number>>): ChangeKind[] => CHANGE_KINDS.filter((k) => counts[k])
 
 export interface IconFilter {
-  status: 'all' | 'blocked' | 'alerts' | 'excluded'
+  status: 'all' | 'blocked' | 'alerts' | 'excluded' | 'unused'
   ruleId: string | null
   category: string
   change: ChangeKind | null
@@ -64,6 +66,7 @@ export function filterIcons(icons: Icon[], f: IconFilter, off: Set<string>, chan
     if (f.status === 'blocked' && !isBlocked(i)) return false
     if (f.status === 'alerts' && !isAlert(i)) return false
     if (f.status === 'excluded' && !off.has(i.key)) return false
+    if (f.status === 'unused' && !isUnused(i)) return false
     if (f.ruleId && !i.findings.some((x) => x.ruleId === f.ruleId)) return false
     if (f.category && i.category.join('/') !== f.category) return false
     if (f.change && !changes.get(i.name)?.has(f.change)) return false

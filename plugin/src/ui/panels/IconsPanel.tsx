@@ -12,7 +12,7 @@ import { Icon, ScanScope, ScanSummary } from '../../types'
 import { cx, plural } from '../util'
 
 export type View = 'list' | 'grouped' | 'grid'
-export type Status = 'all' | 'blocked' | 'alerts' | 'excluded'
+export type Status = 'all' | 'blocked' | 'alerts' | 'excluded' | 'unused'
 
 export interface IconsPanelProps {
   icons: Icon[]
@@ -38,6 +38,8 @@ export interface IconsPanelProps {
   baselineSource: BaselineSource | null
   blockedCount: number
   alertCount: number
+  /** components not placed anywhere in the scanned pages */
+  unusedCount: number
   off: Set<string>
   onQuery: (v: string) => void
   onView: (v: View) => void
@@ -98,6 +100,11 @@ export function IconsPanel(p: IconsPanelProps) {
           <Chip tone="warn" active={status === 'alerts'} onClick={() => p.onShow({ status: 'alerts' })} disabled={!interactive || p.alertCount === 0} title="Exported, but worth a look">
             <WarnIcon /> Warnings {p.alertCount}
           </Chip>
+          {p.unusedCount > 0 && (
+            <Chip active={status === 'unused'} onClick={() => p.onShow({ status: 'unused' })} title="Components with no instance in the pages you scanned. Other files that use the library are not visible here: check Figma's library analytics before removing anything.">
+              Unused {p.unusedCount}
+            </Chip>
+          )}
           {off.size > 0 && (
             <Chip active={status === 'excluded'} onClick={() => p.onShow({ status: 'excluded' })}>Excluded {off.size}</Chip>
           )}

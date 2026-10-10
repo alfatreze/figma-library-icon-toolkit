@@ -96,3 +96,25 @@ describe('rendering', () => {
     expect(md.split('\n').filter((l) => l.startsWith('| &lt;img')).every((l) => l.split('|').length === 6)).toBe(true)
   })
 })
+
+import { isUnused, filterIcons } from '../src/ui/selectors'
+describe('unused components', () => {
+  const placed = [icon('used', [], { placements: 3 } as never), icon('idle', [], { placements: 0 } as never), icon('idle2', [], { placements: 0 } as never), icon('frame', [], { sourceKind: 'frame' })]
+  const r = buildHealth(input(placed))
+  it('counts the components that no instance in the scanned pages uses', () => {
+    expect(r.unused).toEqual({ count: 2, of: 3, names: ['idle', 'idle2'] })
+    expect(buildHealth(input(library)).unused).toEqual({ count: 0, of: 0, names: [] })
+  })
+  it('says in both formats that other files are not visible', () => {
+    expect(healthMarkdown(r)).toContain('## Not placed in the scanned pages (2 of 3 components)')
+    expect(healthMarkdown(r)).toContain('library analytics')
+    expect(healthHtml(r)).toContain('Not placed in the scanned pages (2 of 3 components)')
+  })
+  it('has no section when usage was not measured', () => {
+    expect(healthMarkdown(buildHealth(input(library)))).not.toContain('Not placed')
+  })
+  it('filters the list', () => {
+    expect(placed.filter(isUnused).map((i) => i.name)).toEqual(['idle', 'idle2'])
+    expect(filterIcons(placed, { status: 'unused', ruleId: null, category: '', change: null, query: '' }, new Set(), new Map()).map((i) => i.name)).toEqual(['idle', 'idle2'])
+  })
+})

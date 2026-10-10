@@ -137,11 +137,12 @@ export function IconDetail(props: {
           </div>
         )}
 
-        {icon.usage && (
+        {(icon.usage || icon.placements !== undefined) && (
           <div class={styles.section}>
             <span class={styles.sectionTitle}>Usage</span>
-            {describeUsage(icon.usage).map((l, n) => <div key={n}>{l}</div>)}
-            <div class={styles.muted}>Artwork exported from the {icon.usage.exportedFrom === 'main' ? 'main component' : 'instance (main component not readable)'}.</div>
+            {icon.placements !== undefined && <div>{icon.placements === 0 ? 'Not placed in the scanned pages.' : `Placed ${icon.placements}× in the scanned pages.`} <span class={styles.muted}>Other files that use the library are not visible to a plugin.</span></div>}
+            {icon.usage && describeUsage(icon.usage).map((l, n) => <div key={n}>{l}</div>)}
+            {icon.usage && <div class={styles.muted}>Artwork exported from the {icon.usage.exportedFrom === 'main' ? 'main component' : 'instance (main component not readable)'}.</div>}
           </div>
         )}
 

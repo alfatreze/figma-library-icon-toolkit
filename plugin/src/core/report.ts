@@ -41,6 +41,8 @@ export interface HealthReport {
   rules: RuleRow[]
   blockers: Blocker[]
   autoFixable: number
+  /** components that no instance in the scanned pages uses (other files are not visible to a plugin) */
+  unused: { count: number; of: number; names: string[] }
   changes: { baseline: string; added: number; removed: number; renamed: number; changed: number; recoloured: number; moved: number; unchanged: number; bump: Diff['bump']; breaking: boolean } | null
 }
 
@@ -49,6 +51,8 @@ const sevOf = (i: Icon, s: Severity) => i.findings.some((f) => f.severity === s)
 const fixKind = (ruleId: string) => (ruleId === 'not-component' ? 'convert-frame' : ruleId)
 export const MAX_BLOCKERS = 60
 export const MAX_RULES = 15
+export const MAX_UNUSED = 60
+export const UNUSED_NOTE = 'Only the pages that were scanned are counted. Files that use this library are not visible to a plugin, so check the library analytics in Figma before removing an icon.'
 
 export function buildHealth(input: HealthInput): HealthReport {
   const { icons } = input
@@ -114,6 +118,11 @@ export function buildHealth(input: HealthInput): HealthReport {
     },
     areas,
     rules,
+    unused: (() => {
+      const placed = icons.filter((i) => i.placements !== undefined)
+      const none = placed.filter((i) => i.placements === 0)
+      return { count: none.length, of: placed.length, names: none.slice(0, MAX_UNUSED).map((i) => i.layerName) }
+    })(),
     blockers: blocked.slice(0, MAX_BLOCKERS).map((i) => ({ name: i.layerName, page: i.pageName, nodeId: i.nodeId, messages: i.findings.filter((f) => f.severity === 'error').map((f) => f.message) })),
     autoFixable: icons.filter((i) => (i.fixes ?? []).some((f) => f.actions.length > 0 && f.confidence !== 'low')).length,
     changes: d && input.baseline
@@ -167,6 +176,12 @@ export function healthMarkdown(r: HealthReport): string {
       ''
     )
   } else out.push('## Changes', '', 'No baseline was selected, so changes are not shown.', '')
+  if (r.unused.of > 0) {
+    out.push(`## Not placed in the scanned pages (${r.unused.count} of ${r.unused.of} components)`, '', UNUSED_NOTE, '')
+    for (const n of r.unused.names) out.push(`- ${md(n)}`)
+    if (r.unused.count > r.unused.names.length) out.push(`- …and ${r.unused.count - r.unused.names.length} more.`)
+    out.push('')
+  }
   out.push('## Most common issues', '', '| Issue | Severity | Icons | Auto-fix |', '|---|---|---|---|')
   for (const x of r.rules) out.push(`| ${md(x.title)} | ${sevWord[x.severity]} | ${x.icons} | ${x.autoFixable || '–'} |`)
   if (!r.rules.length) out.push('| No findings | | | |')
@@ -227,6 +242,7 @@ ${stat(t.icons, 'icons scanned' + (r.skipped ? ` (${r.skipped} layers skipped)` 
 ${c ? `<p>${c.added} added · ${c.removed} removed · ${c.renamed} renamed · ${c.changed} drawing changed · ${c.recoloured} recoloured · ${c.moved} moved category · ${c.unchanged} unchanged</p><p class="note">${c.breaking ? `<b>Breaking:</b> removed or renamed icons need a major version (suggested bump: ${esc(c.bump)}).` : `Suggested version bump: ${esc(c.bump)}.`}</p>` : '<p class="muted">No baseline was selected, so changes are not shown.</p>'}
 <h2>Most common issues</h2>
 <table><tr><th>Issue</th><th>Severity</th><th>Icons</th><th>Auto-fix</th></tr>${ruleRows}</table>
+${r.unused.of > 0 ? `<h2>Not placed in the scanned pages (${r.unused.count} of ${r.unused.of} components)</h2><p class="muted">${esc(UNUSED_NOTE)}</p>${r.unused.names.length ? `<p>${r.unused.names.map((n) => `<code>${esc(n)}</code>`).join(' · ')}${r.unused.count > r.unused.names.length ? ` · …and ${r.unused.count - r.unused.names.length} more` : ''}</p>` : ''}` : ''}
 ${r.blockers.length ? `<h2>Blocked icons (${t.blocked})</h2><p class="muted">Not exported until fixed or excluded.</p><table><tr><th>Icon</th><th>Page</th><th>Node</th><th>Why</th></tr>${blockerRows}</table>${t.blocked > r.blockers.length ? `<p class="muted">…and ${t.blocked - r.blockers.length} more.</p>` : ''}` : ''}
 </main></body></html>
 `

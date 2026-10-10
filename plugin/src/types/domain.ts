@@ -92,6 +92,8 @@ export interface RawIcon {
   exportError?: string
   categoryCtx: CategoryContext
   usage?: UsageInfo
+  /** components only: how many instances of it were met in the pages that were scanned (not usage in other files, which a plugin cannot see) */
+  placements?: number
 }
 
 export interface LeafNames {
@@ -152,6 +154,8 @@ export interface Icon {
   category: string[] // slugified path, e.g. ['acessibilidade']
   categoryLabel: string // original names, e.g. 'Acessibilidade'
   usage?: UsageInfo
+  /** components only: instances met in the scanned pages (see RawIcon.placements) */
+  placements?: number
   tags: string[]
   description: string
   kind: IconKind

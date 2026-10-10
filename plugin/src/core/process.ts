@@ -141,6 +141,7 @@ export function processIcons(
       category: cat.slug,
       categoryLabel: cat.label,
       usage: raw.usage,
+      ...(raw.placements !== undefined ? { placements: raw.placements } : {}),
       tags: parseTags(raw.description),
       description: raw.description,
       kind: themed?.kind ?? 'filled',
