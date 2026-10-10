@@ -18,6 +18,8 @@ import { useFilters } from './ui/hooks/useFilters'
 import { useDescriptions } from './ui/hooks/useDescriptions'
 import { DescriptionsDialog } from './ui/DescriptionsDialog'
 import { ReportDialog } from './ui/ReportDialog'
+import { BulkRenameDialog } from './ui/BulkRenameDialog'
+import { useBulkRename } from './ui/hooks/useBulkRename'
 import { buildHealth, healthHtml, healthMarkdown } from './core/report'
 import { useFixes } from './ui/hooks/useFixes'
 import { groupOutputs, outputReady, settingsFor } from './core/outputs'
@@ -242,6 +244,7 @@ function Plugin() {
       warnings: exportable.filter((i) => i.findings.some((f) => f.severity === 'warn')).length,
       date: new Date().toISOString().slice(0, 10)
     })
+  const bulkRename = useBulkRename(icons, visible)
   const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
   const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
   const scanVariables = useMemo(() => {
@@ -524,6 +527,7 @@ function Plugin() {
           onToggleNotes={() => setShowNotes(!showNotes)}
           onOpenSettings={() => setShowSettings(true)}
           onDescriptions={descriptions.show}
+          onRename={bulkRename.show}
         /></TabPanel>
       )}
 
@@ -590,6 +594,10 @@ function Plugin() {
           onApply={fixes.apply}
           applying={fixes.applying}
         />
+      )}
+
+      {bulkRename.open && (
+        <BulkRenameDialog r={bulkRename} labsReady={settings.labs && settings.labsBranchAck} labsOn={settings.labs} onOpenSettings={() => setShowSettings(true)} />
       )}
 
       {reportOpen && healthReport && (

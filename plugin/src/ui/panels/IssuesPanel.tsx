@@ -32,6 +32,7 @@ export interface IssuesPanelProps {
   onToggleNotes: () => void
   onOpenSettings: () => void
   onDescriptions: () => void
+  onRename: () => void
 }
 
 /** the Issues tab: what blocks the export, what is worth a look, and the automatic fixes for both */
@@ -54,9 +55,10 @@ export function IssuesPanel(p: IssuesPanelProps) {
   )
   return (
       <div class={styles.list}>
-        <div class={styles.listHead} style={{ justifyContent: 'space-between' }}>
+        <div class={styles.listHead} style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <span>{p.summary}</span>
-          <span class={styles.fieldRow}>
+          <span class={styles.fieldRow} style={{ flexWrap: 'wrap' }}>
+          <Button secondary onClick={p.onRename} disabled={p.iconCount === 0}>Rename…</Button>
           <Button secondary onClick={p.onDescriptions} disabled={p.iconCount === 0}>Descriptions…</Button>
           <Button secondary onClick={p.onReport} disabled={p.iconCount === 0}>Report…</Button>
         </span>

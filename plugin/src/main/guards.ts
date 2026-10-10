@@ -1,5 +1,5 @@
 import { parseShared } from '../core/config'
-import { ApplyFixRequest, DescriptionItem, DevResourceItem, FixActionId } from '../types'
+import { ApplyFixRequest, DescriptionItem, DevResourceItem, FixActionId, RenameItem } from '../types'
 
 /**
  * The UI runs in an iframe and the main thread is the only code that can touch the file, so every message from the UI is
@@ -11,6 +11,7 @@ export const MAX_CONFIG_CHARS = 200_000
 export const MAX_DEV_RESOURCES = 2000
 export const MAX_FIX_REQUESTS = 5000
 export const MAX_DESCRIPTIONS = 5000
+export const MAX_RENAMES = 5000
 
 const NODE_ID = /^\d{1,10}:\d{1,10}$/
 const FIX_ACTIONS: FixActionId[] = ['replace-with-instance', 'convert-to-component', 'wrap-and-convert', 'rename-layers', 'apply-name']
@@ -70,6 +71,19 @@ export function validDescriptions(items: unknown): DescriptionItem[] {
     const to = clean(it.to, 1000).trim()
     if (!to) continue
     out.push({ nodeId: it.nodeId, from: it.from.slice(0, 5000), to })
+  }
+  return out
+}
+
+/** layer renames to write: bounded, one line, never an empty name */
+export function validRenames(items: unknown): RenameItem[] {
+  if (!Array.isArray(items)) return []
+  const out: RenameItem[] = []
+  for (const it of items.slice(0, MAX_RENAMES) as Partial<RenameItem>[]) {
+    if (!it || !isNodeId(it.nodeId) || typeof it.from !== 'string' || typeof it.to !== 'string') continue
+    const to = it.to.slice(0, 200).replace(/[\u0000-\u001f]/g, ' ').trim()
+    if (!to) continue
+    out.push({ nodeId: it.nodeId, from: it.from.slice(0, 400), to })
   }
   return out
 }

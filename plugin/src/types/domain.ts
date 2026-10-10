@@ -190,3 +190,5 @@ export interface ScanOptions {
 export interface DevResourceItem { nodeId: string; url: string; name: string }
 /** one component description to write (Labs); `from` is what it was when scanned */
 export interface DescriptionItem { nodeId: string; from: string; to: string }
+/** one layer rename to write (Labs); `from` is the name it had when scanned */
+export interface RenameItem { nodeId: string; from: string; to: string }
