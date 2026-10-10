@@ -58,7 +58,7 @@ var NS='__NS__';
 var STROKE=JSON.parse(document.getElementById('stroke').textContent);
 var DATA=JSON.parse(document.getElementById('data').textContent);
 var $=function(id){return document.getElementById(id)};
-var state={q:'',kind:'',cat:'',warn:false,sel:null,group:false};
+var state={q:'',kind:'',cat:'',warn:false,sel:null,group:false,mode:''};
 var root=document.documentElement;
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function hl(text,q){var t=esc(text);if(!q)return t;var i=text.toLowerCase().indexOf(q);if(i<0)return t;return esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length))}
@@ -71,6 +71,8 @@ function matches(d){
   return state.q.split(/\s+/).every(function(w){return hay.indexOf(w)>=0});
 }
 function worst(d){return d.findings.some(function(f){return f.severity==='error'})?'error':d.findings.some(function(f){return f.severity==='warn'})?'warn':''}
+// colours of the chosen Figma variable mode (Light / Dark...): each icon sets its own slot variables, so only the icons bound to variables with that mode change
+function modeStyle(d){if(!state.mode)return '';return d.slots.filter(function(s){return s.modes&&s.modes[state.mode]}).map(function(s){return s.cssVar+':'+s.modes[state.mode]}).join(';')}
 function icon(d,cls){return '<svg class="'+NS+'-icon'+(cls?' '+cls:'')+'" aria-hidden="true" focusable="false"><use href="#'+NS+'-'+d.name+'"/></svg>'}
 function render(){
   var list=DATA.filter(matches);
@@ -85,7 +87,7 @@ function groupBy(list){var m={},order=[];list.forEach(function(d){var k=d.catego
 function card(d){
     var w=worst(d);
     return '<button class="card" data-n="'+esc(d.name)+'" aria-pressed="'+(state.sel===d.name)+'" title="'+esc(d.layer)+'">'
-      +'<span class="stage">'+icon(d)+'</span>'
+      +'<span class="stage" style="'+esc(modeStyle(d))+'">'+icon(d)+'</span>'
       +'<span class="name">'+hl(d.name,state.q.split(/\s+/)[0])+'</span>'
       +'<span class="badges"><span class="badge">'+d.kind+'</span>'+(w?'<span class="badge '+w+'">'+d.findings.length+' '+(w==='error'?'error':'alert')+(d.findings.length>1?'s':'')+'</span>':'')+(d.usage?'<span class="badge" title="Placed '+d.usage.instances+' times">×'+d.usage.instances+'</span>':'')+'</span></button>';
 }
@@ -99,9 +101,9 @@ function open(name){
   var d=DATA.filter(function(x){return x.name===name})[0];if(!d)return;
   state.sel=name;history.replaceState(null,'','#'+encodeURIComponent(state.q)+(name?'&'+encodeURIComponent(name):''));
   var h='<button class="close" id="close" aria-label="Close">Close</button><h2>'+esc(d.name)+'</h2><div class="count">'+esc(d.id)+' · '+d.kind+' · '+d.width+'×'+d.height+'</div>';
-  h+='<h3>Preview</h3><div class="sizes">'+[16,24,32,48,64].map(function(s){return '<span style="--'+NS+'-icon-size:'+s+'px;text-align:center">'+icon(d)+'<div class="count">'+s+'</div></span>'}).join('')+'</div>';
+  h+='<h3>Preview'+(state.mode?' · '+esc(state.mode):'')+'</h3><div class="sizes" style="'+esc(modeStyle(d))+'">'+[16,24,32,48,64].map(function(s){return '<span style="--'+NS+'-icon-size:'+s+'px;text-align:center">'+icon(d)+'<div class="count">'+s+'</div></span>'}).join('')+'</div>';
   h+='<h3>Code</h3>'+d.snippets.map(function(s){return snip(s.label,s.code)}).join('');
-  if(d.slots.length){h+='<h3>Colour slots</h3>'+d.slots.map(function(s){return '<div class="slot"><span class="sw" style="background:'+s.hex+'"></span><code>'+esc(s.cssVar)+'</code>'+(s.token?'<span>→ '+esc(s.token)+'</span>':'')+(s.variable?'<span class="count">('+esc(s.variable)+')</span>':'')+'</div>'}).join('')}
+  if(d.slots.length){h+='<h3>Colour slots</h3>'+d.slots.map(function(s){return '<div class="slot"><span class="sw" style="background:'+s.hex+'"></span><code>'+esc(s.cssVar)+'</code>'+(s.token?'<span>→ '+esc(s.token)+'</span>':'')+(s.variable?'<span class="count">('+esc(s.variable)+')</span>':'')+(s.modes?'<span class="count">'+Object.keys(s.modes).map(function(m){return esc(m)+' '+esc(s.modes[m])}).join(' · ')+'</span>':'')+'</div>'}).join('')}
   if(d.strokeWidth!==null)h+='<h3>Stroke</h3><div class="slot">drawn at '+d.strokeWidth+'px → <code>--'+NS+'-icon-stroke-width</code></div>';
   if(d.category)h+='<h3>Category</h3><div class="count">'+esc(d.category)+'</div>';
   if(d.usage){h+='<h3>In use</h3><div class="count">'+d.usage.instances+' instance(s)'+(d.usage.remote?' from a linked library':'')+(d.usage.sizes.length?' · sizes '+esc(d.usage.sizes.join(', ')):'')+'</div>';var ov=Object.keys(d.usage.overrides);if(ov.length)h+='<div class="count">Overrides: '+ov.map(function(k){return esc(k)+' ×'+d.usage.overrides[k]}).join(', ')+'</div>'}
@@ -135,8 +137,11 @@ $('c2').addEventListener('input',function(e){setVar('--'+NS+'-icon-color-2',e.ta
 $('c3').addEventListener('input',function(e){setVar('--'+NS+'-icon-color-3',e.target.value)});
 $('sw').addEventListener('input',function(e){setVar('--'+NS+'-icon-stroke-width',e.target.value);$('swv').textContent=e.target.value+'px'});
 $('theme').addEventListener('change',function(e){root.setAttribute('data-theme',e.target.value)});
-$('reset').addEventListener('click',function(){['size','c1','c2','c3','sw'].forEach(function(id){});['--'+NS+'-icon-size','--'+NS+'-icon-color','--'+NS+'-icon-color-2','--'+NS+'-icon-color-3','--'+NS+'-icon-stroke-width','--stage-size'].forEach(function(n){root.style.removeProperty(n)});$('size').value=32;applySize(32)});
+$('mode').addEventListener('change',function(e){state.mode=e.target.value;render();if(state.sel)open(state.sel)});
+$('reset').addEventListener('click',function(){['size','c1','c2','c3','sw'].forEach(function(id){});['--'+NS+'-icon-size','--'+NS+'-icon-color','--'+NS+'-icon-color-2','--'+NS+'-icon-color-3','--'+NS+'-icon-stroke-width','--stage-size'].forEach(function(n){root.style.removeProperty(n)});$('size').value=32;applySize(32);state.mode='';$('mode').value='';render()});
 // init
+var modes=[];DATA.forEach(function(d){d.slots.forEach(function(s){if(s.modes)Object.keys(s.modes).forEach(function(m){if(modes.indexOf(m)<0)modes.push(m)})})});
+if(modes.length){$('mode').innerHTML='<option value="">As drawn</option>'+modes.map(function(m){return '<option>'+esc(m)+'</option>'}).join('')}else{$('modeLbl').hidden=true}
 var cats={};DATA.forEach(function(d){if(d.category)cats[d.category]=1});
 $('cat').innerHTML='<option value="">All categories</option>'+Object.keys(cats).sort().map(function(c){return '<option>'+esc(c)+'</option>'}).join('');
 if(!Object.keys(cats).length){$('cat').hidden=true;$('groupLbl').hidden=true}else{state.group=Object.keys(cats).length>1;$('group').checked=state.group}
@@ -177,7 +182,7 @@ export function testPage(b: BuildInput): string {
     // the same strings Dev Mode and the README print (core/snippets.ts): one source of truth for "how do I use this icon"
     snippets: snippetsFor(b, i),
     strokeWidth: i.strokeWidth,
-    slots: i.slots.map((s) => ({ cssVar: s.cssVar, hex: s.hex, token: s.token ?? null, variable: s.variable ?? null })),
+    slots: i.slots.map((s) => ({ cssVar: s.cssVar, hex: s.hex, token: s.token ?? null, variable: s.variable ?? null, modes: s.modes ?? null })),
     findings: i.findings.map((f) => ({ severity: f.severity, message: f.message }))
   }))
   const json = JSON.stringify(data).replace(/</g, '\\u003c')
@@ -210,6 +215,7 @@ ${inlineSprite(b)}
   <label>Colour <input id="c1" type="color" value="#1f1d1d" aria-label="Primary colour"></label>
   <label>Secondary <input id="c2" type="color" value="#4f46e5" aria-label="Secondary colour"> <input id="c3" type="color" value="#ef4444" aria-label="Third colour"></label>
   <label>Stroke <input id="sw" type="range" min="0.5" max="4" step="0.25" value="2"> <span id="swv">2px</span> <span class="count" id="swp"></span></label>
+  <label id="modeLbl">Mode <select id="mode"><option value="">As drawn</option></select></label>
   <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
   <button id="reset" type="button">Reset</button>
   <span>Generated ${escapeHtml(b.generatedAt)} · grid ${b.grid.width}×${b.grid.height}</span>

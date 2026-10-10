@@ -21,3 +21,19 @@ describe('colour slots carry the variable modes', () => {
     expect('modes' in p.icons[0].slots[0]).toBe(false)
   })
 })
+
+import { buildFiles } from '../src/core/generators'
+describe('HTML preview page', () => {
+  const build = (paints: RawIcon['facts']['paints']) => {
+    const p = processIcons([{ ...raw(paints), facts: { ...emptyFacts(), leafCount: 1, paints } }], DEFAULT_SETTINGS, {})
+    return buildFiles({ allIcons: p.icons, settings: DEFAULT_SETTINGS, grid: p.grid, tier: p.tier, generatedAt: '2026-10-10' })['html/index.html']
+  }
+  it('has a Mode switch and carries the mode colours when a variable has modes', () => {
+    const html = build([{ role: 'stroke', hex: '#1f1d1d', opacity: 1, variable: 'color/icon/primary', collection: 'Semantic', modes: { Light: '#1f1d1d', Dark: '#ffd54a' } }])
+    expect(html).toContain('id="mode"')
+    expect(html).toContain('"modes":{"Light":"#1f1d1d","Dark":"#ffd54a"}')
+  })
+  it('the switch stays hidden by the page script when no icon has modes (data has none)', () => {
+    expect(build([])).not.toContain('"modes":{')
+  })
+})

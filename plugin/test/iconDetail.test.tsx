@@ -30,7 +30,7 @@ describe('modes of an icon', () => {
     expect(slotColour(themed.slots[0], null)).toBe('#1a1a1a')
   })
   it('sets every slot variable for a mode', () => {
-    expect(modeStyle(themed, 'Dark')).toBe('--cmn-icon-color:#ffffff;--cmn-icon-color-2:#ff0000')
+    expect(modeStyle(themed, 'Dark')).toBe('--cmn-icon-color:#ffffff') // the unbound second slot is not pinned: it keeps following the page
     expect(modeStyle(themed, null)).toBe('')
   })
   it('picks a dark tile for light colours and a light tile otherwise', () => {

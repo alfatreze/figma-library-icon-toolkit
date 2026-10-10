@@ -15,10 +15,13 @@ export function modeNames(icon: Pick<Icon, 'slots'>): string[] {
 /** the colour of a slot in a mode; a slot without that mode keeps the colour it is drawn with */
 export const slotColour = (s: Pick<SlotInfo, 'hex' | 'modes'>, mode: string | null): string => (mode && s.modes?.[mode]) || s.hex
 
-/** an inline style that sets every slot variable to its colour in `mode` (empty when no mode is chosen) */
+/**
+ * An inline style that sets the slot variables of an icon to their colour in `mode` (empty when no mode is chosen). A slot whose variable
+ * has no such mode is left alone, so it keeps following the page like in the app (currentColor), instead of being pinned to the colour it was drawn with.
+ */
 export function modeStyle(icon: Pick<Icon, 'slots'>, mode: string | null): string {
   if (!mode) return ''
-  return icon.slots.map((s) => `${s.cssVar}:${slotColour(s, mode)}`).join(';')
+  return icon.slots.filter((s) => s.modes?.[mode]).map((s) => `${s.cssVar}:${s.modes![mode]}`).join(';')
 }
 
 /** a readable contrast ratio between two #rrggbb colours (1 to 21); used to pick a background that shows the icon in a mode */
