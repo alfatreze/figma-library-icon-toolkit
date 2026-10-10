@@ -104,7 +104,7 @@ import { ReportDialog } from '../src/ui/ReportDialog'
 import { buildHealth } from '../src/core/report'
 
 describe('ReportDialog', () => {
-  const icons = [icon('1:1', 'home'), icon('1:2', 'search', 'find')]
+  const icons = [icon('1:1', 'home'), icon('1:2', 'search', 'find')].map((i) => ({ ...i, findings: [], fixes: [], layerName: i.name, pageName: 'Icons' }) as unknown as Icon)
   const report = buildHealth({ title: 'cmn', generatedAt: '2026-10-10', icons, tier: 'T4', grid: { width: 16, height: 16, count: 2, total: 2, padding: 0, detected: true }, profile: 'standard', diff: null, baseline: null, skipped: 0 })
 
   it('summarises the library and offers the downloads', () => {
