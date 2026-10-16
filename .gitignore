@@ -6,3 +6,6 @@ plugin/src/**/*.css.d.ts
 .DS_Store
 docs/archive/
 _archive/
+
+# local archives of the plugin folder (never commit)
+/plugin.zip
