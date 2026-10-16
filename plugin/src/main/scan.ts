@@ -1,4 +1,5 @@
 import { parseVariantName } from '../core/naming'
+import { constraintText } from '../core/png'
 import { CategoryContext, FixCandidate, RawIcon, ScanOptions, ScanSummary, SourceKind } from '../types'
 import { emptyFacts, gatherFacts, isIconish, resetFactCaches, variableName, VECTOR_TYPES } from './facts'
 import { cleanPageName, Diagnoser, pageOf } from './diagnose'
@@ -293,6 +294,22 @@ svg = null
 }
 
 /** One icon's facts, SVG and fixes. Never throws: a layer that cannot be read becomes an icon with an `exportError` (blocked, visible in the list). */
+/** the PNG entries of the layer's own export settings (what a designer set up in Figma's export section), as the text they would type */
+function pngExportsOf(node: SceneNode): { size: string; suffix: string }[] | undefined {
+  try {
+    const out: { size: string; suffix: string }[] = []
+    for (const e of 'exportSettings' in node ? node.exportSettings : []) {
+      if (e.format !== 'PNG') continue
+      const size = constraintText(e.constraint ?? { type: 'SCALE', value: 1 })
+      if (size) out.push({ size, suffix: typeof e.suffix === 'string' ? e.suffix.slice(0, 40) : '' })
+    }
+    return out.length ? out.slice(0, 12) : undefined
+  } catch (e) {
+    log.debug('scan', 'ignored', e)
+    return undefined
+  }
+}
+
 async function readCandidate(
   c: Candidate,
   diag: Diagnoser,
@@ -354,6 +371,7 @@ async function readCandidate(
       fixes,
       exportError,
       categoryCtx: c.ctx,
+      pngExports: pngExportsOf(c.node),
       usage: c.instance ? toUsage(c.instance.agg, target.exportedFrom === 'main' ? 'main' : 'instance') : undefined
     }
   } catch (e) {

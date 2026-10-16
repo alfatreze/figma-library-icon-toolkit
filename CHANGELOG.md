@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 While the major version is `0` (initial development) minor versions may contain breaking changes; they are called out under **Changed** or **Removed**.
 
 ## [Unreleased]
+### Added
+- **PNG export as export rows** (Export → *PNG images*), modelled on Figma's export section. Each row has a **size** (`1x`, `2x`, `512w`, `512h`; one side only, the other keeps the proportions), a **suffix** and a **colour** (as drawn in Figma, a typed hex, or a Figma variable in one mode such as `icon/default · Dark`); add as many rows as you need. With no rows yet, they start from the PNG export settings found on the scanned layers. One file per icon and row, `png/<name><suffix>.png`, in the ZIP only (not in repository publishing). The images are drawn in the plugin from the themed SVG, so a chosen colour is applied exactly, opacities are kept and strokes scale with the size. A row with a colour skips icons that have several colours or a gradient (they still export on “as drawn” rows) and says which. Rows that cannot be used (a size that is not valid, a variable that is not in the scan, two rows writing the same file) block the export and say why. PNG is off until switched on.
 
 ## [0.6.0] - 2026-10-16
 The designer and system-manager workflow. Verified in Figma so far: the icon detail panel, variable modes, the token mapping table and the HTML preview colour switch (on a file with Light and Dark modes). Not yet run in Figma: the descriptions helper, the library report, bulk rename and unused components (they are covered by tests and a browser harness; see `docs/verification.md` V35-V37, V39).

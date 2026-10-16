@@ -22,6 +22,9 @@ export interface ExportPanelProps {
   excluded: number
   categories: CategorySummary[]
   rows: OverviewRow[] | null
+  /** the PNG rows section (built by the shell, which owns the scan data it needs) and whether its rows stop the export */
+  pngSection: preact.ComponentChildren
+  pngBlocked: boolean
   hasStrokeIcons: boolean
   release: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null }
   prevCatalog: PreviousCatalog | null
@@ -102,6 +105,8 @@ export function ExportPanel(p: ExportPanelProps) {
           <FormatCards formats={settings.formats} onToggle={(k, on) => p.patch({ formats: { ...settings.formats, [k]: on } })} rows={p.rows} />
           <div class={styles.muted}>README, icons.json and AI guide are always included.</div>
         </Section>
+
+        {p.pngSection}
 
         {(p.categories.length > 0 || p.hasStrokeIcons) && (
           <Section title="Options">
@@ -204,7 +209,7 @@ export function ExportPanel(p: ExportPanelProps) {
             <button class={styles.linkBtn} onClick={p.onSetupPublish}>Set up publishing to GitHub or GitLab</button>
           )}
         </div>
-        <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat} data-hint={noFormat ? 'Choose at least one format' : ''}>
+        <Button onClick={p.onDownload} disabled={p.ready === 0 || noFormat || p.pngBlocked} data-hint={noFormat ? 'Choose at least one format' : p.pngBlocked ? 'Fix the PNG rows first' : ''}>
           Download ZIP
         </Button>
       </div>

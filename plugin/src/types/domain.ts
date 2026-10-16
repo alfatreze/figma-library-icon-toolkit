@@ -94,6 +94,8 @@ export interface RawIcon {
   usage?: UsageInfo
   /** components only: how many instances of it were met in the pages that were scanned (not usage in other files, which a plugin cannot see) */
   placements?: number
+  /** PNG entries of the layer's Figma export settings, as typed in Figma: size ('2x', '512w', '512h') and suffix */
+  pngExports?: { size: string; suffix: string }[]
 }
 
 export interface LeafNames {

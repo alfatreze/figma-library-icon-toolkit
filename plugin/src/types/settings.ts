@@ -46,6 +46,17 @@ export interface OutputSettings {
 
 export type FormatId = 'svg' | 'sprite' | 'html' | 'mask' | 'angular' | 'react' | 'webComponent'
 
+/** the colour a PNG row draws the icon in: as drawn in Figma, a typed colour, or a Figma variable in one mode ('' = the variable's only colour) */
+export type PngColour = { kind: 'drawn' } | { kind: 'hex'; hex: string } | { kind: 'variable'; variable: string; collection: string; mode: string }
+
+/** one PNG export row, like a row of Figma's export section: size (1x, 2x, 512w, 512h), suffix and colour. One file per icon and row. */
+export interface PngRow {
+  id: string
+  size: string
+  suffix: string
+  colour: PngColour
+}
+
 export type Profile = 'lenient' | 'standard' | 'strict'
 
 export interface Settings {
@@ -92,6 +103,8 @@ export interface Settings {
   baselineOutput: string
   /** one access token per git host; stays on this computer (never in the team config, exports or diagnostics) */
   tokens: { github: string; gitlab: string }
+  /** PNG images drawn in the plugin from the themed SVG; they go into the ZIP only (not into repository publishing) */
+  png: { enabled: boolean; rows: PngRow[] }
   precision: number
   formats: {
     svg: boolean
@@ -146,6 +159,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outputs: [],
   baselineOutput: '',
   tokens: { github: '', gitlab: '' },
+  png: { enabled: false, rows: [] },
   precision: 3,
   formats: {
     svg: true,

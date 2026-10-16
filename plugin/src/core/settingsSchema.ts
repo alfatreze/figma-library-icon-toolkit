@@ -46,6 +46,35 @@ function shape<T extends object>(rules: { [K in keyof T]: Check<T[K]> }, fallbac
 
 const rule = <T>(shared: boolean, check: Check<T>): Rule<T> => ({ shared, check })
 
+export const MAX_PNG_ROWS = 12
+
+/** the rows are kept as typed (a half-typed size is still a row); the export plan reports the ones that cannot be used */
+const pngRows: Check<Settings['png']['rows']> = (v) => {
+  if (!Array.isArray(v) || v.length > MAX_PNG_ROWS) return undefined
+  const text = str(40)
+  const colourOf = (c: unknown): Settings['png']['rows'][number]['colour'] | undefined => {
+    if (!c || typeof c !== 'object') return undefined
+    const o = c as Record<string, unknown>
+    if (o.kind === 'drawn') return { kind: 'drawn' }
+    if (o.kind === 'hex' && typeof o.hex === 'string' && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(o.hex)) return { kind: 'hex', hex: o.hex.toLowerCase() }
+    if (o.kind === 'variable' && str(200)(o.variable) !== undefined && str(200)(o.collection) !== undefined && str(100)(o.mode) !== undefined) {
+      return { kind: 'variable', variable: o.variable as string, collection: o.collection as string, mode: o.mode as string }
+    }
+    return undefined
+  }
+  const out: Settings['png']['rows'] = []
+  const ids = new Set<string>()
+  for (const r of v) {
+    if (!r || typeof r !== 'object') return undefined
+    const o = r as Record<string, unknown>
+    const colour = colourOf(o.colour)
+    if (typeof o.id !== 'string' || !/^[\w-]{1,40}$/.test(o.id) || ids.has(o.id) || text(o.size) === undefined || text(o.suffix) === undefined || !colour) return undefined
+    ids.add(o.id)
+    out.push({ id: o.id, size: o.size as string, suffix: o.suffix as string, colour })
+  }
+  return out
+}
+
 export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   namespace: rule(true, str(60)),
   profile: rule(true, oneOf('lenient', 'standard', 'strict')),
@@ -107,6 +136,10 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   }),
   baselineOutput: rule(false, str(40)),
   tokens: rule(false, shape<Settings['tokens']>({ github: str(400), gitlab: str(400) }, DEFAULT_SETTINGS.tokens)),
+  png: rule(
+    true,
+    shape<Settings['png']>({ enabled: bool, rows: pngRows }, DEFAULT_SETTINGS.png)
+  ),
   precision: rule(true, int(1, 6)),
   formats: rule(
     true,
@@ -136,7 +169,7 @@ export function checkSetting<K extends keyof Settings>(key: K, value: unknown): 
  * v2 → v3: the single `repo` (with its token) became one output plus a token per host.
  */
 export function migrateSettings(stored: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens } }
+  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens }, png: { ...DEFAULT_SETTINGS.png, rows: [] } }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out
   const s = { ...(stored as Record<string, unknown>) }
   if (s.zipName === 'icons') s.zipName = ''

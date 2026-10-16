@@ -12,6 +12,9 @@ import { cleanNamespace } from './core/naming'
 import { hasBlockingErrors, processIcons, ThemeCache } from './core/process'
 import { SHARED_KEYS } from './core/settingsSchema'
 import { zipFiles } from './core/zip'
+import { colourOptions, planPng, rowsFromFigma } from './core/png'
+import { buildPngFiles } from './ui/png'
+import { newPngRowId, PngSection } from './ui/PngSection'
 import styles from './ui/styles'
 import { ConfirmApply, FixCard } from './ui/Fixes'
 import { useFilters } from './ui/hooks/useFilters'
@@ -248,8 +251,8 @@ function Plugin() {
   const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
   const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
   const scanVariables = useMemo(() => {
-    const seen = new Map<string, { variable: string; collection?: string; modes?: Record<string, string> }>()
-    for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection, ...(p.modes ? { modes: p.modes } : {}) })
+    const seen = new Map<string, { variable: string; collection?: string; hex?: string; modes?: Record<string, string> }>()
+    for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection, hex: p.hex, ...(p.modes ? { modes: p.modes } : {}) })
     return [...seen.values()]
   }, [raws])
   const exampleVariable = useMemo(() => {
@@ -257,18 +260,43 @@ function Plugin() {
     return p ? { variable: p.variable!, collection: p.collection } : { variable: 'color/neutral/darkest', collection: 'Primitives' }
   }, [raws])
 
+  // PNG rows: the colour choices come from the variables of the scan; with no rows yet they start from the PNG export settings found on the layers
+  const pngOptions = useMemo(() => colourOptions(scanVariables), [scanVariables])
+  const [pngNote, setPngNote] = useState('')
+  useEffect(() => {
+    if (!raws.length || settings.png.rows.length) return
+    const found = rowsFromFigma(raws, newPngRowId)
+    if (!found.rows.length) return
+    setSettings((s) => (s.png.rows.length ? s : { ...s, png: { ...s.png, rows: found.rows } }))
+    setPngNote(`Rows loaded from the PNG export settings of ${plural(found.icons, 'layer')} in Figma. Edit, add or remove rows as you like.`)
+  }, [raws])
+  const pngPlan = useMemo(
+    () => (exportOpen ? planPng(exportable, settings.png.rows, pngOptions, (i) => `${cleanNamespace(settings.namespace)}-${i.name}`) : null),
+    [exportOpen, exportable, settings.png.rows, settings.namespace, pngOptions]
+  )
+  const pngOn = settings.png.enabled && settings.png.rows.length > 0
+  const pngBlocked = pngOn && !!pngPlan && pngPlan.problems.length > 0
+
   const doExport = () => {
     notify('Preparing the ZIP…')
     // let the toast paint first: generating and zipping thousands of files blocks this thread for a moment
     setTimeout(runExport, 30)
   }
-  const runExport = () => {
+  const runExport = async () => {
     try {
       const files = makeFiles()
+      let png: Record<string, Uint8Array> = {}
+      let pngFailed: string[] = []
+      if (pngOn) {
+        const plan = planPng(exportable, settings.png.rows, pngOptions, (i) => `${cleanNamespace(settings.namespace)}-${i.name}`)
+        if (plan.problems.length) return notify('Fix the PNG rows first', true)
+        ;({ files: png, failed: pngFailed } = await buildPngFiles(plan.items, (done, total) => notify(`Drawing PNG images ${done} / ${total}…`)))
+      }
       const name = `${settings.zipName.trim() ? cleanNamespace(settings.zipName) : `${cleanNamespace(settings.namespace)}-icons`}.zip`
-      download(name, zipFiles(files), 'application/zip')
+      download(name, zipFiles(files, png), 'application/zip')
       baseline.snapshotNow('local')
-      notify(`Exported ${exportable.length} icons (${Object.keys(files).length} files)`)
+      const pngCount = Object.keys(png).length
+      notify(`Exported ${exportable.length} icons (${Object.keys(files).length + pngCount} files${pngCount ? `, ${pngCount} PNG` : ''})${pngFailed.length ? `. ${pngFailed.length} PNG could not be drawn: ${pngFailed[0]}` : ''}`, pngFailed.length > 0)
     } catch (e) {
       notify(`Export failed: ${e instanceof Error ? e.message : String(e)}`, true)
     }
@@ -559,6 +587,8 @@ function Plugin() {
           excluded={off.size}
           categories={exportCats}
           rows={overview}
+          pngBlocked={pngBlocked}
+          pngSection={pngPlan && <PngSection png={settings.png} options={pngOptions} plan={pngPlan} figmaNote={pngNote} onChange={(png) => patch({ png })} />}
           hasStrokeIcons={exportable.some((i) => i.hasStroke)}
           release={release}
           prevCatalog={baseline.previous}
