@@ -6,6 +6,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 While the major version is `0` (initial development) minor versions may contain breaking changes; they are called out under **Changed** or **Removed**.
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-10-16
+The designer and system-manager workflow. Verified in Figma so far: the icon detail panel, variable modes, the token mapping table and the HTML preview colour switch (on a file with Light and Dark modes). Not yet run in Figma: the descriptions helper, the library report, bulk rename and unused components (they are covered by tests and a browser harness; see `docs/verification.md` V35-V37, V39).
+
 ### Added
 - **Icon detail panel** (click an icon; replaces the inline expander): the preview in any Figma variable mode (Light / Dark…) and on any background, all sizes, the export name and include switch, source (layer, page, kind, component key, description, tags), colours per slot with the variable, the token and the value in every mode, usage and overrides, findings with their fixes, the change since the baseline, and copy buttons for Angular, HTML, React and SVG. Previous / next steps through the list.
 - **Variable modes.** The scan reads each bound colour variable's colour in every mode of its collection, following aliases. They show in the detail panel, in an **Icon colours** switch of the generated HTML preview, and in a new **token mapping table** (Settings → Style → Open as table…, available in every naming mode except none; naming a variable there switches “Names from” to Custom mapping): every variable the icons use, by collection, with its colours per mode, the CSS name it gets and a field to name it.
@@ -128,7 +132,8 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.0...v0.3.1

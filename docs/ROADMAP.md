@@ -28,7 +28,7 @@ Everything since v0.1.0 is tested in code and in a browser harness, **not inside
 | ~~Fix hardening~~ done (unreleased, not yet run in Figma): prototype links from other layers are repointed to the new instance (all or nothing), colour-variable bindings are kept on carried fills, a show/hide component property is carried. Not covered: reactions pointing at a node inside the replaced layer, converting a plain frame (the API's new id behaviour is unverified) | The remaining ways a fix can lose design intent | M |
 | ~~Merge the Angular modern / classic templates~~ done (snapshot-pinned) | Removes copy-paste before more targets are added | M |
 
-## Next: v0.6 "designer and system-manager workflow" (about 4 to 6 weeks)
+## Done: v0.6.0 "designer and system-manager workflow" (released 2026-10-16; descriptions, report, rename and unused still to be run in Figma)
 | Feature | Value | Size |
 |---|---|---|
 | ~~**Icon detail panel**~~ done (unreleased, not yet run in Figma): click an icon to open one panel with the preview in any variable mode and background, all sizes, export name, source, colours with variable and mode values, usage, findings, the change since the baseline and copy buttons; previous / next through the list | One place to understand an icon | M |
