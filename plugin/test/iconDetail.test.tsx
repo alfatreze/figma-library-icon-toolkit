@@ -69,7 +69,7 @@ describe('IconDetail', () => {
   })
   it('has no mode switch for an icon without variable modes', () => {
     mount(icon({ slots: [slot(1, '#000000')] }))
-    expect(root.querySelector('[aria-label="Mode"]')).toBeNull()
+    expect(root.querySelector('[aria-label="Colour mode"]')).toBeNull()
   })
   it('steps through the list and is limited at both ends', () => {
     const steps: number[] = []

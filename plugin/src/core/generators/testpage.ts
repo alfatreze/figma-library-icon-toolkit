@@ -215,8 +215,8 @@ ${inlineSprite(b)}
   <label>Colour <input id="c1" type="color" value="#1f1d1d" aria-label="Primary colour"></label>
   <label>Secondary <input id="c2" type="color" value="#4f46e5" aria-label="Secondary colour"> <input id="c3" type="color" value="#ef4444" aria-label="Third colour"></label>
   <label>Stroke <input id="sw" type="range" min="0.5" max="4" step="0.25" value="2"> <span id="swv">2px</span> <span class="count" id="swp"></span></label>
-  <label id="modeLbl">Mode <select id="mode"><option value="">As drawn</option></select></label>
-  <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+  <label id="modeLbl" title="Shows the icons with the colours of a Figma variable mode (only icons bound to variables change)">Icon colours <select id="mode"><option value="">As drawn</option></select></label>
+  <label title="Light or dark appearance of this page only">Page theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
   <button id="reset" type="button">Reset</button>
   <span>Generated ${escapeHtml(b.generatedAt)} · grid ${b.grid.width}×${b.grid.height}</span>
 </div>

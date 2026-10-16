@@ -25,7 +25,8 @@ const Swatch = ({ mode, hex }: { mode: string; hex: string }) => (
  * the CSS name it gets now, and a field to name it yourself. The text mapping stays the source of truth: each edit changes one line of it.
  */
 export function MappingDialog(props: { naming: TokenNaming; variables: MappingVariable[]; onChange: (mapping: string) => void; onClose: () => void }) {
-  const { naming } = props
+  // the table always shows what a mapping would do: editing it switches "Names from" to Custom mapping
+  const naming: TokenNaming = { ...props.naming, mode: 'custom' }
   const groups = new Map<string, MappingVariable[]>()
   for (const v of props.variables) groups.set(v.collection ?? '', [...(groups.get(v.collection ?? '') ?? []), v])
   const sorted = [...groups].sort((a, b) => a[0].localeCompare(b[0]))
@@ -38,7 +39,10 @@ export function MappingDialog(props: { naming: TokenNaming; variables: MappingVa
           <Button secondary onClick={props.onClose}>Done</Button>
         </div>
         <div class={styles.muted}>
-          {plural(props.variables.length, 'variable')} used by the scanned icons, {named} named by you. Leave a field empty to use the naming rule. Changes are saved in the mapping text of Settings → Style.
+          Give each Figma variable the CSS name it gets in the export. Type a name such as <code>--icon-color</code>, or leave the field empty to use the automatic name. The colours are for reference only.
+        </div>
+        <div class={styles.muted}>
+          {plural(props.variables.length, 'variable')} in the scan, {named} named by you.{props.naming.mode !== 'custom' && ' Typing a name switches “Names from” to Custom mapping.'}
         </div>
       </div>
       <div class={styles.overlayBody}>

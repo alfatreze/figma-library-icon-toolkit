@@ -181,6 +181,13 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               options={TOKEN_MODES.map((m) => ({ value: m.value, text: m.label }))}
             />
           </Field>
+          {settings.tokenNaming.mode !== 'none' && settings.tokenNaming.mode !== 'custom' && (
+            <div class={styles.fieldRow}>
+              <button class={styles.linkBtn} disabled={extras.scanVariables.length === 0} data-hint={extras.scanVariables.length ? 'See every variable with its colours per mode and name it in a table' : 'Scan first: the table is built from the variables your icons use'} onClick={extras.onOpenMapping}>
+                Open as table…
+              </button>
+            </div>
+          )}
           {settings.tokenNaming.mode !== 'none' && (
             <Field label="Prefix" info={{ title: 'Token prefix', body: <span>Added in front of every token name, e.g. <code>ds</code> gives <code>--ds-color-neutral-darkest</code>. Match your design-token package prefix. Leave empty for none.</span> }}>
               <Textbox value={settings.tokenNaming.prefix} onValueInput={(v) => patch({ tokenNaming: { ...settings.tokenNaming, prefix: v } })} placeholder="(none)" />

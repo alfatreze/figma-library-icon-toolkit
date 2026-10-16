@@ -67,6 +67,16 @@ describe('MappingDialog', () => {
     expect(root.textContent).toContain('one colour for every mode')
     expect(root.textContent).toContain('--icon-primary')
     expect(root.textContent).toContain('1 named by you')
+    expect(root.textContent).toContain('2 variables in the scan')
+  })
+
+  it('opened from another naming mode, it says typing switches to Custom mapping and shows the mapping result', () => {
+    const pathNaming = { ...naming, mode: 'path' as const }
+    act(() => render(<MappingDialog naming={pathNaming} variables={vars} onChange={() => {}} onClose={() => {}} />, root))
+    expect(root.textContent).toContain('switches “Names from” to Custom mapping')
+    expect(root.textContent).toContain('--icon-primary')
+    act(() => render(<MappingDialog naming={naming} variables={vars} onChange={() => {}} onClose={() => {}} />, root))
+    expect(root.textContent).not.toContain('switches “Names from”')
   })
 
   it('editing a field changes only that variable\'s line', () => {

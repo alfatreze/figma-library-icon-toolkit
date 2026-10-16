@@ -66,20 +66,26 @@ export function IconDetail(props: {
           <div class={tileCls(shownTile)} style={style}>{icon.svgOk ? art(64) : <span class={styles.muted}>?</span>}</div>
           <div class={styles.fieldRow} style={{ flexWrap: 'wrap' }}>
             {modes.length > 0 && (
-              <span role="group" aria-label="Mode" class={styles.seg}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span class={styles.muted}>Colours</span>
+                <span role="group" aria-label="Colour mode" class={styles.seg}>
                 <button class={cx(styles.iconBtn, activeMode === null && styles.iconBtnActive)} aria-pressed={activeMode === null} onClick={() => setMode(null)}>As drawn</button>
                 {modes.map((m) => <button key={m} class={cx(styles.iconBtn, activeMode === m && styles.iconBtnActive)} aria-pressed={activeMode === m} onClick={() => setMode(m)}>{m}</button>)}
+                </span>
               </span>
             )}
-            <span role="group" aria-label="Background" class={styles.seg}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span class={styles.muted}>Background</span>
+              <span role="group" aria-label="Background" class={styles.seg}>
               {(['auto', 'light', 'dark', 'checker'] as const).map((t) => <button key={t} class={cx(styles.iconBtn, tile === t && styles.iconBtnActive)} aria-pressed={tile === t} onClick={() => setTile(t)}>{t === 'auto' ? 'Auto' : t[0].toUpperCase() + t.slice(1)}</button>)}
+              </span>
             </span>
           </div>
           <div class={styles.detailLadder} style={style}>
             {SIZES.map((px) => (
               <div key={px} class={tileCls(shownTile)} style={{ padding: 8, minHeight: 0 }}>
                 {icon.svgOk ? art(px) : null}
-                <span class={styles.muted} style={{ display: 'block', textAlign: 'center' }}>{px}</span>
+                <span class={styles.muted} style={{ display: 'block', textAlign: 'center', color: shownTile === 'dark' ? '#d0d0d0' : '#555' }}>{px}</span>
               </div>
             ))}
           </div>

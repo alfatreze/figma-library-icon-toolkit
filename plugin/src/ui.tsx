@@ -652,7 +652,7 @@ function Plugin() {
         />
       )}
       {mappingOpen && (
-        <MappingDialog naming={settings.tokenNaming} variables={scanVariables} onChange={(mapping) => patch({ tokenNaming: { ...settings.tokenNaming, mapping } })} onClose={() => setMappingOpen(false)} />
+        <MappingDialog naming={settings.tokenNaming} variables={scanVariables} onChange={(mapping) => patch({ tokenNaming: { ...settings.tokenNaming, mode: 'custom', mapping } })} onClose={() => setMappingOpen(false)} />
       )}
       <div class={styles.grip} />
     </div>
