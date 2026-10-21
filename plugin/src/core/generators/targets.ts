@@ -46,11 +46,19 @@ export const TARGETS: Target[] = [
   },
   {
     key: 'html',
-    hint: 'Searchable preview page and base CSS',
-    label: 'HTML',
-    detail: 'Base CSS plus a self-contained, searchable test page (html/index.html).',
-    build: (b) => ({ [`html/${ns(b)}-icons.css`]: baseCss(b), 'html/index.html': testPage(b) }),
-    owns: (p) => p.startsWith('html/') && !p.includes('-icons-mask.css')
+    hint: 'Searchable, self-contained preview page',
+    label: 'HTML preview page',
+    detail: 'A self-contained, searchable test page (html/index.html) to browse and try every icon: colours, size, stroke, light and dark.',
+    build: (b) => ({ 'html/index.html': testPage(b) }),
+    owns: (p) => p === 'html/index.html'
+  },
+  {
+    key: 'css',
+    hint: 'The CSS file for the icons',
+    label: 'CSS file',
+    detail: 'The base CSS (html/<prefix>-icons.css): sizes, colour and stroke variables for inline SVG icons.',
+    build: (b) => ({ [`html/${ns(b)}-icons.css`]: baseCss(b) }),
+    owns: (p) => p.startsWith('html/') && p.endsWith('-icons.css')
   },
   {
     key: 'mask',

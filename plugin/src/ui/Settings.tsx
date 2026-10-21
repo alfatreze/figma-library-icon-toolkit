@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Textbox, TextboxMultiline, Toggle } from '@create-figma-plugin/ui'
-import { FormatCards } from './components/FormatCards'
+import { PackageCards } from './components/PackageCards'
 import { Segmented } from './components/Segmented'
 import { TabBar } from './components/TabBar'
 import { HOSTS, parseRepoInput } from '../core/gitHost'
@@ -39,6 +39,9 @@ export interface SettingsExtras {
   /** every distinct Figma variable bound in the last scan */
   scanVariables: { variable: string; collection?: string; modes?: Record<string, string> }[]
   onOpenMapping: () => void
+  /** the PNG card's content and its file count (built by the shell, which owns the scan data) */
+  pngBody: preact.ComponentChildren
+  pngFiles: number
   onAttachDevResources: () => void
   onCopyDiagnostics: () => void
   scannedComponents: number
@@ -56,7 +59,6 @@ export interface SettingsExtras {
 export function SettingsPanel({ settings, patch, onClose, extras, initialTab = 'packages' }: { settings: Settings; patch: (p: Partial<Settings>) => void; onClose: () => void; extras: SettingsExtras; initialTab?: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const f = settings.formats
-  const setFormat = (k: keyof Settings['formats'], v: boolean) => patch({ formats: { ...f, [k]: v } })
   const ns = cleanNamespace(settings.namespace)
   return (
     <Dialog label="Settings" onClose={onClose}>
@@ -73,7 +75,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           <Fragment>
             <div class={styles.section}>
               <span class={styles.sectionTitle}>What to export</span>
-              <FormatCards formats={f} onToggle={(k, on) => setFormat(k, on)} rows={extras.overview} />
+              <PackageCards formats={f} png={settings.png} onFormats={(formats) => patch({ formats })} onPng={(png) => patch({ png })} rows={extras.overview} pngBody={extras.pngBody} pngFiles={extras.pngFiles} />
             </div>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Package</span>

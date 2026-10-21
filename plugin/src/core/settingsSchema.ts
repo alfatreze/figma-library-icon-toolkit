@@ -48,6 +48,14 @@ const rule = <T>(shared: boolean, check: Check<T>): Rule<T> => ({ shared, check 
 
 export const MAX_PNG_ROWS = 12
 
+/** older saved settings and config files have `html` (preview page and CSS together) and no `css`: the CSS file follows the old switch */
+function legacyCss(check: Check<Settings['formats']>): Check<Settings['formats']> {
+  return (v) => {
+    if (v && typeof v === 'object' && !Array.isArray(v) && 'html' in v && !('css' in v)) return check({ ...v, css: (v as { html: unknown }).html })
+    return check(v)
+  }
+}
+
 /** the rows are kept as typed (a half-typed size is still a row); the export plan reports the ones that cannot be used */
 const pngRows: Check<Settings['png']['rows']> = (v) => {
   if (!Array.isArray(v) || v.length > MAX_PNG_ROWS) return undefined
@@ -119,7 +127,12 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
         repo: str(200),
         subdir: str(200),
         branch: str(100),
-        packages: (x) => (x === null ? null : Array.isArray(x) && x.every((k) => typeof k === 'string' && keys.includes(k)) ? (x as OutputSettings['packages']) : undefined)
+        packages: (x) => {
+          if (x === null) return null
+          // before the CSS file was its own package, "html" meant the preview page and the CSS together
+          const list = Array.isArray(x) && x.includes('html') && !x.includes('css') ? [...x, 'css'] : x
+          return Array.isArray(list) && list.every((k) => typeof k === 'string' && keys.includes(k)) ? (list as OutputSettings['packages']) : undefined
+        }
       },
       { id: 'output', name: '', provider: 'github', repo: '', subdir: 'icons', branch: '', packages: null }
     )
@@ -143,10 +156,11 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   precision: rule(true, int(1, 6)),
   formats: rule(
     true,
+    legacyCss(
     shape<Settings['formats']>(
-      { svg: bool, sprite: bool, html: bool, mask: bool, angularModern: bool, angularClassic: bool, react: bool, webComponent: bool, codeConnect: bool },
+      { svg: bool, sprite: bool, html: bool, css: bool, mask: bool, angularModern: bool, angularClassic: bool, react: bool, webComponent: bool, codeConnect: bool },
       DEFAULT_SETTINGS.formats
-    )
+    ))
   ),
   codeConnectUrl: rule(true, url),
   importPath: rule(true, (v) => (typeof v === 'string' && /^[\w@~./-]{1,80}$/.test(v) ? v : undefined)),

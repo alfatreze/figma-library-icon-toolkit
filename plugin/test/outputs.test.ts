@@ -8,7 +8,7 @@ import { fakeGithub, newState } from './helpers/fakeHost'
 
 const out = (over: Partial<OutputSettings> = {}): OutputSettings => ({ id: 'a', name: 'A', provider: 'github', repo: 'acme/icons', subdir: 'icons', branch: '', packages: null, ...over })
 const tokens = { github: 'tok', gitlab: '' }
-const formats = { ...DEFAULT_SETTINGS.formats, svg: true, sprite: false, html: false, mask: false, angularModern: true, angularClassic: false, react: true, webComponent: false, codeConnect: false }
+const formats = { ...DEFAULT_SETTINGS.formats, svg: true, sprite: false, html: false, css: false, mask: false, angularModern: true, angularClassic: false, react: true, webComponent: false, codeConnect: false }
 
 describe('packages per output', () => {
   it('null means every package that is switched on; a list never adds one that is off', () => {
@@ -131,5 +131,24 @@ import { exportConfig } from '../src/core/config'
 describe('exported config', () => {
   it('stores the namespace the files really use, not what was typed', () => {
     expect(JSON.parse(exportConfig({ ...DEFAULT_SETTINGS, namespace: 'gitl:' })).namespace).toBe('gitl')
+  })
+})
+
+describe('the CSS file as its own package', () => {
+  it('older settings: the CSS file follows the old HTML switch, in saved settings and in output package lists', () => {
+    expect(migrateSettings({ formats: { html: false } }).formats).toMatchObject({ html: false, css: false })
+    expect(migrateSettings({ formats: { html: true } }).formats).toMatchObject({ html: true, css: true })
+    expect(migrateSettings({ formats: { html: false, css: true } }).formats).toMatchObject({ html: false, css: true })
+    const o = migrateSettings({ outputs: [out({ packages: ['html', 'react'] })] }).outputs[0]
+    expect(o.packages).toEqual(['html', 'react', 'css'])
+    expect(migrateSettings({ outputs: [out({ packages: ['html', 'css'] })] }).outputs[0].packages).toEqual(['html', 'css'])
+  })
+  it('builds the preview page and the CSS file independently', () => {
+    const grid = { width: 24, height: 24, count: 0, total: 0, padding: 0, detected: false } as never
+    const base = { allIcons: [], grid, tier: 'A' as never, generatedAt: '2026-01-01' }
+    const only = (k: 'html' | 'css') => Object.keys(buildFiles({ ...base, settings: { ...DEFAULT_SETTINGS, formats: Object.fromEntries(Object.keys(DEFAULT_SETTINGS.formats).map((x) => [x, x === k])) as Settings['formats'] } })).filter((p) => p.startsWith('html/'))
+    expect(only('html')).toEqual(['html/index.html'])
+    expect(only('css').every((p) => p.endsWith('-icons.css'))).toBe(true)
+    expect(only('css')).toHaveLength(1)
   })
 })

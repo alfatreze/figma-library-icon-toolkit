@@ -1,4 +1,4 @@
-import { Button, Dropdown, Textbox, Toggle } from '@create-figma-plugin/ui'
+import { Button, Textbox } from '@create-figma-plugin/ui'
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import { MAX_PNG_ROWS } from '../core/settingsSchema'
@@ -6,41 +6,113 @@ import { normaliseHex, PngColourOption, PngPlan } from '../core/png'
 import { PngColour, PngRow, Settings } from '../types'
 import { InfoTip } from './InfoTip'
 import styles from './styles'
-import { plural } from './util'
+import { cx, plural } from './util'
 
 export const newPngRowId = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 const same = (a: PngColour, b: PngColour) => a.kind === 'variable' && b.kind === 'variable' && a.variable === b.variable && a.collection === b.collection && a.mode === b.mode
 
-const optionText = (o: PngColourOption) => `${o.colour.variable}${o.colour.mode ? ` · ${o.colour.mode}` : ''}  ${o.hex}`
+/** the colour as a small square; “as drawn” is a two-tone square because the icon's own colour differs from icon to icon */
+const Swatch = ({ hex, size = 16 }: { hex: string | null; size?: number }) => (
+  <span
+    aria-hidden="true"
+    style={{
+      width: size,
+      height: size,
+      borderRadius: 4,
+      flex: 'none',
+      display: 'inline-block',
+      border: '1px solid var(--figma-color-border)',
+      background: hex ?? 'linear-gradient(135deg, #ffffff 50%, #1e1e1e 50%)'
+    }}
+  />
+)
+
+/** what the colour cell of a row says: the hex, the variable, or “As drawn” */
+function colourLabel(c: PngColour, options: PngColourOption[]): { hex: string | null; text: string } {
+  if (c.kind === 'drawn') return { hex: null, text: 'As drawn' }
+  if (c.kind === 'hex') return { hex: normaliseHex(c.hex), text: c.hex.toUpperCase() }
+  const o = options.find((x) => same(x.colour, c))
+  return { hex: o?.hex ?? null, text: `${c.variable}${c.mode ? ` · ${c.mode}` : ''}${o ? '' : ' (not in the scan)'}` }
+}
+
+const listBtn = (active: boolean) => cx(styles.iconBtn, active && styles.iconBtnActive)
+
+/** the colour editor of one row: as drawn, a typed colour, or one of the scanned variables in a mode, as a visual list */
+function ColourPicker(props: { colour: PngColour; options: PngColourOption[]; onPick: (c: PngColour) => void }) {
+  const { colour, options } = props
+  const [draft, setDraft] = useState(colour.kind === 'hex' ? colour.hex : '')
+  const bad = draft.trim() !== '' && !normaliseHex(draft)
+  const groups = new Map<string, PngColourOption[]>()
+  for (const o of options) groups.set(o.colour.collection, [...(groups.get(o.colour.collection) ?? []), o])
+  return (
+    <div style={{ padding: '6px 0 2px' }}>
+      <button class={listBtn(colour.kind === 'drawn')} style={{ width: '100%', justifyContent: 'flex-start', gap: 8 }} aria-pressed={colour.kind === 'drawn'} onClick={() => props.onPick({ kind: 'drawn' })}>
+        <Swatch hex={null} /> As drawn in Figma
+      </button>
+      <div class={styles.fieldRow} style={{ margin: '6px 0' }}>
+        <Swatch hex={normaliseHex(draft)} />
+        <div class={styles.grow}>
+          <Textbox
+            value={draft}
+            placeholder="Type a colour, e.g. #112233"
+            onValueInput={(v) => {
+              setDraft(v)
+              const hex = normaliseHex(v)
+              if (hex) props.onPick({ kind: 'hex', hex })
+            }}
+          />
+        </div>
+      </div>
+      {bad && <div class={styles.sevWarn}>Use a colour like #112233 or #123.</div>}
+      {options.length === 0 ? (
+        <div class={styles.muted}>Scan icons that use Figma variables to pick from them here.</div>
+      ) : (
+        <div style={{ maxHeight: 190, overflowY: 'auto' }}>
+          {[...groups].map(([collection, list]) => (
+            <div key={collection}>
+              <div class={styles.sectionTitle} style={{ padding: '6px 0 2px' }}>{collection || '(no collection)'}</div>
+              {list.map((o) => (
+                <button
+                  key={`${o.colour.variable}|${o.colour.mode}`}
+                  class={listBtn(same(o.colour, colour))}
+                  style={{ width: '100%', justifyContent: 'flex-start', gap: 8 }}
+                  aria-pressed={same(o.colour, colour)}
+                  onClick={() => props.onPick(o.colour)}
+                >
+                  <Swatch hex={o.hex} />
+                  <span class={styles.ellipsis}>{o.colour.variable}</span>
+                  {o.colour.mode && <span class={styles.muted}>{o.colour.mode}</span>}
+                  <span class={styles.muted} style={{ marginLeft: 'auto' }}>{o.hex}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function RowEditor(props: { row: PngRow; options: PngColourOption[]; problems: string[]; onChange: (r: PngRow) => void; onRemove: () => void }) {
   const { row, options } = props
-  const [hexDraft, setHexDraft] = useState(row.colour.kind === 'hex' ? row.colour.hex : '')
-  const index = row.colour.kind === 'variable' ? options.findIndex((o) => same(o.colour, row.colour)) : -1
-  const value = row.colour.kind === 'drawn' ? 'drawn' : row.colour.kind === 'hex' ? 'hex' : index >= 0 ? `v${index}` : 'stale'
-  const choices = [
-    { value: 'drawn', text: 'Colour: as drawn in Figma' },
-    { value: 'hex', text: 'Colour: custom…' },
-    ...options.map((o, i) => ({ value: `v${i}`, text: `Colour: ${optionText(o)}` })),
-    ...(value === 'stale' && row.colour.kind === 'variable' ? [{ value: 'stale', text: `Colour: ${row.colour.variable} (not in the scan)` }] : [])
-  ]
-  const pick = (v: string) => {
-    if (v === 'drawn') props.onChange({ ...row, colour: { kind: 'drawn' } })
-    else if (v === 'hex') {
-      const hex = normaliseHex(hexDraft) ?? '#000000'
-      setHexDraft(hex)
-      props.onChange({ ...row, colour: { kind: 'hex', hex } })
-    } else if (v.startsWith('v')) {
-      const o = options[Number(v.slice(1))]
-      if (o) props.onChange({ ...row, colour: o.colour })
-    }
-  }
-  const draftBad = row.colour.kind === 'hex' && !normaliseHex(hexDraft)
+  const [open, setOpen] = useState(false)
+  const label = colourLabel(row.colour, options)
   return (
-    <div style={{ padding: '6px 0', borderBottom: '1px solid var(--figma-color-border)' }}>
+    <div style={{ padding: '4px 0', borderBottom: '1px solid var(--figma-color-border)' }}>
       <div class={styles.fieldRow}>
-        <div style={{ width: 84 }}>
+        <button
+          class={cx(styles.iconBtn, open && styles.iconBtnActive)}
+          style={{ width: 132, justifyContent: 'flex-start', gap: 8, flex: 'none' }}
+          aria-expanded={open}
+          aria-label={`Colour: ${label.text}`}
+          data-hint="Choose the colour"
+          onClick={() => setOpen(!open)}
+        >
+          <Swatch hex={label.hex} />
+          <span class={styles.ellipsis}>{label.text}</span>
+        </button>
+        <div style={{ width: 72, flex: 'none' }}>
           <Textbox value={row.size} placeholder="2x, 512w" onValueInput={(size) => props.onChange({ ...row, size })} />
         </div>
         <div class={styles.grow}>
@@ -48,35 +120,17 @@ function RowEditor(props: { row: PngRow; options: PngColourOption[]; problems: s
         </div>
         <button class={styles.iconBtn} aria-label="Remove this row" data-hint="Remove this row" onClick={props.onRemove}>×</button>
       </div>
-      <div class={styles.fieldRow} style={{ marginTop: 6 }}>
-        <div class={styles.grow}>
-          <Dropdown value={value} options={choices} onValueChange={pick} />
-        </div>
-        {row.colour.kind === 'hex' && (
-          <div style={{ width: 96 }}>
-            <Textbox
-              value={hexDraft}
-              placeholder="#112233"
-              onValueInput={(v) => {
-                setHexDraft(v)
-                const hex = normaliseHex(v)
-                if (hex) props.onChange({ ...row, colour: { kind: 'hex', hex } })
-              }}
-            />
-          </div>
-        )}
-      </div>
-      {draftBad && <div class={styles.sevWarn}>Use a colour like #112233 or #123.</div>}
+      {open && <ColourPicker colour={row.colour} options={options} onPick={(colour) => props.onChange({ ...row, colour })} />}
       {props.problems.map((p) => <div key={p} class={styles.sevWarn}>{p}</div>)}
     </div>
   )
 }
 
 /**
- * PNG export rows, like Figma's export section: size, suffix and colour per row, one file per icon and row. Off until switched on.
+ * The inside of the PNG card, like Figma's export section: size, suffix and colour per row, one file per icon and row.
  * The rows start from the PNG export settings found in the file (seeded once per scan by the shell when there are none).
  */
-export function PngSection(props: {
+export function PngBody(props: {
   png: Settings['png']
   options: PngColourOption[]
   plan: PngPlan
@@ -88,17 +142,9 @@ export function PngSection(props: {
   const skippedNames = [...new Set(plan.skipped.map((s) => s.name))]
   return (
     <div class={styles.section}>
-      <div class={styles.fieldRow}>
-        <span class={`${styles.sectionTitle} ${styles.grow}`}>PNG images</span>
-        <InfoTip title="PNG images">
-          <span>
-            One PNG per icon and row, drawn here from the same themed SVG as the other formats, so a colour you choose is applied exactly. A row is a Figma-style export: <code>2x</code> scales the icon, <code>512w</code> or <code>512h</code> sets one side and keeps the proportions. The file is the icon name plus the suffix, so give rows that differ in colour or size different suffixes. PNG files are in the ZIP only, not in repository publishing. Icons with several colours or a gradient are drawn only on rows set to “as drawn”.
-          </span>
-        </InfoTip>
+      <div class={styles.muted}>
+        One PNG per icon and row, drawn from the same themed SVG as the other formats. <code>2x</code> scales the icon, <code>512w</code> or <code>512h</code> sets one side. The file is the icon name plus the suffix, so rows that differ in colour or size need different suffixes. In the ZIP only, not in repository publishing.
       </div>
-      <Toggle value={png.enabled} onValueChange={(enabled) => props.onChange({ ...png, enabled })}>
-        Include PNG images in the ZIP
-      </Toggle>
       {props.figmaNote && <div class={styles.muted}>{props.figmaNote}</div>}
       {png.rows.map((r) => (
         <RowEditor
@@ -119,16 +165,13 @@ export function PngSection(props: {
           Add row
         </Button>
       </div>
-      {png.enabled && png.rows.length === 0 && <div class={styles.muted}>Add a row to export PNG images.</div>}
-      {png.enabled && png.rows.length > 0 && plan.problems.every((p) => !p.rowId) && (
+      {png.rows.length === 0 && <div class={styles.muted}>Add a row to export PNG images.</div>}
+      {png.rows.length > 0 && plan.problems.every((p) => !p.rowId) && skippedNames.length > 0 && (
         <div class={styles.muted}>
-          {plural(plan.items.length, 'PNG file')}
-          {skippedNames.length > 0 && <span> · {plural(skippedNames.length, 'icon')} not drawn on rows with a colour (several colours, a gradient or fixed colours)</span>}
-          {skippedNames.length > 0 && (
-            <InfoTip title="Not drawn on coloured rows">
-              <span>{skippedNames.slice(0, 40).join(', ')}{skippedNames.length > 40 ? `, and ${skippedNames.length - 40} more` : ''}. They are still drawn on rows set to “as drawn”.</span>
-            </InfoTip>
-          )}
+          {plural(skippedNames.length, 'icon')} not drawn on rows with a colour (several colours, a gradient or fixed colours)
+          <InfoTip title="Not drawn on coloured rows">
+            <span>{skippedNames.slice(0, 40).join(', ')}{skippedNames.length > 40 ? `, and ${skippedNames.length - 40} more` : ''}. They are still drawn on rows set to “as drawn”.</span>
+          </InfoTip>
         </div>
       )}
     </div>

@@ -59,7 +59,7 @@ export function enabledFormats(settings: Settings): FormatId[] {
   const out: FormatId[] = []
   if (f.svg) out.push('svg')
   if (f.sprite) out.push('sprite')
-  if (f.html) out.push('html')
+  if (f.html || f.css) out.push('html')
   if (f.mask) out.push('mask')
   if (f.angularModern || f.angularClassic) out.push('angular')
   if (f.react) out.push('react')

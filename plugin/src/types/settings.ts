@@ -109,7 +109,10 @@ export interface Settings {
   formats: {
     svg: boolean
     sprite: boolean
+    /** the searchable preview page, html/index.html (self-contained) */
     html: boolean
+    /** the base CSS file, html/<ns>-icons.css */
+    css: boolean
     mask: boolean
     angularModern: boolean
     angularClassic: boolean
@@ -165,6 +168,7 @@ export const DEFAULT_SETTINGS: Settings = {
     svg: true,
     sprite: true,
     html: true,
+    css: true,
     mask: false,
     angularModern: true,
     angularClassic: true,

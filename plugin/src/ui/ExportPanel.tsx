@@ -1,6 +1,6 @@
 import { Button, Checkbox, Dropdown, Toggle } from '@create-figma-plugin/ui'
 import { Dialog } from './Dialog'
-import { FormatCards } from './components/FormatCards'
+import { PackageCards } from './components/PackageCards'
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import { BASELINE_LABEL, BaselineSource } from '../core/baseline'
@@ -22,8 +22,9 @@ export interface ExportPanelProps {
   excluded: number
   categories: CategorySummary[]
   rows: OverviewRow[] | null
-  /** the PNG rows section (built by the shell, which owns the scan data it needs) and whether its rows stop the export */
-  pngSection: preact.ComponentChildren
+  /** the PNG card's content and file count (built by the shell, which owns the scan data), and whether its rows stop the export */
+  pngBody: preact.ComponentChildren
+  pngFiles: number
   pngBlocked: boolean
   hasStrokeIcons: boolean
   release: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null }
@@ -69,7 +70,7 @@ export function ExportPanel(p: ExportPanelProps) {
   const enabledRows = (p.rows ?? []).filter((r) => fmtOn(r.id))
   const files = enabledRows.reduce((a, r) => a + r.files, 0)
   const bytes = enabledRows.reduce((a, r) => a + r.bytes, 0)
-  const noFormat = !Object.values(settings.formats).some(Boolean)
+  const noFormat = !Object.values(settings.formats).some(Boolean) && !settings.png.enabled
   const d = release.diff
   const groups: [string, string, string[]][] = d
     ? [
@@ -102,11 +103,9 @@ export function ExportPanel(p: ExportPanelProps) {
         {p.excluded > 0 && <div class={styles.muted}>{p.excluded} left out by you.</div>}
 
         <Section title="Formats">
-          <FormatCards formats={settings.formats} onToggle={(k, on) => p.patch({ formats: { ...settings.formats, [k]: on } })} rows={p.rows} />
+          <PackageCards formats={settings.formats} png={settings.png} onFormats={(formats) => p.patch({ formats })} onPng={(png) => p.patch({ png })} rows={p.rows} pngBody={p.pngBody} pngFiles={p.pngFiles} />
           <div class={styles.muted}>README, icons.json and AI guide are always included.</div>
         </Section>
-
-        {p.pngSection}
 
         {(p.categories.length > 0 || p.hasStrokeIcons) && (
           <Section title="Options">

@@ -18,7 +18,8 @@ export function readmeFile(b: BuildInput): string {
   const tree: string[] = []
   if (f.svg) tree.push(`svg/${b.settings.splitByCategory ? '<category>/' : ''}${n}-<name>.svg   one themeable SVG per icon`)
   if (f.sprite) tree.push(`sprite/${n}-sprite.svg   all icons as <symbol>${b.settings.splitByCategory ? ' (+ one sprite per category)' : ''}`)
-  if (f.html) tree.push(`html/${n}-icons.css   base CSS (size, variables)`, 'html/index.html   searchable preview: open it in a browser')
+  if (f.css) tree.push(`html/${n}-icons.css   base CSS (size, variables)`)
+  if (f.html) tree.push('html/index.html   searchable preview: open it in a browser')
   if (f.mask) tree.push(`html/${n}-icons-mask.css   optional CSS-mask classes`)
   if (f.angularModern) tree.push('angular/   Angular 17.1+ component (signals)')
   if (f.angularClassic) tree.push('angular-classic/   Angular 14+ component (@Input)')

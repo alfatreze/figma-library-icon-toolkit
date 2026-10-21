@@ -14,7 +14,7 @@ import { SHARED_KEYS } from './core/settingsSchema'
 import { zipFiles } from './core/zip'
 import { colourOptions, planPng, rowsFromFigma } from './core/png'
 import { buildPngFiles } from './ui/png'
-import { newPngRowId, PngSection } from './ui/PngSection'
+import { newPngRowId, PngBody } from './ui/PngSection'
 import styles from './ui/styles'
 import { ConfirmApply, FixCard } from './ui/Fixes'
 import { useFilters } from './ui/hooks/useFilters'
@@ -271,9 +271,10 @@ function Plugin() {
     setPngNote(`Rows loaded from the PNG export settings of ${plural(found.icons, 'layer')} in Figma. Edit, add or remove rows as you like.`)
   }, [raws])
   const pngPlan = useMemo(
-    () => (exportOpen ? planPng(exportable, settings.png.rows, pngOptions, (i) => `${cleanNamespace(settings.namespace)}-${i.name}`) : null),
-    [exportOpen, exportable, settings.png.rows, settings.namespace, pngOptions]
+    () => (exportOpen || showSettings ? planPng(exportable, settings.png.rows, pngOptions, (i) => `${cleanNamespace(settings.namespace)}-${i.name}`) : null),
+    [exportOpen, showSettings, exportable, settings.png.rows, settings.namespace, pngOptions]
   )
+  const pngBody = pngPlan ? <PngBody png={settings.png} options={pngOptions} plan={pngPlan} figmaNote={pngNote} onChange={(png) => patch({ png })} /> : null
   const pngOn = settings.png.enabled && settings.png.rows.length > 0
   const pngBlocked = pngOn && !!pngPlan && pngPlan.problems.length > 0
 
@@ -588,7 +589,8 @@ function Plugin() {
           categories={exportCats}
           rows={overview}
           pngBlocked={pngBlocked}
-          pngSection={pngPlan && <PngSection png={settings.png} options={pngOptions} plan={pngPlan} figmaNote={pngNote} onChange={(png) => patch({ png })} />}
+          pngBody={pngBody}
+          pngFiles={pngPlan?.items.length ?? 0}
           hasStrokeIcons={exportable.some((i) => i.hasStroke)}
           release={release}
           prevCatalog={baseline.previous}
@@ -678,7 +680,7 @@ function Plugin() {
           settings={settings}
           patch={patch}
           onClose={() => setShowSettings(false)}
-          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onOpenMapping: () => setMappingOpen(true), onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, testMessages: publish.testMessages, onTestRepo: publish.test, outputProblems: publish.problems }}
+          extras={{ overview, onCopyDiagnostics: () => emit<RequestDiagnosticsHandler>('REQUEST_DIAGNOSTICS'), exampleVariable, scanVariables, onOpenMapping: () => setMappingOpen(true), pngBody, pngFiles: pngPlan?.items.length ?? 0, onAttachDevResources, scannedComponents: icons.filter((i) => i.sourceKind === 'component' || i.sourceKind === 'component-set').length, onExportConfig, onImportConfig, configMessage, shared: sharedInfo, onPublish, onUseShared, testMessages: publish.testMessages, onTestRepo: publish.test, outputProblems: publish.problems }}
         />
       )}
       {mappingOpen && (
