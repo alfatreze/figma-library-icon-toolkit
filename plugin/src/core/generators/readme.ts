@@ -24,6 +24,8 @@ export function readmeFile(b: BuildInput): string {
   if (f.angularModern) tree.push('angular/   Angular 17.1+ component (signals)')
   if (f.angularClassic) tree.push('angular-classic/   Angular 14+ component (@Input)')
   if (f.react) tree.push('react/   React component + typed icon data')
+  if (f.vue) tree.push('vue/   Vue 3 component + typed icon data')
+  if (f.svelte) tree.push('svelte/   Svelte 4/5 component + typed icon data')
   if (f.webComponent) tree.push('web-component/   framework-free custom element')
   if (f.codeConnect) tree.push('code-connect/   Figma Code Connect templates (Dev Mode + MCP)')
   tree.push('icons.json   catalogue for tools/AI', 'toolkit.config.json   settings used (re-export identically)', 'AGENTS.md   guide for AI agents')
@@ -118,6 +120,39 @@ export const Demo = () => <${C} icon={${constant}} size={24} color="#0a7d3b" />;
 \`\`\`
 By name (\`<${C} name="${name}" />\`): registered icons (\`register${P}Icons(…)\`) render at once, others load their category as a lazy chunk on first use. \`register${P}AllIcons()\` (from \`all-icons.ts\`) registers everything synchronously.
 Props: \`icon\` or \`name\` (typed), \`size\` (number = px, or CSS length), \`color\`, \`strokeWidth\` (line icons), \`label\` (accessible name; omit for decorative). Extra props go to the wrapping \`<span>\`.`)
+  }
+
+  if (f.vue || f.svelte) {
+    const P = n.charAt(0).toUpperCase() + n.slice(1).replace(/-([a-z0-9])/g, (_m, c) => c.toUpperCase())
+    const constant = sample ? constName(b, sample) : 'icon'
+    if (f.vue) {
+      parts.push(`### Vue
+1. Copy \`vue/\` into your app, e.g. \`src/icons/\`.
+2. Use the typed component (Vue 3, no dependencies; it is a plain TypeScript file, so no extra build step). Import the icons you use (synchronous, tree-shakable):
+\`\`\`vue
+<script setup lang="ts">
+import { ${C}, ${constant} } from './icons';
+</script>
+
+<template>
+  <${C} :icon="${constant}" :size="24" color="#0a7d3b" />
+</template>
+\`\`\`
+By name (\`<${C} name="${name}" />\`): registered icons (\`register${P}Icons(…)\`) render at once, others load their category as a lazy chunk on first use. Props: \`icon\` or \`name\` (typed), \`size\`, \`color\`, \`strokeWidth\` (line icons), \`label\` (accessible name; omit for decorative).`)
+    }
+    if (f.svelte) {
+      parts.push(`### Svelte
+1. Copy \`svelte/\` into your app, e.g. \`src/lib/icons/\`.
+2. Use the typed component (Svelte 4 and 5, no dependencies). Import the icons you use (synchronous, tree-shakable):
+\`\`\`svelte
+<script lang="ts">
+  import { ${C}, ${constant} } from './icons';
+</script>
+
+<${C} icon={${constant}} size={24} color="#0a7d3b" />
+\`\`\`
+By name (\`<${C} name="${name}" />\`): registered icons (\`register${P}Icons(…)\`) render at once, others load their category as a lazy chunk on first use. Props: \`icon\` or \`name\` (typed), \`size\`, \`color\`, \`strokeWidth\` (line icons), \`label\` (accessible name; omit for decorative). Other attributes go to the wrapping \`<span>\`.`)
+    }
   }
 
   if (f.webComponent) {

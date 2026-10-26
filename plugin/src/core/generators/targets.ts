@@ -6,6 +6,8 @@ import { baseCss, maskCss } from './css'
 import { reactFiles } from './react'
 import { categorySprites, spriteFile, svgFiles } from './svg-files'
 import { testPage } from './testpage'
+import { svelteFiles } from './svelte'
+import { vueFiles } from './vue'
 import { webComponentFiles } from './webcomponent'
 
 /**
@@ -91,6 +93,22 @@ export const TARGETS: Target[] = [
     detail: 'Typed <Icon icon={…} /> / name component (React 17+), no dependencies; per-icon data, lazy category chunks. Props: size, color, strokeWidth, label.',
     build: reactFiles,
     owns: under('react')
+  },
+  {
+    key: 'vue',
+    hint: 'Vue 3 component, no SFC build needed',
+    label: 'Vue',
+    detail: 'Typed <Icon name="…" /> component for Vue 3 (a plain TypeScript file: no .vue compiler needed), no dependencies; per-icon data, lazy category chunks. Props: size, color, strokeWidth, label.',
+    build: vueFiles,
+    owns: under('vue')
+  },
+  {
+    key: 'svelte',
+    hint: 'Svelte 4 and 5 component',
+    label: 'Svelte',
+    detail: 'Typed <Icon name="…" /> component for Svelte 4 and 5 (classic syntax, one file serves both), no dependencies; per-icon data, lazy category chunks. Props: size, color, strokeWidth, label.',
+    build: svelteFiles,
+    owns: under('svelte')
   },
   {
     key: 'webComponent',

@@ -6,7 +6,9 @@
     "html": 37500,
     "react": 17000,
     "sprite": 3700,
+    "svelte": 17000,
     "svg": 3900,
+    "vue": 17000,
     "web-component": 9000
   },
   "files": {
@@ -16,11 +18,13 @@
     "html": 3,
     "react": 17,
     "sprite": 1,
+    "svelte": 17,
     "svg": 6,
+    "vue": 17,
     "web-component": 3
   },
   "plugin": {
     "main.js": 72000,
-    "ui.js": 430000
+    "ui.js": 445000
   }
 }

@@ -75,7 +75,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
           <Fragment>
             <div class={styles.section}>
               <span class={styles.sectionTitle}>What to export</span>
-              <PackageCards formats={f} png={settings.png} onFormats={(formats) => patch({ formats })} onPng={(png) => patch({ png })} rows={extras.overview} pngBody={extras.pngBody} pngFiles={extras.pngFiles} />
+              <PackageCards formats={f} png={settings.png} npm={settings.npm} onNpm={(npm) => patch({ npm })} onFormats={(formats) => patch({ formats })} onPng={(png) => patch({ png })} rows={extras.overview} pngBody={extras.pngBody} pngFiles={extras.pngFiles} />
             </div>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Package</span>
@@ -534,7 +534,7 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               <Row
                 info={{
                   title: 'Dev resources',
-                  body: <span>Adds a link to every icon <em>component</em> (Dev Mode shows it under “Dev resources”), pointing at <code>&lt;link&gt;#icon-name</code>, e.g. the <code>icons.json</code> in your repository or a Storybook page. This <strong>writes to your Figma file</strong> (one link per component, skipped when it already exists; one undo step). Scan first: it uses the icons currently listed.</span>
+                  body: <span>Adds a link to every icon <em>component</em> (Dev Mode shows it under “Dev resources”), pointing at <code>&lt;link&gt;#icon-name</code>, e.g. the <code>icons.json</code> in your repository or a Storybook page. This <strong>writes to your Figma file</strong> (one link per component, skipped when it already exists; one undo step). Scan first: it uses the icons currently listed. <strong>Developers also get a check in Dev Mode</strong>: when the link points at the <code>icons.json</code> of a <em>public</em> GitHub or GitLab repository, the inspect panel reads it (a plain request, no token, nothing sent) and shows which of the selected icons are already in the repository. Publish the team config so developers see the same link.</span>
                 }}
               >
                 <div class={styles.section}>

@@ -43,6 +43,9 @@ jobs:
           - { name: angular (signals) on Angular 17.1, toolchain: ng17, kind: angular }
           - { name: angular (signals) on latest Angular, toolchain: ng-latest, kind: angular }
           - { name: react on React 18, toolchain: react18, kind: react }
+          - { name: vue on Vue 3, toolchain: vue3, kind: vue }
+          - { name: svelte on Svelte 5, toolchain: svelte5, kind: svelte }
+          - { name: svelte on Svelte 4, toolchain: svelte4, kind: svelte }
           - { name: web-component, toolchain: react18, kind: web-component }
     name: ${{ matrix.name }}
     steps:

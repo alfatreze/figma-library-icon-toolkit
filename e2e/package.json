@@ -2,6 +2,16 @@
   "name": "icon-toolkit-e2e",
   "private": true,
   "type": "module",
-  "scripts": { "test": "playwright test" },
-  "devDependencies": { "@playwright/test": "^1.48.0", "pixelmatch": "^6.0.0", "pngjs": "^7.0.0" }
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "esbuild": "^0.28.2",
+    "esbuild-svelte": "^0.9.5",
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0",
+    "svelte": "^5.57.2",
+    "vue": "^3.5.44"
+  }
 }

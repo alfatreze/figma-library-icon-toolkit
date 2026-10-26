@@ -131,16 +131,16 @@ describe('PackageCards', () => {
     root.remove()
   })
   const draw = (formats: typeof DEFAULT_SETTINGS.formats, png = DEFAULT_SETTINGS.png, on: { f?: (f: typeof formats) => void; p?: (p: typeof png) => void } = {}) =>
-    act(() => render(<PackageCards formats={formats} png={png} onFormats={on.f ?? (() => {})} onPng={on.p ?? (() => {})} rows={null} pngBody={<div>PNG rows here</div>} pngFiles={6} />, root))
+    act(() => render(<PackageCards formats={formats} png={png} npm={DEFAULT_SETTINGS.npm} onNpm={() => {}} onFormats={on.f ?? (() => {})} onPng={on.p ?? (() => {})} rows={null} pngBody={<div>PNG rows here</div>} pngFiles={6} />, root))
   const names = () => Array.from(root.querySelectorAll('input[type=checkbox]')).map((i) => i.closest('label')!.textContent)
 
-  it('lists SVG, PNG, HTML & CSS, Angular, React, Web Component and Code Connect, PNG right after SVG', () => {
+  it('lists SVG, PNG, HTML & CSS, Angular, React, Vue, Svelte, Web Component, Code Connect and npm packages, PNG right after SVG', () => {
     draw(DEFAULT_SETTINGS.formats)
     const titles = Array.from(root.querySelectorAll('label')).map((l) => (l.textContent ?? '').replace(/^✓/, ''))
-    const order = ['SVG', 'PNG', 'HTML & CSS', 'Angular', 'React', 'Web Component', 'Code Connect'].map((t) => titles.findIndex((x) => x.startsWith(t)))
+    const order = ['SVG', 'PNG', 'HTML & CSS', 'Angular', 'React', 'Vue', 'Svelte', 'Web Component', 'Code Connect', 'npm packages'].map((t) => titles.findIndex((x) => x.startsWith(t)))
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(names()).toHaveLength(7)
+    expect(names()).toHaveLength(10)
   })
 
   it('starts folded, and a card folds out to its own settings', () => {
@@ -161,6 +161,18 @@ describe('PackageCards', () => {
     expect(changes[0].enabled).toBe(true)
     draw(DEFAULT_SETTINGS.formats, { enabled: true, rows: [] })
     expect(root.textContent).toContain('6 files')
+  })
+
+  it('npm packages: a card with scope and licence, switched on with the others', () => {
+    const changes: (typeof DEFAULT_SETTINGS.npm)[] = []
+    act(() => render(<PackageCards formats={DEFAULT_SETTINGS.formats} png={DEFAULT_SETTINGS.png} npm={{ enabled: true, scope: 'acme', license: '' }} onNpm={(n) => changes.push(n)} onFormats={() => {}} onPng={() => {}} rows={null} pngBody={null} pngFiles={0} />, root))
+    act(() => (root.querySelector('button[aria-label="Show npm packages settings"]') as HTMLButtonElement).click())
+    expect(root.textContent).toContain('Use a scope like @acme')
+    expect(root.textContent).toContain('UNLICENSED is used until then')
+    const scope = Array.from(root.querySelectorAll('input')).find((i) => i.placeholder.startsWith('@acme')) as HTMLInputElement
+    scope.value = '@acme'
+    act(() => { scope.dispatchEvent(new Event('input', { bubbles: true })) })
+    expect(changes[0]).toEqual({ enabled: true, scope: '@acme', license: '' })
   })
 
   it('Angular: one card, the version is a choice inside it (17.1+, 14+ or both)', () => {

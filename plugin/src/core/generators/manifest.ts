@@ -4,7 +4,8 @@ import { summariseCategories } from '../categories'
 import { OVERRIDES } from '../overrides'
 import { RULES, STEPS } from '../rules'
 import { changelogMarkdown } from '../changelog'
-import { BuildInput, componentName, Files, ns, strokeSteps, symbolId, policyOf } from './common'
+import { pascal } from '../naming'
+import { BuildInput, componentName, constName, Files, ns, strokeSteps, symbolId, policyOf } from './common'
 
 export function manifestFile(b: BuildInput): string {
   const n = ns(b)
@@ -81,13 +82,82 @@ export function manifestFile(b: BuildInput): string {
   return JSON.stringify(data, null, 2) + '\n'
 }
 
+
+/** the part of AGENTS.md that depends on what was exported: where each package is and how to use it */
+function agentsUsage(b: BuildInput): string {
+  const n = ns(b)
+  const C = componentName(b)
+  const f = b.settings.formats
+  const first = b.icons[0]
+  const name = first?.name ?? 'name'
+  const constant = first ? constName(b, first) : 'icon'
+  const P = pascal(n)
+  const rows: string[] = []
+  if (f.angularModern) rows.push(`| Angular 17.1+ | \`angular/\` | \`<${n}-icon name="${name}" />\`: import \`${C}\` in the component's \`imports\`; icons by name load their category lazily, or \`provide${P}Icons(${constant})\` for tree-shaken ones |`)
+  if (f.angularClassic) rows.push(`| Angular 14+ | \`angular-classic/\` | same tag, \`@Input\` based (\`${C}\` in a module or standalone \`imports\`) |`)
+  if (f.react) rows.push(`| React 17+ | \`react/\` | \`<${C} name="${name}" size={24} />\` or \`<${C} icon={${constant}} />\` (imported from \`./icons\`: synchronous and tree-shakable) |`)
+  if (f.vue) rows.push(`| Vue 3 | \`vue/\` | \`<${C} name="${name}" :size="24" />\` or \`<${C} :icon="${constant}" />\`; a plain TypeScript file, no \`.vue\` build step |`)
+  if (f.svelte) rows.push(`| Svelte 4 and 5 | \`svelte/\` | \`<${C} name="${name}" size={24} />\` or \`<${C} icon={${constant}} />\` |`)
+  if (f.webComponent) rows.push(`| Any framework | \`web-component/\` | \`<${n}-icon name="${name}" size="24"></${n}-icon>\` after loading \`${n}-icon.js\` once |`)
+  if (f.sprite) rows.push(`| Plain HTML | \`sprite/${n}-sprite.svg\` | \`<svg class="${n}-icon"><use href="…/${n}-sprite.svg#${n}-${name}"/></svg>\` (load \`html/${n}-icons.css\` once for sizing) |`)
+  if (f.svg) rows.push(`| Inline or <img> | \`svg/${n}-<name>.svg\` | one themeable file per icon |`)
+  const shared = `All component packages take the same inputs: \`name\` (typed; a renamed icon's old name still works for one major version) or \`icon\` (the imported object), \`size\` (number = px, or any CSS length), \`color\`, \`strokeWidth\` (line icons) and \`label\` (accessible name; omit for a decorative icon).`
+  return `## Which package to use
+${rows.length ? `| Stack | Folder | Use |\n|---|---|---|\n${rows.join('\n')}\n\n${shared}` : 'No code package was exported (only the files listed in README.md).'}
+${b.settings.importPath.trim() ? `\nComponents are imported from \`${b.settings.importPath.trim()}\` in the examples (copy the package folder there).` : ''}
+${b.settings.npm.enabled ? '\nEach package folder has a `package.json` and can be published to npm as it is (see its README.md).' : ''}
+`
+}
+
+/** step-by-step recipes for the jobs an assistant is most often asked to do with this library */
+function agentsRecipes(b: BuildInput): string {
+  const n = ns(b)
+  const s = b.settings
+  const dup = s.duplicateNames === 'block' ? 'the export stops until one is renamed' : s.duplicateNames === 'category' ? 'the category is put in front of the name (`<category>-<name>`)' : 'a number is added (`-2`, `-3`…)'
+  const ignoredSegs = s.ignoreSegments.filter(Boolean)
+  const ignoredVariants = s.ignoreVariantValues.filter(Boolean)
+  return `## Recipes
+### Use an icon that exists
+1. Look it up in \`icons.json\` (\`icons[].name\`, \`tags\` (from the Figma description), \`category\`, \`categoryLabel\`). Search tags and category, not only the name.
+2. Use the package of the stack you are in (table above) with exactly that \`name\`. Never invent a name: a name that is not in \`icons.json\` renders nothing.
+3. Size and colour with the component inputs or the CSS variables below; do not edit the generated files.
+
+### Add a new icon
+Icons come from Figma, not from code. Do not hand-write SVG into the generated folders.
+1. A designer adds the icon as a **component** to the Figma library, named \`<category>/<name>\`, on the grid (${b.grid.width}×${b.grid.height}), artwork as vector layers.
+2. Re-run the Icon Library Toolkit plugin and export (or publish) again: this regenerates every file, \`icons.json\` and \`CHANGELOG.md\`.
+3. Review the diff: only the new icon and the catalogue should change. Commit the regenerated folders.
+If the icon is wanted before the design is done, use a temporary text label in the UI and open a request to the design team; do not copy an icon with a different meaning.
+
+### Rename or remove an icon
+Renaming in Figma keeps the icon's identity (its component key): the next export lists the old name as deprecated and old code keeps working for one major version. Removing an icon is a major version. Search the code base for the old name before accepting a removal, and migrate with \`deprecated[].replacedBy\`.
+
+### Fix an icon that does not show
+1. Is the name in \`icons.json\`? Check spelling and case (names are lowercase kebab-case). A renamed icon: look in \`deprecated\`.
+2. Is it sized? The icon takes its size from \`--${n}-icon-size\` (default \`1em\`): a parent with \`font-size: 0\` or an explicit \`width: 0\` hides it.
+3. Colour: the primary colour is \`--${n}-icon-color\` (default \`currentColor\`); an icon drawn with the same colour as its background is not missing.
+4. Used by name from a lazy category: the first render may be empty until its chunk arrives; register the icons you use up front to make them synchronous.
+5. Fewer colours than in Figma? Secondary colours need \`--${n}-icon-color-2\`… (see \`colorSlots\` for the icon).
+
+## Rules this library was exported with
+- Names: lowercase kebab-case, ASCII only; namespace \`${n}\`.
+- Two icons with the same name: ${dup}.
+- ${ignoredSegs.length ? `Category folders left out of names: ${ignoredSegs.map((x) => `\`${x}\``).join(', ')}.` : 'No category folders are left out of names.'}
+- ${ignoredVariants.length ? `Variant values left out of names: ${ignoredVariants.map((x) => `\`${x}\``).join(', ')} (so \`home\` is the default variant, others add their value).` : 'Every variant value is part of the name.'}
+- Categories come from ${s.categorySource === 'auto' ? 'the layer-name path, then the Figma section, frame or page' : `the Figma ${s.categorySource === 'path' ? 'layer-name path' : s.categorySource}`}.
+- Colours are ${s.colorMode === 'themeable' ? 'themeable (CSS variables; a colour bound to a Figma variable also falls back to your design token)' : 'fixed as drawn in Figma (not themeable)'}.
+`
+}
+
 export function agentsFile(b: BuildInput): string {
   const n = ns(b)
   const C = componentName(b)
   return `# ${n} icon library — guide for developers and AI agents
 
 Generated ${b.generatedAt} from Figma. ${b.icons.length} icons. Machine-readable catalogue: \`icons.json\`.
+**Generated files are overwritten by every export: never edit them by hand.** Change the design in Figma and export again.
 
+${agentsUsage(b)}
 ## Naming grammar
 - Canonical id: \`${n}:<name>\`; \`<name>\` is lowercase kebab-case \`[a-z0-9-]\`, ASCII only.
 - SVG file: \`svg/${n}-<name>.svg\` · sprite symbol: \`#${n}-<name>\` · Angular: \`<${n}-icon name="<name>" />\` (class \`${C}\`)
@@ -134,6 +204,7 @@ as "Overrides lost in code": ${Object.keys(OVERRIDES).filter((k) => OVERRIDES[k 
 3. Map instance overrides: width/height → \`--${n}-icon-size\`; fill → \`--${n}-icon-color\`; secondary fills → \`--${n}-icon-color-N\`; stroke weight → \`--${n}-icon-stroke-width\`.
 4. Decorative icons use \`aria-hidden="true"\`; meaningful icons need a label (\`label\` input / \`aria-label\`).
 
+${agentsRecipes(b)}
 ## Library health
 Structure tier: **${b.tier} ${TIER_LABEL[b.tier]}**. Icons with unresolved errors were not exported (see FIX-PLAN.md if present).
 `

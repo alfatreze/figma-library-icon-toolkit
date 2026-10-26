@@ -7,6 +7,9 @@ import { processIcons, ThemeCache } from '../core/process'
 import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from '../core/snippets'
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
+import { CatalogLink, parseCatalogLink, readPublicCatalog, repoStatus, RepoStatus } from '../core/repoCatalog'
+import { PreviousCatalog } from '../core/changelog'
+import { browserFetch } from './repoClient'
 import styles from './styles'
 import { copyText, download, notify, plural } from './util'
 import {
@@ -83,6 +86,24 @@ export function InspectPanel() {
       notify(`Could not build the ZIP: ${e instanceof Error ? e.message : String(e)}`, true)
     }
   }
+  // "is it in your repo?": the catalog is read once from the link the design team set (a public repository, no token), and only when icons are shown
+  const link: CatalogLink | null = useMemo(() => parseCatalogLink(settings.devResourceUrl), [settings.devResourceUrl])
+  const linkKey = link ? `${link.provider}:${link.repo}:${link.ref}:${link.path}` : ''
+  const [repo, setRepo] = useState<{ key: string; state: 'loading' | 'ok' | 'error'; catalog?: PreviousCatalog; message?: string } | null>(null)
+  useEffect(() => {
+    if (!link || icons.length === 0 || repo?.key === linkKey) return
+    let cancelled = false
+    setRepo({ key: linkKey, state: 'loading' })
+    readPublicCatalog(link, browserFetch).then(
+      (catalog) => !cancelled && setRepo({ key: linkKey, state: 'ok', catalog }),
+      (e) => !cancelled && setRepo({ key: linkKey, state: 'error', message: e instanceof Error ? e.message : String(e) })
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [linkKey, icons.length > 0])
+  const statusOf = (icon: Icon): RepoStatus | null => (repo?.state === 'ok' && repo.catalog ? repoStatus(icon, repo.catalog) : null)
+  const inRepo = icons.filter((i) => statusOf(i)?.kind === 'in-repo').length
   const copy = (label: string, text: string) => notify(copyText(text) ? `${label} copied` : 'Copy is blocked here; select the text and copy it', false)
 
   return (
@@ -92,6 +113,11 @@ export function InspectPanel() {
         <span class={styles.muted}>
           {selected === 0 ? 'Select an icon, or a frame that contains icons.' : busy ? 'Reading icons…' : `${plural(icons.length, 'icon')} found`}
         </span>
+        {link && icons.length > 0 && !busy && (
+          <span class={repo?.state === 'error' ? styles.sevWarn : styles.muted}>
+            {repo?.state === 'ok' ? `${inRepo} of ${icons.length} in ${link.repo}` : repo?.state === 'error' ? repo.message : `Checking ${link.repo}…`}
+          </span>
+        )}
       </div>
       <div class={styles.list}>
         {error && <div class={styles.sevError}>{error}</div>}
@@ -105,6 +131,11 @@ export function InspectPanel() {
                 <div class={styles.grow}>
                   <div class={styles.mono}>{icon.name}</div>
                   <div class={styles.muted}>{[icon.categoryLabel, icon.usage ? `×${icon.usage.instances}` : '', icon.kind].filter(Boolean).join(' · ')}</div>
+                  {(() => {
+                    const st = statusOf(icon)
+                    if (!st) return null
+                    return st.kind === 'in-repo' ? <div class={styles.muted}>✓ In the repository</div> : st.kind === 'renamed' ? <div class={styles.sevWarn}>In the repository as “{st.repoName}”: export again to update it</div> : <div class={styles.sevWarn}>Not in the repository yet</div>
+                  })()}
                 </div>
                 <button class={styles.linkBtn} onClick={() => setOpen(isOpen ? null : icon.key)} aria-expanded={isOpen}>{isOpen ? 'Hide' : 'Code'}</button>
               </div>

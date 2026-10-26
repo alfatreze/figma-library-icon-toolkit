@@ -103,7 +103,7 @@ export function ExportPanel(p: ExportPanelProps) {
         {p.excluded > 0 && <div class={styles.muted}>{p.excluded} left out by you.</div>}
 
         <Section title="Formats">
-          <PackageCards formats={settings.formats} png={settings.png} onFormats={(formats) => p.patch({ formats })} onPng={(png) => p.patch({ png })} rows={p.rows} pngBody={p.pngBody} pngFiles={p.pngFiles} />
+          <PackageCards formats={settings.formats} png={settings.png} npm={settings.npm} onNpm={(npm) => p.patch({ npm })} onFormats={(formats) => p.patch({ formats })} onPng={(png) => p.patch({ png })} rows={p.rows} pngBody={p.pngBody} pngFiles={p.pngFiles} />
           <div class={styles.muted}>README, icons.json and AI guide are always included.</div>
         </Section>
 

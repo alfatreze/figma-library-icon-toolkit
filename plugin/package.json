@@ -62,7 +62,7 @@
         "https://api.github.com",
         "https://gitlab.com"
       ],
-      "reasoning": "Optional \"Publish to a repository\": when you press Test connection or Publish, the plugin sends your export files and your own access token to GitHub (api.github.com) or GitLab (gitlab.com) to create a branch and a pull / merge request. No other network access, no analytics."
+      "reasoning": "Optional \"Publish to a repository\": when you press Test connection or Publish, the plugin sends your export files and your own access token to GitHub (api.github.com) or GitLab (gitlab.com) to create a branch and a pull / merge request. Dev Mode: when the team set a link to the repository's icons.json, the inspect panel reads that one public file with a plain request (no token, no data sent) to show which icons are already in the repository. No other network access, no analytics."
     },
     "capabilities": [
       "codegen",

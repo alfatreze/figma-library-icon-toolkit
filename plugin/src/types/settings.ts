@@ -103,6 +103,8 @@ export interface Settings {
   baselineOutput: string
   /** one access token per git host; stays on this computer (never in the team config, exports or diagnostics) */
   tokens: { github: string; gitlab: string }
+  /** npm-ready packages: a package.json (and build file) in every component package and in svg/, so a folder can be published as it is */
+  npm: { enabled: boolean; scope: string; license: string }
   /** PNG images drawn in the plugin from the themed SVG; they go into the ZIP only (not into repository publishing) */
   png: { enabled: boolean; rows: PngRow[] }
   precision: number
@@ -117,6 +119,8 @@ export interface Settings {
     angularModern: boolean
     angularClassic: boolean
     react: boolean
+    vue: boolean
+    svelte: boolean
     webComponent: boolean
     /** Code Connect template files (needs an Organization/Enterprise plan to publish) */
     codeConnect: boolean
@@ -162,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outputs: [],
   baselineOutput: '',
   tokens: { github: '', gitlab: '' },
+  npm: { enabled: false, scope: '', license: 'UNLICENSED' },
   png: { enabled: false, rows: [] },
   precision: 3,
   formats: {
@@ -173,6 +178,8 @@ export const DEFAULT_SETTINGS: Settings = {
     angularModern: true,
     angularClassic: true,
     react: false,
+    vue: false,
+    svelte: false,
     webComponent: false,
     codeConnect: false
   },

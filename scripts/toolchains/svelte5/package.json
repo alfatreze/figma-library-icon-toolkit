@@ -1,0 +1,1 @@
+{"name": "toolchain-svelte5", "private": true, "dependencies": {"svelte": "^5.0.0", "svelte-check": "^4.0.0", "typescript": "~5.6.0", "@sveltejs/package": "^2.3.0"}}

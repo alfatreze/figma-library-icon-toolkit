@@ -62,7 +62,7 @@ export function enabledFormats(settings: Settings): FormatId[] {
   if (f.html || f.css) out.push('html')
   if (f.mask) out.push('mask')
   if (f.angularModern || f.angularClassic) out.push('angular')
-  if (f.react) out.push('react')
+  if (f.react || f.vue || f.svelte) out.push('react') // the Vue and Svelte components take the same size, colour and stroke inputs as React
   if (f.webComponent) out.push('webComponent')
   return out
 }

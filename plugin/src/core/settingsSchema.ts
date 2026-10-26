@@ -149,6 +149,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   }),
   baselineOutput: rule(false, str(40)),
   tokens: rule(false, shape<Settings['tokens']>({ github: str(400), gitlab: str(400) }, DEFAULT_SETTINGS.tokens)),
+  npm: rule(true, shape<Settings['npm']>({ enabled: bool, scope: (v) => (typeof v === 'string' && (v === '' || /^@[a-z0-9][a-z0-9-]{0,40}$/.test(v)) ? v : undefined), license: (v) => (typeof v === 'string' && /^[A-Za-z0-9.+() -]{1,60}$/.test(v) ? v : undefined) }, DEFAULT_SETTINGS.npm)),
   png: rule(
     true,
     shape<Settings['png']>({ enabled: bool, rows: pngRows }, DEFAULT_SETTINGS.png)
@@ -158,7 +159,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
     true,
     legacyCss(
     shape<Settings['formats']>(
-      { svg: bool, sprite: bool, html: bool, css: bool, mask: bool, angularModern: bool, angularClassic: bool, react: bool, webComponent: bool, codeConnect: bool },
+      { svg: bool, sprite: bool, html: bool, css: bool, mask: bool, angularModern: bool, angularClassic: bool, react: bool, vue: bool, svelte: bool, webComponent: bool, codeConnect: bool },
       DEFAULT_SETTINGS.formats
     ))
   ),
@@ -183,7 +184,7 @@ export function checkSetting<K extends keyof Settings>(key: K, value: unknown): 
  * v2 → v3: the single `repo` (with its token) became one output plus a token per host.
  */
 export function migrateSettings(stored: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens }, png: { ...DEFAULT_SETTINGS.png, rows: [] } }
+  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens }, png: { ...DEFAULT_SETTINGS.png, rows: [] }, npm: { ...DEFAULT_SETTINGS.npm } }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out
   const s = { ...(stored as Record<string, unknown>) }
   if (s.zipName === 'icons') s.zipName = ''
