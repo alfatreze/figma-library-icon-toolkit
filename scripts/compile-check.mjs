@@ -88,7 +88,11 @@ if (existsSync(join(src, 'package.json')) && args.build !== 'false') {
 // Storybook stories (the export has them switched on): type-checked against the real Storybook types, next to the package they import
 const storiesDir = join(dump, 'stories')
 const storyFile = { react: /\.react\.stories\.tsx$/, vue: /\.vue\.stories\.ts$/, svelte: /\.svelte\.stories\.ts$|\.svelte$/ }[kind]
-if (storyFile && existsSync(storiesDir) && readdirSync(storiesDir).some((f) => storyFile.test(f))) {
+// (only in toolchains that have Storybook installed: the Svelte 4 one does not)
+const storybookPkg = { react: 'react', vue: 'vue3', svelte: 'svelte' }[kind]
+const hasStorybook = !!storybookPkg && existsSync(join(toolchain, 'node_modules', '@storybook', storybookPkg))
+if (storyFile && existsSync(storiesDir) && readdirSync(storiesDir).some((f) => storyFile.test(f)) && !hasStorybook) console.log(`skipped: ${kind} Storybook stories (no Storybook in this toolchain)`)
+if (storyFile && hasStorybook && existsSync(storiesDir) && readdirSync(storiesDir).some((f) => storyFile.test(f))) {
   const w = mkdtempSync(join(tmpdir(), `stories-${kind}-`))
   symlinkSync(join(toolchain, 'node_modules'), join(w, 'node_modules'))
   execFileSync('cp', ['-R', dir, join(w, kind)])
