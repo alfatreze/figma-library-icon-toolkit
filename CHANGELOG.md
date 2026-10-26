@@ -6,6 +6,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 While the major version is `0` (initial development) minor versions may contain breaking changes; they are called out under **Changed** or **Removed**.
 
 ## [Unreleased]
+
+## [0.7.0-rc.1] - 2026-10-26
+Release candidate for the developer-experience milestone. Everything below is covered by unit tests, real-toolchain compile checks and a Chromium render test, but has **not been run inside Figma yet** (checks V35-V50 in `docs/verification.md`); install it from the release zip to try it, and report what breaks.
+
 ### Added
 - **Vue and Svelte packages** (two new cards): a typed `<Icon name="…" />` component per framework with the same inputs as React (`name` or `icon`, `size`, `color`, `strokeWidth`, `label`), the same per-icon tree-shakable data and lazy category chunks. Vue 3 is a plain TypeScript file (no `.vue` compiler needed); Svelte uses the classic syntax, so one file serves Svelte 4 and 5. Both are compiled with the real toolchains in CI (plain `tsc` for Vue, `svelte-check` for Svelte, both with `verbatimModuleSyntax`) and drawn in Chromium next to the inline SVG, sprite and Web Component: the pixels must match and follow `--<ns>-icon-color`.
 - **npm packages** (new card, off by default): a `package.json` (ESM, types, `sideEffects: false`, your version, an optional `@scope`, a licence), the build file it needs and a README in the React, Vue, Svelte, Angular 17.1+ and Web Component folders and in `svg/`, so a folder can be published as it is. CI runs each package's own build and checks that every file `package.json` points at exists. The Web Component lists its one file as a side effect (it registers the element). Angular 14+ is not packaged: ng-packagr 14 cannot bundle the lazy category chunks.
@@ -151,7 +155,8 @@ First public release.
 - **Project sync (Labs):** local companion `tools/icon-sync.mjs` writes into a project folder and can commit with git.
 - Resizable window, info popovers for complex options, team config import/export.
 
-[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.7.0-rc.1...HEAD
+[0.7.0-rc.1]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.6.0...v0.7.0-rc.1
 [0.6.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alfatreze/figma-library-icon-toolkit/compare/v0.3.1...v0.4.0
