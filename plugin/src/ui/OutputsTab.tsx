@@ -57,7 +57,7 @@ export function OutputsTab(props: {
                 </div>
                 <Button secondary onClick={() => patch({ outputs: settings.outputs.filter((x) => x.id !== o.id) })}>Remove</Button>
               </div>
-              <Field label="Packages" info={{ title: 'Packages', body: <span>Which of the packages you switched on in the Packages tab this output receives. Every output also gets <code>icons.json</code>, the README, the config and the changelog, so each folder describes itself and can be used as the baseline.</span> }}>
+              <Field label="Packages" info={{ title: 'Packages', body: <span>Which of the packages you switched on in the Packages tab this output receives. Every output also gets <code>icons.json</code>, the README, the config and the changelog, so each folder describes itself and can be used as the baseline. PNG images (when switched on in the PNG card) go to outputs that receive all packages, in a <code>png/</code> folder.</span> }}>
                 <div>
                   <Toggle value={!own} onValueChange={(all) => setOutput(o.id, { packages: all ? null : enabled.map((t) => t.key) })}>
                     All packages that are on ({enabled.length})

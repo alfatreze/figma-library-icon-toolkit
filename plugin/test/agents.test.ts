@@ -51,7 +51,7 @@ describe('AGENTS.md', () => {
   })
 
   it('mentions the import path and the npm packages when they are set', () => {
-    const text = agents({ importPath: '@/icons', npm: { enabled: true, scope: '', license: 'MIT' } }, { react: true })
+    const text = agents({ importPath: '@/icons', npm: { enabled: true, scope: '', license: 'MIT', stories: false } }, { react: true })
     expect(text).toContain('Components are imported from `@/icons`')
     expect(text).toContain('can be published to npm')
     expect(agents({ importPath: '' }, { react: true })).not.toContain('Components are imported from')

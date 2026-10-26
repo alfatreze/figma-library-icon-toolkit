@@ -1,3 +1,4 @@
+import { bytesToBase64 } from './base64'
 import { call, commonError, messageOf } from './http'
 import { Change, CommitArgs, FetchFn, HostClient, HostError, RepoInfo, TreeEntry } from './types'
 
@@ -17,7 +18,8 @@ export function chunkChanges(changes: Change[]): Change[][] {
   let cur: Change[] = []
   let bytes = 0
   for (const c of changes) {
-    const size = c.content ? c.content.length * 1.1 + 200 : 200
+    // an image is uploaded as its own blob request: it adds nothing to the tree request body
+    const size = typeof c.content === 'string' ? c.content.length * 1.1 + 200 : 200
     if (cur.length && (cur.length >= CHUNK_FILES || bytes + size > CHUNK_BYTES)) {
       out.push(cur)
       cur = []
@@ -75,10 +77,16 @@ export function githubClient(repo: string, token: string, fetchFn: FetchFn): Hos
       const chunks = chunkChanges(a.changes)
       let done = 0
       for (const chunk of chunks) {
-        const t = await post<{ sha: string }>('/git/trees', {
-          base_tree: tree,
-          tree: chunk.map((c) => (c.content === null ? { path: c.path, mode: '100644', type: 'blob', sha: null } : { path: c.path, mode: '100644', type: 'blob', content: c.content }))
-        })
+        const entries = []
+        for (const c of chunk) {
+          if (c.content === null) entries.push({ path: c.path, mode: '100644', type: 'blob', sha: null })
+          else if (typeof c.content === 'string') entries.push({ path: c.path, mode: '100644', type: 'blob', content: c.content })
+          else {
+            const blob = await post<{ sha: string }>('/git/blobs', { content: bytesToBase64(c.content), encoding: 'base64' })
+            entries.push({ path: c.path, mode: '100644', type: 'blob', sha: blob.data.sha })
+          }
+        }
+        const t = await post<{ sha: string }>('/git/trees', { base_tree: tree, tree: entries })
         tree = t.data.sha
         done += chunk.length
         a.onProgress?.(done, a.changes.length)

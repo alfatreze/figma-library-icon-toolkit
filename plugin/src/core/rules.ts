@@ -32,6 +32,8 @@ export const RULES: Record<string, RuleInfo> = {
   'auto-name': { title: 'Default Figma name', why: 'Names like "Frame 12" say nothing about the icon.', fix: 'Give the layer a meaningful name.', step: 2 },
   'duplicate-resolved': { title: 'Duplicate name resolved', why: 'Two icons had the same name. The plugin renamed one for the export (category prefix or number), but the new name depends on the library layout and can change.', fix: 'Rename one of them in Figma so each icon has a unique, stable name.', step: 2 },
   'copy-name': { title: 'Looks like a copy', why: '"Copy of…" usually means a duplicate or leftover.', fix: 'Remove the suffix or delete the duplicate.', step: 2 },
+  'name-pattern': { title: 'Name does not follow your pattern', why: 'Your naming pattern (Settings → Scan → Names must match) is not met by this name.', fix: 'Rename the icon (Issues → Rename… can add or change parts of many names at once).', step: 2 },
+  'name-category-prefix': { title: 'Name does not start with its category', why: 'Your naming rule says a name starts with its category (arrows → arrows-left), so it stays unique and grouped in code.', fix: 'Add the category as a prefix (Issues → Rename… → add prefix).', step: 2 },
   'variant-name': { title: 'Default variant property name', why: '"Property 1" is not meaningful in code.', fix: 'Rename the variant property (e.g. Style).', step: 2 },
   'off-grid': { title: 'Off the library grid', why: 'Icon size differs from the library size.', fix: 'Resize the frame to the library size.', step: 3 },
   'non-square': { title: 'Not square', why: 'Icon box is not square.', fix: 'Use a square frame unless intentional.', step: 3 },

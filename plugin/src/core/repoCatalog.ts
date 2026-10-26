@@ -82,3 +82,28 @@ export function repoStatus(icon: { name: string; componentKey?: string }, catalo
   }
   return catalog.icons.some((c) => c.name === icon.name) ? { kind: 'in-repo' } : { kind: 'missing' }
 }
+
+export interface ChangelogBadge {
+  text: string
+  /** from the latest release: worth a highlight */
+  fresh: boolean
+}
+
+/**
+ * The per-icon changelog line for the Dev Mode panel, from the repository's icons.json: what the latest release did to this icon, else
+ * when it was last changed or added. `repoName` is the icon's name in the repository (it differs from the Figma name after a rename).
+ */
+export function changelogBadge(repoName: string, catalog: PreviousCatalog): ChangelogBadge | null {
+  const latest = catalog.libraryVersion
+  const icon = catalog.icons.find((i) => i.name === repoName)
+  if (!icon) return null
+  const renamed = (catalog.deprecated ?? []).find((d) => d.replacedBy === repoName)
+  const fresh = (v?: string) => !!v && v === latest
+  if (fresh(icon.since)) return { text: `New in v${icon.since}`, fresh: true }
+  if (renamed && fresh(renamed.since)) return { text: `Renamed from ${renamed.name} in v${renamed.since}`, fresh: true }
+  if (fresh(icon.changedIn)) return { text: `Updated in v${icon.changedIn}`, fresh: true }
+  if (icon.changedIn) return { text: `Updated in v${icon.changedIn}`, fresh: false }
+  if (renamed) return { text: `Renamed from ${renamed.name} in v${renamed.since}`, fresh: false }
+  if (icon.since) return { text: `Since v${icon.since}`, fresh: false }
+  return null
+}

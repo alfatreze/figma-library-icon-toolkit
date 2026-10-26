@@ -165,14 +165,14 @@ describe('PackageCards', () => {
 
   it('npm packages: a card with scope and licence, switched on with the others', () => {
     const changes: (typeof DEFAULT_SETTINGS.npm)[] = []
-    act(() => render(<PackageCards formats={DEFAULT_SETTINGS.formats} png={DEFAULT_SETTINGS.png} npm={{ enabled: true, scope: 'acme', license: '' }} onNpm={(n) => changes.push(n)} onFormats={() => {}} onPng={() => {}} rows={null} pngBody={null} pngFiles={0} />, root))
+    act(() => render(<PackageCards formats={DEFAULT_SETTINGS.formats} png={DEFAULT_SETTINGS.png} npm={{ enabled: true, scope: 'acme', license: '', stories: false }} onNpm={(n) => changes.push(n)} onFormats={() => {}} onPng={() => {}} rows={null} pngBody={null} pngFiles={0} />, root))
     act(() => (root.querySelector('button[aria-label="Show npm packages settings"]') as HTMLButtonElement).click())
     expect(root.textContent).toContain('Use a scope like @acme')
     expect(root.textContent).toContain('UNLICENSED is used until then')
     const scope = Array.from(root.querySelectorAll('input')).find((i) => i.placeholder.startsWith('@acme')) as HTMLInputElement
     scope.value = '@acme'
     act(() => { scope.dispatchEvent(new Event('input', { bubbles: true })) })
-    expect(changes[0]).toEqual({ enabled: true, scope: '@acme', license: '' })
+    expect(changes[0]).toEqual({ enabled: true, scope: '@acme', license: '', stories: false })
   })
 
   it('Angular: one card, the version is a choice inside it (17.1+, 14+ or both)', () => {

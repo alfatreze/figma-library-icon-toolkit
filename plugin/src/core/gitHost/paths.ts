@@ -9,8 +9,8 @@ export function safeSubdir(input: string): string | null {
   return p
 }
 
-/** generated files are plain text assets: no dot-files, no executables, no package manifests */
-const ALLOWED_EXT = new Set(['.svg', '.ts', '.js', '.css', '.html', '.json', '.md'])
+/** generated files are plain assets (text, and PNG images): no dot-files, no executables, no package manifests */
+const ALLOWED_EXT = new Set(['.svg', '.png', '.ts', '.js', '.css', '.html', '.json', '.md', '.svelte'])
 export function safeGeneratedPath(rel: string): boolean {
   if (!rel || rel.length > 300 || rel.startsWith('/') || rel.includes('\\') || rel.includes('\0')) return false
   const parts = rel.split('/')

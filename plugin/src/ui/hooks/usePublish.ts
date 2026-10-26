@@ -44,7 +44,9 @@ export function usePublish(
   settings: Settings,
   filesFor: (o: OutputSettings) => Files,
   onPublished: () => void,
-  describe: (g: OutputGroup) => { title: string; body: string }
+  describe: (g: OutputGroup) => { title: string; body: string },
+  /** image files (PNG) for an output, drawn on demand; empty when the output does not receive them */
+  imagesFor: (o: OutputSettings) => Promise<Record<string, Uint8Array>> = async () => ({})
 ) {
   const [views, setViews] = useState<GroupView[]>([])
   const [planning, setPlanning] = useState(false)
@@ -80,7 +82,7 @@ export function usePublish(
     for (const group of groups) {
       try {
         const plans = []
-        for (const o of group.outputs) plans.push(await planPublish({ client: clientFor(o, settings.tokens), files: filesFor(o), subdir: o.subdir, branch: group.branch, now }))
+        for (const o of group.outputs) plans.push(await planPublish({ client: clientFor(o, settings.tokens), files: { ...filesFor(o), ...(await imagesFor(o)) }, subdir: o.subdir, branch: group.branch, now }))
         patchView(group.key, { plan: mergePlans(plans) })
       } catch (e) {
         patchView(group.key, { error: message(e) })

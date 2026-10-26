@@ -3,7 +3,8 @@
 exports[`generated React package > stays the same: another namespace and original colours 1`] = `
 {
   "react/acme-icon-registry.ts": "import { useEffect, useReducer } from 'react';
-import { ACME_CATEGORY_OF, ACME_DEPRECATED, AcmeIconData } from './icon-data';
+import { ACME_CATEGORY_OF, ACME_DEPRECATED } from './icon-data';
+import type { AcmeIconData } from './icon-data';
 import { ACME_LOADERS } from './loaders';
 
 const store = new Map<string, AcmeIconData>();
@@ -51,8 +52,10 @@ export function useAcmeIcon(requestedName: string | undefined): AcmeIconData | u
   return hit;
 }
 ",
-  "react/acme-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
-import { AcmeIconData, AcmeIconDeprecatedName, AcmeIconName, acmeStrokeFor, acmeSvg } from './icon-data';
+  "react/acme-icon.tsx": "import { memo } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
+import { acmeStrokeFor, acmeSvg } from './icon-data';
+import type { AcmeIconData, AcmeIconDeprecatedName, AcmeIconName } from './icon-data';
 import { useAcmeIcon } from './acme-icon-registry';
 
 export interface AcmeIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
@@ -259,7 +262,8 @@ import { cmnPie } from '../icons/pie';
 export default [cmnHome, cmnPie] as readonly CmnIconData[];
 ",
   "react/cmn-icon-registry.ts": "import { useEffect, useReducer } from 'react';
-import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED } from './icon-data';
+import type { CmnIconData } from './icon-data';
 import { CMN_LOADERS } from './loaders';
 
 const store = new Map<string, CmnIconData>();
@@ -307,8 +311,10 @@ export function useCmnIcon(requestedName: string | undefined): CmnIconData | und
   return hit;
 }
 ",
-  "react/cmn-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
-import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+  "react/cmn-icon.tsx": "import { memo } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
+import { cmnStrokeFor, cmnSvg } from './icon-data';
+import type { CmnIconData, CmnIconDeprecatedName, CmnIconName } from './icon-data';
 import { useCmnIcon } from './cmn-icon-registry';
 
 export interface CmnIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
@@ -494,7 +500,8 @@ import { cmnPie } from '../icons/pie';
 export default [cmnHome, cmnPie] as readonly CmnIconData[];
 ",
   "react/cmn-icon-registry.ts": "import { useEffect, useReducer } from 'react';
-import { CMN_CATEGORY_OF, CMN_DEPRECATED, CmnIconData } from './icon-data';
+import { CMN_CATEGORY_OF, CMN_DEPRECATED } from './icon-data';
+import type { CmnIconData } from './icon-data';
 import { CMN_LOADERS } from './loaders';
 
 const store = new Map<string, CmnIconData>();
@@ -542,8 +549,10 @@ export function useCmnIcon(requestedName: string | undefined): CmnIconData | und
   return hit;
 }
 ",
-  "react/cmn-icon.tsx": "import { CSSProperties, HTMLAttributes, memo } from 'react';
-import { CmnIconData, CmnIconDeprecatedName, CmnIconName, cmnStrokeFor, cmnSvg } from './icon-data';
+  "react/cmn-icon.tsx": "import { memo } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
+import { cmnStrokeFor, cmnSvg } from './icon-data';
+import type { CmnIconData, CmnIconDeprecatedName, CmnIconName } from './icon-data';
 import { useCmnIcon } from './cmn-icon-registry';
 
 export interface CmnIconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {

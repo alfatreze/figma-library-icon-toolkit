@@ -87,7 +87,8 @@ export function npmFiles(b: BuildInput): Files {
     out['svelte/README.md'] = readme(b, 'svelte', 'Svelte components for the icons (Svelte 4 and 5).', `\`\`\`svelte\n<script lang="ts">\n  import { ${C} } from '${packageName(b, 'svelte')}';\n</script>\n\n<${C} name="${first}" size={24} />\n\`\`\``)
   }
   if (f.angularModern) {
-    // Angular 14+ is not packaged: ng-packagr 14 cannot bundle the lazy category chunks (dynamic imports); ng-packagr 17 can
+    // Angular 14+ is not packaged. ng-packagr 14 cannot bundle the lazy category chunks (dynamic imports). A package built with ng-packagr 17 links with the
+    // Angular 14 linker, but its typings use the Angular 16+ input metadata, so Angular 14's strict template check no longer sees the inputs (checked).
     out['angular/package.json'] = json({
       ...base(b, 'angular', `${n} icons as Angular 17.1+ components`),
       scripts: { build: 'ng-packagr -p ng-package.json', release: 'npm run build && npm publish ./dist' },
@@ -96,7 +97,7 @@ export function npmFiles(b: BuildInput): Files {
       devDependencies: { '@angular/common': '^17.1.0', '@angular/compiler': '^17.1.0', '@angular/compiler-cli': '^17.1.0', '@angular/core': '^17.1.0', '@angular/platform-browser': '^17.1.0', 'ng-packagr': '^17.1.0', typescript: '~5.3.0' }
     })
     out['angular/ng-package.json'] = json({ $schema: './node_modules/ng-packagr/ng-package.schema.json', dest: 'dist', lib: { entryFile: 'index.ts' } })
-    out['angular/README.md'] = readme(b, 'angular', 'Angular 17.1+ components for the icons.', `Add \`${C}\` to the component's \`imports\` and use \`<${n}-icon name="${first}" />\` (see the export's README for the sprite and registry options).`, 'npm install && npm run release', 'It builds with ng-packagr and publishes the build output (`dist/`), not this folder.')
+    out['angular/README.md'] = readme(b, 'angular', 'Angular 17.1+ components for the icons.', `Add \`${C}\` to the component's \`imports\` and use \`<${n}-icon name="${first}"></${n}-icon>\` (see the export's README for the sprite and registry options).`, 'npm install && npm run release', 'It builds with ng-packagr and publishes the build output (`dist/`), not this folder.')
   }
   if (f.webComponent) {
     out['web-component/package.json'] = json({

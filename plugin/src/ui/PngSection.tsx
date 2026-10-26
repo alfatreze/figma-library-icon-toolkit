@@ -143,7 +143,7 @@ export function PngBody(props: {
   return (
     <div class={styles.section}>
       <div class={styles.muted}>
-        One PNG per icon and row, drawn from the same themed SVG as the other formats. <code>2x</code> scales the icon, <code>512w</code> or <code>512h</code> sets one side. The file is the icon name plus the suffix, so rows that differ in colour or size need different suffixes. In the ZIP only, not in repository publishing.
+        One PNG per icon and row, drawn from the same themed SVG as the other formats. <code>2x</code> scales the icon, <code>512w</code> or <code>512h</code> sets one side. The file is the icon name plus the suffix, so rows that differ in colour or size need different suffixes. They go in the ZIP and, when you publish, to outputs that receive all packages (GitHub accepts up to 150 changed images per publish; GitLab has no such limit).
       </div>
       {props.figmaNote && <div class={styles.muted}>{props.figmaNote}</div>}
       {png.rows.map((r) => (

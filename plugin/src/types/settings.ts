@@ -82,6 +82,8 @@ export interface Settings {
   ignoreSegments: string[]
   /** variant values omitted from names (e.g. "Default") */
   ignoreVariantValues: string[]
+  /** optional naming checks (warnings only): a pattern every name must match, and names that start with their category */
+  nameRules: { pattern: string; categoryPrefix: boolean }
   libSizeMode: 'auto' | 'manual'
   libWidth: number
   libHeight: number
@@ -104,7 +106,7 @@ export interface Settings {
   /** one access token per git host; stays on this computer (never in the team config, exports or diagnostics) */
   tokens: { github: string; gitlab: string }
   /** npm-ready packages: a package.json (and build file) in every component package and in svg/, so a folder can be published as it is */
-  npm: { enabled: boolean; scope: string; license: string }
+  npm: { enabled: boolean; scope: string; license: string; /** Storybook stories for React, Vue and Svelte, in stories/ */ stories: boolean }
   /** PNG images drawn in the plugin from the themed SVG; they go into the ZIP only (not into repository publishing) */
   png: { enabled: boolean; rows: PngRow[] }
   precision: number
@@ -151,6 +153,7 @@ export const DEFAULT_SETTINGS: Settings = {
   splitByCategory: false,
   ignoreSegments: ['icon', 'icons'],
   ignoreVariantValues: ['default'],
+  nameRules: { pattern: '', categoryPrefix: false },
   libSizeMode: 'auto',
   libWidth: 24,
   libHeight: 24,
@@ -166,7 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outputs: [],
   baselineOutput: '',
   tokens: { github: '', gitlab: '' },
-  npm: { enabled: false, scope: '', license: 'UNLICENSED' },
+  npm: { enabled: false, scope: '', license: 'UNLICENSED', stories: false },
   png: { enabled: false, rows: [] },
   precision: 3,
   formats: {

@@ -69,12 +69,30 @@ export function reactComponentSnippet(i: SnippetInput): string {
   return `// import { ${C} } from '${importFrom(i)}'\n<${C} ${attrs} />`
 }
 
+/** with the exported Vue component: <CmnIcon name="home" :size="24" /> */
+export function vueSnippet(i: SnippetInput): string {
+  const C = pascal(i.ns) + 'Icon'
+  const attrs = [`name="${i.name}"`, i.sizePx !== null ? (i.sizeUnit === 'rem' ? `size="${rem(i.sizePx)}"` : `:size="${i.sizePx}"`) : '', i.color ? `color="${q(i.color)}"` : '', i.strokeWidth !== undefined ? `:stroke-width="${i.strokeWidth}"` : '', i.label ? `label="${q(i.label)}"` : '']
+    .filter(Boolean)
+    .join(' ')
+  return `<!-- import { ${C} } from '${importFrom(i)}' -->\n<${C} ${attrs} />`
+}
+
+/** with the exported Svelte component: <CmnIcon name="home" size={24} /> */
+export function svelteSnippet(i: SnippetInput): string {
+  const C = pascal(i.ns) + 'Icon'
+  const attrs = [`name="${i.name}"`, i.sizePx !== null ? (i.sizeUnit === 'rem' ? `size="${rem(i.sizePx)}"` : `size={${i.sizePx}}`) : '', i.color ? `color="${q(i.color)}"` : '', i.strokeWidth !== undefined ? `strokeWidth={${i.strokeWidth}}` : '', i.label ? `label="${q(i.label)}"` : '']
+    .filter(Boolean)
+    .join(' ')
+  return `<!-- import { ${C} } from '${importFrom(i)}' -->\n<${C} ${attrs} />`
+}
+
 export function angularSnippet(i: SnippetInput): string {
   const C = pascal(i.ns) + 'Icon'
   const attrs = [`name="${i.name}"`, i.sizePx !== null ? (i.sizeUnit === 'rem' ? `size="${rem(i.sizePx)}"` : `[size]="${i.sizePx}"`) : '', i.color ? `color="${q(i.color)}"` : '', i.strokeWidth !== undefined ? `[strokeWidth]="${i.strokeWidth}"` : '', i.label ? `label="${q(i.label)}"` : '']
     .filter(Boolean)
     .join(' ')
-  return `<!-- import { ${C} } from '${importFrom(i)}';  add ${C} to the component's imports -->\n<${i.ns}-icon ${attrs} />`
+  return `<!-- import { ${C} } from '${importFrom(i)}';  add ${C} to the component's imports -->\n<${i.ns}-icon ${attrs}></${i.ns}-icon>`
 }
 
 export function webComponentSnippet(i: SnippetInput): string {

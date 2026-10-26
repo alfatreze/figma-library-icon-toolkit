@@ -98,6 +98,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   splitByCategory: rule(true, bool),
   ignoreSegments: rule(true, strList(50, 60)),
   ignoreVariantValues: rule(true, strList(50, 60)),
+  nameRules: rule(true, shape<Settings['nameRules']>({ pattern: str(200), categoryPrefix: bool }, DEFAULT_SETTINGS.nameRules)),
   libSizeMode: rule(true, oneOf('auto', 'manual')),
   libWidth: rule(true, num(1, 512)),
   libHeight: rule(true, num(1, 512)),
@@ -149,7 +150,7 @@ export const SCHEMA: { [K in keyof Settings]: Rule<Settings[K]> } = {
   }),
   baselineOutput: rule(false, str(40)),
   tokens: rule(false, shape<Settings['tokens']>({ github: str(400), gitlab: str(400) }, DEFAULT_SETTINGS.tokens)),
-  npm: rule(true, shape<Settings['npm']>({ enabled: bool, scope: (v) => (typeof v === 'string' && (v === '' || /^@[a-z0-9][a-z0-9-]{0,40}$/.test(v)) ? v : undefined), license: (v) => (typeof v === 'string' && /^[A-Za-z0-9.+() -]{1,60}$/.test(v) ? v : undefined) }, DEFAULT_SETTINGS.npm)),
+  npm: rule(true, shape<Settings['npm']>({ enabled: bool, scope: (v) => (typeof v === 'string' && (v === '' || /^@[a-z0-9][a-z0-9-]{0,40}$/.test(v)) ? v : undefined), license: (v) => (typeof v === 'string' && /^[A-Za-z0-9.+() -]{1,60}$/.test(v) ? v : undefined), stories: bool }, DEFAULT_SETTINGS.npm)),
   png: rule(
     true,
     shape<Settings['png']>({ enabled: bool, rows: pngRows }, DEFAULT_SETTINGS.png)
@@ -184,7 +185,7 @@ export function checkSetting<K extends keyof Settings>(key: K, value: unknown): 
  * v2 → v3: the single `repo` (with its token) became one output plus a token per host.
  */
 export function migrateSettings(stored: unknown): Settings {
-  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens }, png: { ...DEFAULT_SETTINGS.png, rows: [] }, npm: { ...DEFAULT_SETTINGS.npm } }
+  const out: Settings = { ...DEFAULT_SETTINGS, formats: { ...DEFAULT_SETTINGS.formats }, tokenNaming: { ...DEFAULT_SETTINGS.tokenNaming }, outputs: [], tokens: { ...DEFAULT_SETTINGS.tokens }, png: { ...DEFAULT_SETTINGS.png, rows: [] }, nameRules: { ...DEFAULT_SETTINGS.nameRules }, npm: { ...DEFAULT_SETTINGS.npm } }
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out
   const s = { ...(stored as Record<string, unknown>) }
   if (s.zipName === 'icons') s.zipName = ''

@@ -2,6 +2,7 @@ import { Icon } from '../../types'
 import { BuildInput, Files } from './common'
 import { exportConfig } from '../config'
 import { npmFiles } from './npm'
+import { storiesFiles } from './stories'
 import { agentsFile, auditFiles, changelogFile, manifestFile } from './manifest'
 import { readmeFile } from './readme'
 import { TARGETS } from './targets'
@@ -19,6 +20,7 @@ export function buildFiles(input: Omit<BuildInput, 'icons'>): Files {
   let out: Files = {}
   for (const t of TARGETS) if (b.settings.formats[t.key]) out = { ...out, ...t.build(b) }
   if (b.settings.npm.enabled) out = { ...out, ...npmFiles(b) }
+  if (b.settings.npm.stories) out = { ...out, ...storiesFiles(b) }
   out['icons.json'] = manifestFile(b)
   out['toolkit.config.json'] = exportConfig(b.settings)
   out['AGENTS.md'] = agentsFile(b)

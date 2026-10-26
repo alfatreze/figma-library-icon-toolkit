@@ -1,6 +1,6 @@
 import { gitBlobSha } from './sha'
 import { MANAGED_FILE, safeGeneratedPath, safeSubdir, validBranch } from './paths'
-import { Change, HostClient, HostError } from './types'
+import { Change, FileContent, HostClient, HostError } from './types'
 
 export interface PublishPlan {
   provider: HostClient['provider']
@@ -18,16 +18,19 @@ export interface PublishPlan {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 /** icons/update-2026-10-09-1204: unique per minute, so a second publish never collides with the first branch */
+/** GitHub takes one request per binary file (a blob), so a large PNG set is too slow and runs into its rate limits: publish those through GitLab or the ZIP */
+export const MAX_GITHUB_BINARY_FILES = 150
+
 export const autoBranch = (d = new Date()) => `icons/update-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
 
 /**
  * Compares the export with the repository's default branch, without writing anything.
  * Only files this tool created earlier (listed in <folder>/.icon-toolkit.json) are ever deleted.
  */
-export async function planPublish(a: { client: HostClient; files: Record<string, string>; subdir: string; branch?: string; now?: Date }): Promise<PublishPlan> {
+export async function planPublish(a: { client: HostClient; files: Record<string, FileContent>; subdir: string; branch?: string; now?: Date }): Promise<PublishPlan> {
   const subdir = safeSubdir(a.subdir)
   if (!subdir) throw new HostError('invalid', 'Use a plain folder name such as "icons": not the repository root, not a hidden folder.')
-  for (const rel of Object.keys(a.files)) if (!safeGeneratedPath(rel)) throw new HostError('invalid', `Refusing to publish "${rel}": only plain asset files (svg, ts, js, css, html, json, md) are allowed.`)
+  for (const rel of Object.keys(a.files)) if (!safeGeneratedPath(rel)) throw new HostError('invalid', `Refusing to publish "${rel}": only plain asset files (svg, png, ts, js, css, html, json, md) are allowed.`)
 
   const info = await a.client.info()
   if (!info.canWrite) throw new HostError('permission', 'This token cannot write to the repository. Give it write access to contents and pull / merge requests.')
@@ -63,6 +66,10 @@ export async function planPublish(a: { client: HostClient; files: Record<string,
       continue
     }
     changes.push({ path: full, content })
+  }
+  const binary = changes.filter((c) => c.content instanceof Uint8Array).length
+  if (a.client.provider === 'github' && binary > MAX_GITHUB_BINARY_FILES) {
+    throw new HostError('invalid', `${binary} image files changed, which is more than GitHub accepts in one publish here (${MAX_GITHUB_BINARY_FILES}: each image is a separate request). Publish the images from the ZIP, switch them off for this output, or use GitLab.`)
   }
   const removed = previous.filter((rel) => !(rel in a.files) && current.has(`${subdir}/${rel}`))
   for (const rel of removed) changes.push({ path: `${subdir}/${rel}`, content: null })

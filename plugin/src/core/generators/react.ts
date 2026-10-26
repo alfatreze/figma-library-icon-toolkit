@@ -9,7 +9,8 @@ function registry(b: BuildInput): string {
   const k = K(b)
   const P = pascal(n)
   return `import { useEffect, useReducer } from 'react';
-import { ${k}_CATEGORY_OF, ${k}_DEPRECATED, ${C}Data } from './icon-data';
+import { ${k}_CATEGORY_OF, ${k}_DEPRECATED } from './icon-data';
+import type { ${C}Data } from './icon-data';
 import { ${k}_LOADERS } from './loaders';
 
 const store = new Map<string, ${C}Data>();
@@ -75,8 +76,10 @@ function component(b: BuildInput): string {
   const C = componentName(b)
   const c = camelNs(b)
   const P = pascal(n)
-  return `import { CSSProperties, HTMLAttributes, memo } from 'react';
-import { ${C}Data, ${C}DeprecatedName, ${C}Name, ${c}StrokeFor, ${c}Svg } from './icon-data';
+  return `import { memo } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
+import { ${c}StrokeFor, ${c}Svg } from './icon-data';
+import type { ${C}Data, ${C}DeprecatedName, ${C}Name } from './icon-data';
 import { use${P}Icon } from './${n}-icon-registry';
 
 export interface ${C}Props extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {

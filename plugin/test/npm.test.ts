@@ -14,7 +14,7 @@ const raw = (name: string): RawIcon => ({
 const all = Object.fromEntries(Object.keys(DEFAULT_SETTINGS.formats).map((k) => [k, true])) as Settings['formats']
 
 function build(npm: Partial<Settings['npm']>, formats: Partial<Settings['formats']> = {}): Files {
-  const s: Settings = { ...DEFAULT_SETTINGS, namespace: 'cmn', formats: { ...all, ...formats }, npm: { enabled: true, scope: '@acme', license: 'MIT', ...npm } }
+  const s: Settings = { ...DEFAULT_SETTINGS, namespace: 'cmn', formats: { ...all, ...formats }, npm: { enabled: true, scope: '@acme', license: 'MIT', stories: false, ...npm } }
   const p = processIcons([raw('home'), raw('search')], s, {})
   return buildFiles({ allIcons: p.icons, settings: s, grid: p.grid, tier: p.tier, generatedAt: '2026-01-01', release: { version: '2.3.0', deprecated: [], diff: null } })
 }
@@ -91,9 +91,39 @@ describe('npm-ready packages', () => {
   })
 
   it('is a validated team setting, off by default', () => {
-    expect(migrateSettings({}).npm).toEqual({ enabled: false, scope: '', license: 'UNLICENSED' })
-    expect(checkSetting('npm', { enabled: true, scope: '@acme', license: 'MIT' })).toEqual({ enabled: true, scope: '@acme', license: 'MIT' })
+    expect(migrateSettings({}).npm).toEqual({ enabled: false, scope: '', license: 'UNLICENSED', stories: false })
+    expect(checkSetting('npm', { enabled: true, scope: '@acme', license: 'MIT', stories: true })).toEqual({ enabled: true, scope: '@acme', license: 'MIT', stories: true })
     expect(checkSetting('npm', { enabled: true, scope: 'acme', license: 'MIT' })?.scope).toBe('')
     expect(checkSetting('npm', { enabled: true, scope: '', license: '<script>' })?.license).toBe('UNLICENSED')
+  })
+})
+
+describe('Storybook stories', () => {
+  it('are off unless asked for, and sit in stories/ so the packages stay clean', () => {
+    expect(Object.keys(build({})).filter((p) => p.startsWith('stories/'))).toEqual([])
+    const files = build({ stories: true })
+    expect(Object.keys(files).filter((p) => p.startsWith('stories/')).sort()).toEqual([
+      'stories/README.md', 'stories/cmn-icon-gallery.svelte', 'stories/cmn-icon.react.stories.tsx', 'stories/cmn-icon.svelte.stories.ts', 'stories/cmn-icon.vue.stories.ts'
+    ])
+    for (const dir of ['react', 'vue', 'svelte']) expect(Object.keys(files).filter((p) => p.startsWith(`${dir}/`) && /stories/.test(p))).toEqual([])
+  })
+  it('have a Playground with controls and an AllIcons story, per framework', () => {
+    const files = build({ stories: true })
+    for (const f of ['react.stories.tsx', 'vue.stories.ts', 'svelte.stories.ts']) {
+      const text = files[`stories/cmn-icon.${f}`]
+      expect(text, f).toContain('export const Playground')
+      expect(text, f).toContain('export const AllIcons')
+      expect(text, f).toContain("control: 'select', options: CMN_ICON_NAMES")
+      expect(text, f).toMatch(/title: 'Icons\/CmnIcon'/)
+    }
+    expect(files['stories/cmn-icon.react.stories.tsx']).toContain("from '../react'")
+    expect(files['stories/README.md']).toContain('React, Vue, Svelte components')
+  })
+  it('only cover the frameworks that are exported', () => {
+    const files = build({ stories: true }, Object.fromEntries(Object.keys(all).map((k) => [k, k === 'vue'])) as Settings['formats'])
+    expect(Object.keys(files).filter((p) => p.startsWith('stories/')).sort()).toEqual(['stories/README.md', 'stories/cmn-icon.vue.stories.ts'])
+  })
+  it('are a validated team setting', () => {
+    expect(checkSetting('npm', { enabled: true, scope: '', license: 'MIT', stories: 'yes' })?.stories).toBe(false)
   })
 })

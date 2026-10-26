@@ -12,14 +12,14 @@ Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other depe
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular-classic';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -357,14 +357,14 @@ Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependen
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -698,14 +698,14 @@ Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other depe
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular-classic';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -1043,14 +1043,14 @@ Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependen
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -1384,14 +1384,14 @@ Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other depe
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular-classic';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -1729,14 +1729,14 @@ Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependen
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 ## Sprite strategy
-\`<cmn-sprite-icon name="…" />\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<cmn-sprite-icon name="…"></cmn-sprite-icon>\` draws from \`sprite/cmn-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provideCmnSprite({ url: '/assets/cmn-sprite.svg', inline: true })]
 \`\`\`
@@ -2070,10 +2070,10 @@ Supports Angular 14 or newer (standalone + @Input). No FontAwesome or other depe
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular-classic';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.
@@ -2310,10 +2310,10 @@ Supports Angular 17.1 or newer (signal inputs). No FontAwesome or other dependen
 \`\`\`ts
 import { CmnIcon, cmnHome } from './angular';
 
-@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [CmnIcon], template: \`<cmn-icon [icon]="home"></cmn-icon>\` })
 export class Demo { home = cmnHome; }
 \`\`\`
-2. **By name** (\`<cmn-icon name="name" />\`). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<cmn-icon name="name"></cmn-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`provideCmnIcons(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(CmnIconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provideCmnAllIcons } from './all-icons'\` and \`providers: [provideCmnAllIcons()]\`.
 
 Inputs: \`name\` (typed), \`icon\`, \`size\`, \`color\`, \`strokeWidth\`, \`label\`.

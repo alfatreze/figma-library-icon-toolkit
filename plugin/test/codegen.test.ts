@@ -34,10 +34,22 @@ describe('codegen (Dev Mode)', () => {
   it('shows every framework for an instance of an icon component', async () => {
     const c = makeComponent(fig, 'icon/Home')
     const r = await run(c.createInstance())
-    expect(titles(r)).toEqual(expect.arrayContaining(['Angular', 'HTML (sprite)', 'React', 'Web Component', 'CSS variables']))
+    expect(titles(r)).toEqual(expect.arrayContaining(['Angular', 'HTML (sprite)', 'React', 'Vue', 'Svelte', 'Web Component', 'CSS variables']))
     const html = r.find((x) => x.title === 'HTML (sprite)')!.code
     expect(html).toContain('-sprite.svg#')
     expect(html).toContain('home')
+  })
+
+  it('prints the Vue and Svelte components with the same inputs, and narrows to them', async () => {
+    const c = makeComponent(fig, 'icon/Home')
+    const inst = c.createInstance()
+    inst.width = 32
+    inst.height = 32
+    const vue = (await run(inst, 'vue')).find((x) => x.title === 'Vue')!.code
+    const svelte = (await run(inst, 'svelte')).find((x) => x.title === 'Svelte')!.code
+    expect(vue).toMatch(/<[A-Za-z]+Icon name="home" :size="32" \/>/)
+    expect(svelte).toMatch(/<[A-Za-z]+Icon name="home" size=\{32\} \/>/)
+    expect((await run(inst, 'vue')).find((x) => x.title === 'Svelte')).toBeUndefined()
   })
 
   it('narrows to the language Dev Mode asked for', async () => {
@@ -103,5 +115,13 @@ describe('codegen (Dev Mode)', () => {
     }
     const r = await run(broken)
     expect(r[0].code).toMatch(/Could not generate code.*boom/)
+  })
+})
+
+describe('the manifest lists every language the Dev Mode codegen answers to', () => {
+  it('has a codegen language for each framework snippet', async () => {
+    const pkg = JSON.parse((await import('fs')).readFileSync((await import('path')).join(__dirname, '../package.json'), 'utf8'))
+    const values = pkg['figma-plugin'].codegenLanguages.map((l: { value: string }) => l.value)
+    expect(values).toEqual(['angular', 'html', 'react', 'vue', 'svelte', 'webcomponent', 'css'])
   })
 })

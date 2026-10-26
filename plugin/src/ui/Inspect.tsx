@@ -4,10 +4,10 @@ import { h } from 'preact'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { buildFiles } from '../core/generators'
 import { processIcons, ThemeCache } from '../core/process'
-import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput } from '../core/snippets'
+import { angularSnippet, htmlSnippet, reactComponentSnippet, SnippetInput, svelteSnippet, vueSnippet } from '../core/snippets'
 import { cleanNamespace } from '../core/naming'
 import { zipFiles } from '../core/zip'
-import { CatalogLink, parseCatalogLink, readPublicCatalog, repoStatus, RepoStatus } from '../core/repoCatalog'
+import { changelogBadge, CatalogLink, parseCatalogLink, readPublicCatalog, repoStatus, RepoStatus } from '../core/repoCatalog'
 import { PreviousCatalog } from '../core/changelog'
 import { browserFetch } from './repoClient'
 import styles from './styles'
@@ -134,7 +134,11 @@ export function InspectPanel() {
                   {(() => {
                     const st = statusOf(icon)
                     if (!st) return null
-                    return st.kind === 'in-repo' ? <div class={styles.muted}>✓ In the repository</div> : st.kind === 'renamed' ? <div class={styles.sevWarn}>In the repository as “{st.repoName}”: export again to update it</div> : <div class={styles.sevWarn}>Not in the repository yet</div>
+                    const badge = repo?.catalog && st.kind !== 'missing' ? changelogBadge(st.kind === 'renamed' ? st.repoName : icon.name, repo.catalog) : null
+                    const line = badge && <div class={badge.fresh ? styles.sevWarn : styles.muted} data-hint="From the repository's icons.json">{badge.text}</div>
+                    if (st.kind === 'in-repo') return <div><div class={styles.muted}>✓ In the repository</div>{line}</div>
+                    if (st.kind === 'renamed') return <div><div class={styles.sevWarn}>In the repository as “{st.repoName}”: export again to update it</div>{line}</div>
+                    return <div class={styles.sevWarn}>Not in the repository yet</div>
                   })()}
                 </div>
                 <button class={styles.linkBtn} onClick={() => setOpen(isOpen ? null : icon.key)} aria-expanded={isOpen}>{isOpen ? 'Hide' : 'Code'}</button>
@@ -145,6 +149,8 @@ export function InspectPanel() {
                     <Button secondary onClick={() => copy('Angular', angularSnippet(input))}>Copy Angular</Button>
                     <Button secondary onClick={() => copy('HTML', htmlSnippet(input))}>Copy HTML</Button>
                     <Button secondary onClick={() => copy('React', reactComponentSnippet(input))}>Copy React</Button>
+                    <Button secondary onClick={() => copy('Vue', vueSnippet(input))}>Copy Vue</Button>
+                    <Button secondary onClick={() => copy('Svelte', svelteSnippet(input))}>Copy Svelte</Button>
                     <Button secondary onClick={() => download(`${cleanNamespace(settings.namespace)}-${icon.name}.svg`, icon.standalone, 'image/svg+xml')}>SVG</Button>
                   </div>
                   <pre class={styles.mono} style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: 11 }}>{angularSnippet(input)}</pre>

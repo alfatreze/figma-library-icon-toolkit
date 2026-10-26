@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { chunkChanges } from '../src/core/gitHost/github'
+import { bytesToBase64 } from '../src/core/gitHost/base64'
+import { MAX_GITHUB_BINARY_FILES } from '../src/core/gitHost/publish'
 import { chunkActions } from '../src/core/gitHost/gitlab'
 import { createClient, gitBlobSha, HostError, MANAGED_FILE, parseRepoInput, planPublish, publishPlan, safeGeneratedPath, safeSubdir, validBranch } from '../src/core/gitHost'
 import { FakeState, fakeGithub, fakeGitlab, newState } from './helpers/fakeHost'
@@ -60,7 +62,7 @@ for (const provider of ['github', 'gitlab'] as const) {
       expect(branch.get('icons/svg/a.svg')).toBe('<svg>a</svg>')
       expect(branch.get('README.md')).toBe('my repo') // the rest of the repo is untouched
       expect(st.branches.get('main')!.has('icons/svg/a.svg')).toBe(false) // the default branch never changes
-      expect(JSON.parse(branch.get(`icons/${MANAGED_FILE}`)!).files.sort()).toEqual(['icons.json', 'svg/a.svg', 'svg/b.svg'])
+      expect(JSON.parse(branch.get(`icons/${MANAGED_FILE}`)! as string).files.sort()).toEqual(['icons.json', 'svg/a.svg', 'svg/b.svg'])
     })
 
     it('second publish sends only what changed and removes only files the tool created', async () => {
@@ -157,5 +159,65 @@ describe('createClient', () => {
     const f = fakeGithub(newState())
     expect(() => createClient('github', 'acme/icons', '  ', f)).toThrow(HostError)
     expect(() => createClient('github', 'nonsense', 'tok', f)).toThrow(/owner\/name/)
+  })
+})
+
+describe('images (PNG) in a publish', () => {
+  const png = (n: number) => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, n, n + 1, n + 2, 255, 0])
+  const files = { 'svg/a.svg': '<svg>a</svg>', 'png/cmn-a.png': png(1), 'png/cmn-a@2x.png': png(2) }
+
+  it('base64 round trips bytes, including a large image', () => {
+    const big = Uint8Array.from({ length: 200_000 }, (_, i) => i % 251)
+    expect(Uint8Array.from(atob(bytesToBase64(big)), (c) => c.charCodeAt(0))).toEqual(big)
+  })
+
+  it('git blob ids of bytes match those of the same text', async () => {
+    expect(await gitBlobSha(new TextEncoder().encode('hello\n'))).toBe('ce013625030ba8dba906f756967f9e9ca394464a')
+  })
+
+  it('png files are allowed generated paths, other binaries are not', () => {
+    expect(safeGeneratedPath('png/cmn-a@2x.png')).toBe(true)
+    expect(safeGeneratedPath('png/run.exe')).toBe(false)
+    expect(safeGeneratedPath('.hidden/a.png')).toBe(false)
+  })
+
+  for (const provider of ['github', 'gitlab'] as const) {
+    it(`${provider}: images arrive byte for byte in the same commit as the text files, and a second publish skips unchanged ones`, async () => {
+      const st = newState({ 'README.md': 'x' })
+      const c = () => createClient(provider, provider === 'github' ? 'acme/icons' : 'group/sub/icons', st.token, provider === 'github' ? fakeGithub(st) : fakeGitlab(st))
+      const plan = await planPublish({ client: c(), files, subdir: 'icons', now: NOW })
+      expect(plan.added.sort()).toEqual(['png/cmn-a.png', 'png/cmn-a@2x.png', 'svg/a.svg'])
+      await publishPlan(c(), plan, { message: 'm', title: 't', body: 'b' })
+      const branch = st.branches.get(plan.branch)!
+      expect(branch.get('icons/png/cmn-a.png')).toEqual(png(1))
+      expect(branch.get('icons/png/cmn-a@2x.png')).toEqual(png(2))
+      expect(branch.get('icons/svg/a.svg')).toBe('<svg>a</svg>')
+      // merge it into main and publish again with one image changed
+      st.branches.set('main', new Map(branch))
+      const again = await planPublish({ client: c(), files: { ...files, 'png/cmn-a@2x.png': png(9) }, subdir: 'icons', now: new Date('2026-10-09T12:05:00') })
+      expect(again.changed).toEqual(['png/cmn-a@2x.png'])
+      expect(again.unchanged).toBe(2)
+    })
+  }
+
+  it('GitHub needs one request per image, so a very large image set is refused with advice; GitLab batches them', async () => {
+    const many = Object.fromEntries(Array.from({ length: MAX_GITHUB_BINARY_FILES + 1 }, (_, i) => [`png/i${i}.png`, png(i % 200)]))
+    const gh = newState({ 'README.md': 'x' })
+    await expect(planPublish({ client: createClient('github', 'acme/icons', gh.token, fakeGithub(gh)), files: many, subdir: 'icons', now: NOW })).rejects.toThrow(/GitLab/)
+    const gl = newState({ 'README.md': 'x' })
+    const plan = await planPublish({ client: createClient('gitlab', 'group/sub/icons', gl.token, fakeGitlab(gl)), files: many, subdir: 'icons', now: NOW })
+    expect(plan.added).toHaveLength(MAX_GITHUB_BINARY_FILES + 1)
+  })
+
+  it('GitHub uploads each image as a blob, GitLab sends base64 actions', async () => {
+    const gh = newState({ 'README.md': 'x' })
+    const ghc = createClient('github', 'acme/icons', gh.token, fakeGithub(gh))
+    await publishPlan(ghc, await planPublish({ client: ghc, files, subdir: 'icons', now: NOW }), { message: 'm', title: 't', body: 'b' })
+    expect(gh.requests.filter((r) => r.url.endsWith('/git/blobs')).length).toBe(2)
+    const gl = newState({ 'README.md': 'x' })
+    const glc = createClient('gitlab', 'group/sub/icons', gl.token, fakeGitlab(gl))
+    await publishPlan(glc, await planPublish({ client: glc, files, subdir: 'icons', now: NOW }), { message: 'm', title: 't', body: 'b' })
+    const commit = gl.requests.find((r) => r.url.endsWith('/repository/commits'))!.body as { actions: { file_path: string; encoding?: string }[] }
+    expect(commit.actions.filter((a) => a.encoding === 'base64').map((a) => a.file_path).sort()).toEqual(['icons/png/cmn-a.png', 'icons/png/cmn-a@2x.png'])
   })
 })

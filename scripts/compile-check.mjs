@@ -45,13 +45,19 @@ const base = { strict: true, skipLibCheck: true, noEmit: false, outDir: join(wor
 const ts = (extra, files) => writeFileSync(join(work, 'tsconfig.json'), JSON.stringify({ compilerOptions: { ...base, ...extra }, include: files ?? ['src/**/*.ts', 'src/**/*.tsx'] }, null, 2))
 
 if (kind.startsWith('angular')) {
+  // a consumer written the way the README tells you to (a closing tag, bound inputs) must pass the strict template check of this Angular version:
+  // Angular before 15.1 rejects a self-closing component tag, so the snippets must not use one
+  writeFileSync(
+    join(src, 'zz-consumer.ts'),
+    `import { Component } from '@angular/core';\nimport { CmnIcon } from './cmn-icon.component';\n\n@Component({ selector: 'app-consumer', standalone: true, imports: [CmnIcon], template: '<cmn-icon name="bars-multipath" [size]="24" color="red" label="x"></cmn-icon>' })\nexport class AppConsumer {}\n`
+  )
   ts({ experimentalDecorators: true, useDefineForClassFields: false }, ['src/**/*.ts'])
   const cfg = JSON.parse(execFileSync('cat', [join(work, 'tsconfig.json')]))
   cfg.angularCompilerOptions = { strictTemplates: true, strictInjectionParameters: true }
   writeFileSync(join(work, 'tsconfig.json'), JSON.stringify(cfg, null, 2))
   execFileSync(bin('ngc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit', cwd: work })
 } else if (kind === 'react') {
-  ts({ jsx: 'react-jsx', moduleResolution: tsMajor >= 5 ? 'bundler' : 'node' }, ['src/**/*.ts', 'src/**/*.tsx'])
+  ts({ jsx: 'react-jsx', moduleResolution: tsMajor >= 5 ? 'bundler' : 'node', verbatimModuleSyntax: true, isolatedModules: true }, ['src/**/*.ts', 'src/**/*.tsx'])
   execFileSync(bin('tsc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit', cwd: work })
 } else if (kind === 'vue') {
   ts({ moduleResolution: tsMajor >= 5 ? 'bundler' : 'node', verbatimModuleSyntax: true, isolatedModules: true }, ['src/**/*.ts'])
@@ -78,5 +84,20 @@ if (existsSync(join(src, 'package.json')) && args.build !== 'false') {
   walk(pkg.exports)
   for (const ref of refs) if (ref.startsWith('./') && !ref.includes('*') && !existsSync(join(src, ref))) throw new Error(`package.json points at ${ref}, which does not exist after the build`)
   console.log(`ok: ${kind} package builds (npm run build)`)
+}
+// Storybook stories (the export has them switched on): type-checked against the real Storybook types, next to the package they import
+const storiesDir = join(dump, 'stories')
+const storyFile = { react: /\.react\.stories\.tsx$/, vue: /\.vue\.stories\.ts$/, svelte: /\.svelte\.stories\.ts$|\.svelte$/ }[kind]
+if (storyFile && existsSync(storiesDir) && readdirSync(storiesDir).some((f) => storyFile.test(f))) {
+  const w = mkdtempSync(join(tmpdir(), `stories-${kind}-`))
+  symlinkSync(join(toolchain, 'node_modules'), join(w, 'node_modules'))
+  execFileSync('cp', ['-R', dir, join(w, kind)])
+  mkdirSync(join(w, 'stories'))
+  for (const f of readdirSync(storiesDir)) if (storyFile.test(f)) execFileSync('cp', [join(storiesDir, f), join(w, 'stories', f)])
+  const cfg = { compilerOptions: { ...base, outDir: join(w, 'out'), rootDir: w, noEmit: true, verbatimModuleSyntax: true, isolatedModules: true, ...(kind === 'react' ? { jsx: 'react-jsx' } : {}) }, include: [`${kind}/**/*.ts`, ...(kind === 'react' ? [`${kind}/**/*.tsx`, 'stories/*.tsx'] : []), 'stories/*.ts', ...(kind === 'svelte' ? ['stories/*.svelte', `${kind}/**/*.svelte`] : [])] }
+  writeFileSync(join(w, 'tsconfig.json'), JSON.stringify(cfg, null, 2))
+  if (kind === 'svelte') execFileSync(bin('svelte-check'), ['--tsconfig', join(w, 'tsconfig.json'), '--workspace', w, '--fail-on-warnings'], { stdio: 'inherit', cwd: w })
+  else execFileSync(bin('tsc'), ['-p', join(w, 'tsconfig.json')], { stdio: 'inherit', cwd: w })
+  console.log(`ok: ${kind} Storybook stories type-check`)
 }
 console.log(`ok: ${kind} compiles (${readdirSync(src).length} top-level entries)`)

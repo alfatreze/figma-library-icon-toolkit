@@ -86,7 +86,7 @@ export function PackageCards(props: {
       return (
         <div class={styles.section}>
           <div class={styles.muted}>
-            Adds a <code>package.json</code> (ESM, types, <code>sideEffects: false</code>) and the build file it needs to the React, Vue, Svelte, Angular 17.1+ and Web Component folders and to <code>svg/</code>, so each folder can be published as it is. Angular 14+ is not packaged: its build tool cannot bundle the lazy category chunks.
+            Adds a <code>package.json</code> (ESM, types, <code>sideEffects: false</code>) and the build file it needs to the React, Vue, Svelte, Angular 17.1+ and Web Component folders and to <code>svg/</code>, so each folder can be published as it is. Angular 14+ is not packaged: ng-packagr 14 cannot bundle the lazy category chunks, and a package built with ng-packagr 17 has typings that Angular 14's template checker cannot read (copy angular-classic/ into your app instead).
           </div>
           <div class={styles.fieldRow}>
             <span class={styles.muted} style={{ width: 56 }}>Scope</span>
@@ -98,6 +98,15 @@ export function PackageCards(props: {
             <div class={styles.grow}><Textbox value={npm.license} placeholder="MIT, UNLICENSED…" onValueInput={(license) => props.onNpm({ ...npm, license })} /></div>
           </div>
           {licenseBad && <div class={styles.sevWarn}>Use an SPDX name such as MIT or UNLICENSED; UNLICENSED is used until then.</div>}
+          <label class={styles.pkgSub}>
+            <input type="checkbox" class={styles.srOnly} checked={npm.stories} onChange={(e) => props.onNpm({ ...npm, stories: (e.currentTarget as HTMLInputElement).checked })} />
+            <Box on={npm.stories} />
+            <span>
+              <span class={styles.fmtName}>Storybook stories</span>
+              <span class={styles.fmtHint}>A Playground and an all-icons story for React, Vue and Svelte, in a separate stories/ folder.</span>
+            </span>
+            <span />
+          </label>
         </div>
       )
     }

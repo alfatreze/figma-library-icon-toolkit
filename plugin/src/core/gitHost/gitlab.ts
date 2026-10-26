@@ -1,4 +1,5 @@
 import { call, commonError, messageOf } from './http'
+import { bytesToBase64 } from './base64'
 import { Change, CommitArgs, FetchFn, HostClient, HostError, RepoInfo, TreeEntry } from './types'
 
 const API = 'https://gitlab.com/api/v4'
@@ -67,7 +68,12 @@ export function gitlabClient(repo: string, token: string, fetchFn: FetchFn): Hos
     },
 
     async commit(a: CommitArgs) {
-      const actions = a.changes.map((c: Change) => ({ action: c.content === null ? 'delete' : a.existing.has(c.path) ? 'update' : 'create', file_path: c.path, content: c.content ?? undefined }))
+      const actions = a.changes.map((c: Change) => ({
+        action: c.content === null ? 'delete' : a.existing.has(c.path) ? 'update' : 'create',
+        file_path: c.path,
+        // an image goes as base64 (the commits API takes many files per request)
+        ...(c.content instanceof Uint8Array ? { content: bytesToBase64(c.content), encoding: 'base64' } : { content: c.content ?? undefined })
+      }))
       const chunks = chunkActions(actions)
       let done = 0
       let last = ''

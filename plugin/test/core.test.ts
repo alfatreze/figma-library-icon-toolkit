@@ -481,7 +481,7 @@ describe('snippets (codegen + readme must agree)', () => {
     expect(s).toContain('--cmn-icon-size: 1.5rem')
   })
   it('angular + react + css', () => {
-    expect(angularSnippet(base)).toContain('<cmn-icon name="home" [size]="24" color="#0a7d3b" />')
+    expect(angularSnippet(base)).toContain('<cmn-icon name="home" [size]="24" color="#0a7d3b"></cmn-icon>') // a closing tag: Angular before 15.1 rejects a self-closing component
     expect(reactComponentSnippet(base)).toContain('<CmnIcon name="home" size={24} color="#0a7d3b" />')
     expect(reactSnippet(base)).toContain("style={{ '--cmn-icon-color': '#0a7d3b', '--cmn-icon-size': '24px' }}")
     expect(cssSnippet({ ...base, vars: {}, sizePx: null })).toContain('no overrides')

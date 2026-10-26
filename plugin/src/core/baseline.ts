@@ -22,7 +22,7 @@ export interface Snapshot {
 export const SNAPSHOT_CHUNK = 90000 // bytes per plugin-data entry (limit is 100 kB)
 
 export function makeSnapshot(icons: CatalogIcon[], meta: { at: string; by?: string | null; version?: string; namespace?: string }): Snapshot {
-  const slim = icons.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.figma?.componentKey ?? null, layerName: i.figma?.layerName } }))
+  const slim = icons.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.figma?.componentKey ?? null, layerName: i.figma?.layerName }, ...(i.since ? { since: i.since } : {}), ...(i.changedIn ? { changedIn: i.changedIn } : {}) }))
   const id = hash32(slim.map((i) => `${i.name}:${i.hash}:${i.colorHash}`).join('|') + meta.at)
   return { v: 1, id, ...meta, icons: slim }
 }

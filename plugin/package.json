@@ -83,6 +83,14 @@
         "value": "react"
       },
       {
+        "label": "Icon: Vue",
+        "value": "vue"
+      },
+      {
+        "label": "Icon: Svelte",
+        "value": "svelte"
+      },
+      {
         "label": "Icon: Web Component",
         "value": "webcomponent"
       },

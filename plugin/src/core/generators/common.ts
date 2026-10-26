@@ -1,5 +1,5 @@
 import { GridInfo, Icon, Settings } from '../../types'
-import { Diff } from '../changelog'
+import { Diff, IconHistory } from '../changelog'
 import { Tier } from '../library'
 import { camel, cleanNamespace, pascal } from '../naming'
 import { parseStrokeTable } from '../stroke'
@@ -22,7 +22,7 @@ export interface BuildInput {
   /** a selection exported from Dev Mode, not the whole library: marked in icons.json and the README so it is never mistaken for the catalog */
   partial?: boolean
   /** library version + identity history (from comparing with a previous icons.json) */
-  release?: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null }
+  release?: { version: string; deprecated: { name: string; replacedBy: string; since: string }[]; diff: Diff | null; /** when each icon was added / last changed (see nextHistory) */ history?: IconHistory }
 }
 
 export const ns = (b: BuildInput) => cleanNamespace(b.settings.namespace)

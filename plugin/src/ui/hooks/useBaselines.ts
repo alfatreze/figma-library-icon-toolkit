@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 import {
   BaselineSource, catalogToSnapshot, changesByName, decodeSnapshot, encodeSnapshot, makeSnapshot, pickBaseline, Snapshot, snapshotToCatalog
 } from '../../core/baseline'
-import { bumpVersion, diffCatalogs, nextDeprecated, parseCatalog, PreviousCatalog } from '../../core/changelog'
+import { bumpVersion, diffCatalogs, nextDeprecated, nextHistory, parseCatalog, PreviousCatalog } from '../../core/changelog'
 import { BaselinesHandler, BaselineSavedHandler, Icon, SaveBaselineHandler, Settings } from '../../types'
 import { baselineOutputOf } from '../../core/outputs'
 import { clientFor } from '../repoClient'
@@ -58,14 +58,16 @@ export function useBaselines(exportable: Icon[], settings: Settings) {
     const diff = previous ? diffCatalogs(previous, catalog) : null
     const version = previous ? bumpVersion(previous.libraryVersion, diff!.bump) : '1.0.0'
     const deprecated = nextDeprecated(previous, diff, version, new Set(catalog.map((c) => c.name)))
-    return { version, deprecated, diff }
+    const history = nextHistory(diff, version, catalog.map((c) => c.name))
+    return { version, deprecated, diff, history }
   }, [exportable, previous])
   const changes = useMemo(() => changesByName(release.diff), [release.diff])
   const changeCounts = useMemo(() => countChanges(changes), [changes])
 
   /** the local snapshot is automatic and never touches the file; the shared one is an explicit Labs action */
   const snapshotNow = (target: 'local' | 'shared') => {
-    const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey ?? null, layerName: i.layerName } }))
+    const history = (name: string) => release.history[name] ?? {}
+    const catalog = exportable.map((i) => ({ name: i.name, hash: i.hash, colorHash: i.colorHash, category: i.category, figma: { componentKey: i.componentKey ?? null, layerName: i.layerName }, ...history(i.name) }))
     emit<SaveBaselineHandler>('SAVE_BASELINE', encodeSnapshot(makeSnapshot(catalog, { at: new Date().toISOString(), version: release.version, namespace: settings.namespace })), target)
   }
   const saveShared = () => {

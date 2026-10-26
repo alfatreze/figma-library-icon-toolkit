@@ -14,10 +14,13 @@ export interface TreeEntry {
   sha: string
 }
 
+/** text, or the bytes of a binary file (a PNG image) */
+export type FileContent = string | Uint8Array
+
 /** content null = delete the file */
 export interface Change {
   path: string
-  content: string | null
+  content: FileContent | null
 }
 
 export type HostErrorKind = 'auth' | 'permission' | 'notfound' | 'exists' | 'rate' | 'invalid' | 'network' | 'server'

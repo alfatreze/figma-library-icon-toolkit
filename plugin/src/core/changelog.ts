@@ -7,6 +7,9 @@ export interface CatalogIcon {
   colorHash?: string // colours + variable bindings
   category?: string[]
   figma?: { componentKey?: string | null; nodeId?: string; layerName?: string }
+  /** the library version that added the icon, and the last one that changed its drawing or colours (carried from export to export) */
+  since?: string
+  changedIn?: string
 }
 
 export interface PreviousCatalog {
@@ -24,6 +27,8 @@ export interface Change {
 }
 
 export interface Diff {
+  /** for every icon that has a previous entry: what that entry said about when the icon was added and last changed (current name → values) */
+  history?: Record<string, { since?: string; changedIn?: string }>
   added: Change[]
   removed: Change[]
   renamed: { from: string; to: string }[]
@@ -68,7 +73,9 @@ export function parseCatalog(input: string): PreviousCatalog {
       hash: typeof i.hash === 'string' && HASH.test(i.hash) ? i.hash : undefined,
       colorHash: typeof i.colorHash === 'string' && HASH.test(i.colorHash) ? i.colorHash : undefined,
       category,
-      figma: { componentKey: text(fig.componentKey, 100) ?? null, nodeId: text(fig.nodeId, 60), layerName: text(fig.layerName, 300) }
+      figma: { componentKey: text(fig.componentKey, 100) ?? null, nodeId: text(fig.nodeId, 60), layerName: text(fig.layerName, 300) },
+      ...(typeof i.since === 'string' && SEMVER.test(i.since) ? { since: i.since } : {}),
+      ...(typeof i.changedIn === 'string' && SEMVER.test(i.changedIn) ? { changedIn: i.changedIn } : {})
     })
     seen.add(i.name)
   }
@@ -109,7 +116,7 @@ export function diffCatalogs(prev: PreviousCatalog, cur: CatalogIcon[]): Diff {
   const used = new Set<CatalogIcon>()
   const take = (list: CatalogIcon[] | undefined) => list?.find((x) => !used.has(x))
   const matched: (CatalogIcon | undefined)[] = cur.map(() => undefined)
-  const diff: Diff = { added: [], removed: [], renamed: [], changed: [], recoloured: [], relabelled: [], moved: [], unchanged: 0, bump: 'none', matchedBy: { key: 0, name: 0 } }
+  const diff: Diff = { history: {}, added: [], removed: [], renamed: [], changed: [], recoloured: [], relabelled: [], moved: [], unchanged: 0, bump: 'none', matchedBy: { key: 0, name: 0 } }
   cur.forEach((c, i) => {
     const k = c.figma?.componentKey
     const p = k ? take(byKey.get(k)) : undefined
@@ -134,6 +141,7 @@ export function diffCatalogs(prev: PreviousCatalog, cur: CatalogIcon[]): Diff {
       diff.added.push({ name: c.name })
       continue
     }
+    diff.history![c.name] = { ...(p.since ? { since: p.since } : {}), ...(p.changedIn ? { changedIn: p.changedIn } : {}) }
     let touched = false
     if (p.name !== c.name) {
       diff.renamed.push({ from: p.name, to: c.name })
@@ -164,6 +172,30 @@ export function diffCatalogs(prev: PreviousCatalog, cur: CatalogIcon[]): Diff {
   for (const p of prev.icons) if (!used.has(p)) diff.removed.push({ name: p.name })
   diff.bump = diff.removed.length || diff.renamed.length ? 'major' : diff.added.length ? 'minor' : diff.changed.length || diff.recoloured.length ? 'patch' : 'none'
   return diff
+}
+
+export type IconHistory = Record<string, { since?: string; changedIn?: string }>
+
+/**
+ * Per icon: the version that added it and the last version that changed its drawing or colours, carried forward from the previous
+ * export. A first export (no baseline) says every icon is "since" that version; an icon whose previous entry had no history keeps none
+ * rather than getting an invented one. Values from an older file are only kept when they are real versions.
+ */
+export function nextHistory(diff: Diff | null, version: string, names: string[]): IconHistory {
+  const out: IconHistory = {}
+  const touched = new Set([...(diff?.changed ?? []), ...(diff?.recoloured ?? [])].map((c) => c.name))
+  const added = new Set((diff?.added ?? []).map((c) => c.name))
+  for (const name of names) {
+    if (!diff || added.has(name)) {
+      out[name] = { since: version }
+      continue
+    }
+    const before = diff.history?.[name] ?? {}
+    const since = before.since && SEMVER.test(before.since) ? before.since : undefined
+    const changedIn = touched.has(name) ? version : before.changedIn && SEMVER.test(before.changedIn) ? before.changedIn : undefined
+    out[name] = { ...(since ? { since } : {}), ...(changedIn ? { changedIn } : {}) }
+  }
+  return out
 }
 
 export function bumpVersion(version: string | undefined, bump: Diff['bump']): string {

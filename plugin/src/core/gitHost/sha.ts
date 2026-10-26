@@ -1,6 +1,6 @@
 /** The id git gives a file: SHA-1 of "blob <bytes>\0" + content. Comparing it with the host's tree tells us what really changed. */
-export async function gitBlobSha(content: string): Promise<string> {
-  const body = new TextEncoder().encode(content)
+export async function gitBlobSha(content: string | Uint8Array): Promise<string> {
+  const body = typeof content === 'string' ? new TextEncoder().encode(content) : content
   const head = new TextEncoder().encode(`blob ${body.length}\0`)
   const all = new Uint8Array(head.length + body.length)
   all.set(head, 0)

@@ -1,5 +1,5 @@
 import { gitBlobSha } from '../../src/core/gitHost/sha'
-import { FetchFn } from '../../src/core/gitHost/types'
+import { FetchFn, FileContent } from '../../src/core/gitHost/types'
 
 /**
  * In-memory stand-ins for the GitHub and GitLab REST APIs: just the endpoints publishing uses, with the rules that matter
@@ -10,7 +10,7 @@ export interface FakeState {
   canWrite: boolean
   defaultBranch: string
   /** branch -> files */
-  branches: Map<string, Map<string, string>>
+  branches: Map<string, Map<string, FileContent>>
   requests: { method: string; url: string; body: unknown }[]
   pulls: { title: string; head: string; base: string; body: string }[]
   commits: { branch: string; message: string; paths: string[] }[]
@@ -18,7 +18,7 @@ export interface FakeState {
   networkDown: boolean
 }
 
-export function newState(files: Record<string, string> = {}): FakeState {
+export function newState(files: Record<string, FileContent> = {}): FakeState {
   return {
     token: 'good-token',
     canWrite: true,
@@ -40,8 +40,9 @@ const reply = (status: number, body: unknown, headers: Record<string, string> = 
 })
 
 export function fakeGithub(st: FakeState, repo = 'acme/icons'): FetchFn {
-  const trees = new Map<string, Map<string, string>>()
-  const commits = new Map<string, { tree: string; branchFiles: Map<string, string> }>()
+  const trees = new Map<string, Map<string, FileContent>>()
+  const commits = new Map<string, { tree: string; branchFiles: Map<string, FileContent> }>()
+  const blobs = new Map<string, Uint8Array>()
   let n = 0
   const base = `https://api.github.com/repos/${repo}`
   return async (url, init = {}) => {
@@ -71,7 +72,7 @@ export function fakeGithub(st: FakeState, repo = 'acme/icons'): FetchFn {
     m = /^\/contents\/([^?]+)\?ref=(.+)$/.exec(path)
     if (method === 'GET' && m) {
       const c = st.branches.get(decodeURIComponent(m[2]))?.get(decodeURIComponent(m[1]))
-      return c === undefined ? reply(404, { message: 'Not Found' }) : reply(200, { encoding: 'base64', content: btoa(String.fromCharCode(...new TextEncoder().encode(c))) })
+      return c === undefined ? reply(404, { message: 'Not Found' }) : reply(200, { encoding: 'base64', content: btoa(String.fromCharCode(...(typeof c === 'string' ? new TextEncoder().encode(c) : c))) })
     }
     m = /^\/git\/ref\/heads\/(.+)$/.exec(path)
     if (method === 'GET' && m) {
@@ -84,11 +85,20 @@ export function fakeGithub(st: FakeState, repo = 'acme/icons'): FetchFn {
     }
     m = /^\/git\/commits\/(.+)$/.exec(path)
     if (method === 'GET' && m) return reply(200, { tree: { sha: commits.get(m[1])!.tree } })
+    if (method === 'POST' && path === '/git/blobs') {
+      if (body.encoding !== 'base64') return reply(422, { message: 'only base64 here' })
+      const sha = `b${++n}`
+      blobs.set(sha, Uint8Array.from(atob(body.content), (c) => c.charCodeAt(0)))
+      return reply(201, { sha })
+    }
     if (method === 'POST' && path === '/git/trees') {
       const next = new Map(trees.get(body.base_tree)!)
-      for (const e of body.tree as { path: string; sha?: null; content?: string }[]) {
+      for (const e of body.tree as { path: string; sha?: string | null; content?: string }[]) {
         if (e.sha === null) next.delete(e.path)
-        else next.set(e.path, e.content!)
+        else if (e.sha) {
+          if (!blobs.has(e.sha)) return reply(422, { message: 'tree.sha is not a blob' })
+          next.set(e.path, blobs.get(e.sha)!)
+        } else next.set(e.path, e.content!)
       }
       const sha = `t${++n}`
       trees.set(sha, next)
@@ -162,9 +172,9 @@ export function fakeGitlab(st: FakeState, repo = 'group/sub/icons'): FetchFn {
         if (a.action === 'create' && files.has(a.file_path)) return reply(400, { message: `A file with this name already exists: ${a.file_path}` })
         if ((a.action === 'update' || a.action === 'delete') && !files.has(a.file_path)) return reply(400, { message: `A file with this name doesn't exist: ${a.file_path}` })
       }
-      for (const a of body.actions as { action: string; file_path: string; content?: string }[]) {
+      for (const a of body.actions as { action: string; file_path: string; content?: string; encoding?: string }[]) {
         if (a.action === 'delete') files.delete(a.file_path)
-        else files.set(a.file_path, a.content ?? '')
+        else files.set(a.file_path, a.encoding === 'base64' ? Uint8Array.from(atob(a.content ?? ''), (c) => c.charCodeAt(0)) : a.content ?? '')
       }
       st.commits.push({ branch: body.branch, message: body.commit_message, paths: body.actions.map((a: { file_path: string }) => a.file_path) })
       return reply(201, { id: `g${st.commits.length}` })

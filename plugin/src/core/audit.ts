@@ -1,12 +1,15 @@
 import { Finding, GridInfo, Profile, RawIcon, Settings, Severity } from '../types'
 import { hasCopyMarker, isAutoName, validateName } from './naming'
 import { contrastRatio } from './contrast'
+import { hasCategoryPrefix, matchesPattern } from './nameRules'
 import { overrideFindings } from './overrides'
 
 export interface AuditContext {
   profile: Profile
   grid: GridInfo
   name: string
+  /** the icon's category folders (slugs), for the optional "starts with its category" rule */
+  category?: string[]
   duplicate: boolean
   kindColors: number
   themedOk: boolean
@@ -53,6 +56,8 @@ export function auditIcon(icon: RawIcon, ctx: AuditContext): Finding[] {
   if (nameError) add('invalid-name', 'error', nameError, 'Rename the layer (or the row in the plugin).')
   if (ctx.duplicate) add('duplicate-name', 'error', `Duplicate name "${ctx.name}".`, 'Give each icon a unique name.')
   if (isAutoName(icon.setName ?? icon.rawName)) add('auto-name', 'warn', 'Layer still has a default Figma name.', 'Give the layer a meaningful name.')
+  if (!nameError && !matchesPattern(ctx.name, ctx.settings.nameRules.pattern)) add('name-pattern', 'warn', `Name “${ctx.name}” does not match your naming pattern.`, 'Rename the icon, or change the pattern in Settings → Scan.')
+  if (!nameError && ctx.settings.nameRules.categoryPrefix && !hasCategoryPrefix(ctx.name, ctx.category ?? [])) add('name-category-prefix', 'warn', `Name “${ctx.name}” does not start with its category “${(ctx.category ?? []).slice(-1)[0]}”.`, 'Add the category as a prefix (Issues → Rename… → add prefix).')
   if (hasCopyMarker(icon.rawName)) add('copy-name', 'warn', 'Name looks like a duplicate ("Copy").', 'Remove the copy suffix or delete the duplicate.')
   if (/^property\s*\d+\s*=/i.test(icon.rawName)) add('variant-name', 'info', 'Variant property still has the default name ("Property 1").', 'Rename the variant property (e.g. "Style").')
 

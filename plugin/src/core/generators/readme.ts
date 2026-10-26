@@ -87,13 +87,13 @@ import { ${C}, ${constant} } from './icons';          // path to the copied fold
 @Component({
   standalone: true,
   imports: [${C}],
-  template: \`<${n}-icon [icon]="home" [size]="24" color="#0a7d3b" />\`
+  template: \`<${n}-icon [icon]="home" [size]="24" color="#0a7d3b"></${n}-icon>\`
 })
 export class Demo { home = ${constant}; }
 \`\`\`
-Or **by name**: \`<${n}-icon name="${name}" />\`. Icons registered with \`provide${P}Icons(…)\` render at once; any other icon loads its category as a lazy chunk the first time it is used. \`provide${P}AllIcons()\` (from \`all-icons.ts\`) registers everything synchronously at the cost of a large bundle.
+Or **by name**: \`<${n}-icon name="${name}"></${n}-icon>\` (always write the closing tag: Angular before 15.1 does not accept a self-closing component tag). Icons registered with \`provide${P}Icons(…)\` render at once; any other icon loads its category as a lazy chunk the first time it is used. \`provide${P}AllIcons()\` (from \`all-icons.ts\`) registers everything synchronously at the cost of a large bundle.
 ${f.sprite ? `
-Sprite strategy: \`<${n}-sprite-icon name="${name}" />\` draws from \`sprite/${n}-sprite.svg\` with \`provide${P}Sprite({ url: '/assets/${n}-sprite.svg', inline: true })\`.
+Sprite strategy: \`<${n}-sprite-icon name="${name}"></${n}-sprite-icon>\` draws from \`sprite/${n}-sprite.svg\` with \`provide${P}Sprite({ url: '/assets/${n}-sprite.svg', inline: true })\`.
 ` : ''}
 | Input | Meaning |
 |---|---|

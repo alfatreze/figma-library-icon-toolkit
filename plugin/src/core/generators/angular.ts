@@ -439,14 +439,14 @@ Supports ${range}. No FontAwesome or other dependency.
 \`\`\`ts
 import { ${C}, ${constant} } from './${flavour === 'modern' ? 'angular' : 'angular-classic'}';
 
-@Component({ standalone: true, imports: [${C}], template: \`<${n}-icon [icon]="home" />\` })
+@Component({ standalone: true, imports: [${C}], template: \`<${n}-icon [icon]="home"></${n}-icon>\` })
 export class Demo { home = ${constant}; }
 \`\`\`
-2. **By name** (\`<${n}-icon name="${first?.name ?? 'name'}" />\`). Icons you registered with \`${provide}(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(${P}IconRegistry).preload('<category>')\` to warm a category.
+2. **By name** (\`<${n}-icon name="${first?.name ?? 'name'}"></${n}-icon>\`; write the closing tag, Angular before 15.1 rejects a self-closing component). Icons you registered with \`${provide}(…)\` render at once; any other icon loads its **category** as a lazy chunk the first time it is used (first paint is empty, then the icon appears). Call \`inject(${P}IconRegistry).preload('<category>')\` to warm a category.
 3. **Everything synchronously** (large bundle): \`import { provide${P}AllIcons } from './all-icons'\` and \`providers: [provide${P}AllIcons()]\`.
 ${withSprite ? `
 ## Sprite strategy
-\`<${n}-sprite-icon name="…" />\` draws from \`sprite/${n}-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
+\`<${n}-sprite-icon name="…"></${n}-sprite-icon>\` draws from \`sprite/${n}-sprite.svg\` through \`<use>\`: one cached request, no per-icon JS.
 \`\`\`ts
 providers: [provide${P}Sprite({ url: '/assets/${n}-sprite.svg', inline: true })]
 \`\`\`

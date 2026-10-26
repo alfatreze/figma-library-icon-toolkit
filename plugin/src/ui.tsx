@@ -50,7 +50,7 @@ import { recentLog } from './log'
 import { DiagnosticsHandler, RequestDiagnosticsHandler } from './types'
 import { SettingsPanel, SettingsTab } from './ui/Settings'
 import { PublishDialog } from './ui/PublishDialog'
-import { ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixCandidate, CancelScanHandler, DEFAULT_SETTINGS, Icon, LocateHandler, ResizeHandler, SaveSettingsHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler, ScanHandler, ScanScope, SelectionHandler, Settings, SettingsLoadedHandler, UiReadyHandler } from './types'
+import { OutputSettings, ConfigPublishedHandler, PublishConfigHandler, SharedConfigHandler, FixCandidate, CancelScanHandler, DEFAULT_SETTINGS, Icon, LocateHandler, ResizeHandler, SaveSettingsHandler, AttachDevResourcesHandler, DevResourcesAttachedHandler, ScanHandler, ScanScope, SelectionHandler, Settings, SettingsLoadedHandler, UiReadyHandler } from './types'
 
 const PAGE_SIZE = 200
 type Tab = 'icons' | 'issues' | 'skipped'
@@ -249,7 +249,24 @@ function Plugin() {
   const detailIndex = detail ? Math.max(0, visible.findIndex((i) => i.key === detail.key)) : 0
   const bulkRename = useBulkRename(icons, visible)
   const descriptions = useDescriptions(icons, cleanNamespace(settings.namespace))
-  const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages))
+  // PNG images in a publish: drawn once per set of rows and icons, for the outputs that receive every package
+  const pngPublish = useRef<{ key: string; images: Promise<Record<string, Uint8Array>> } | null>(null)
+  const imagesFor = (o: OutputSettings): Promise<Record<string, Uint8Array>> => {
+    if (!settings.png.enabled || !settings.png.rows.length || o.packages !== null) return Promise.resolve({})
+    const plan = planPng(exportable, settings.png.rows, pngOptions, (i) => `${cleanNamespace(settings.namespace)}-${i.name}`)
+    if (plan.problems.length) return Promise.reject(new Error('Fix the PNG rows first (Settings → Packages → PNG), or switch PNG off for this publish.'))
+    const key = JSON.stringify([plan.items.map((i) => [i.path, i.icon.hash, i.icon.colorHash, i.w, i.h, i.hex])])
+    if (pngPublish.current?.key !== key) {
+      const images = buildPngFiles(plan.items).then(({ files, failed }) => {
+        if (failed.length) throw new Error(`${failed.length} PNG could not be drawn (${failed[0]})`)
+        return files
+      })
+      images.catch(() => { if (pngPublish.current?.key === key) pngPublish.current = null })
+      pngPublish.current = { key, images }
+    }
+    return pngPublish.current.images
+  }
+  const publish = usePublish(settings, (o) => makeFiles(settingsFor(settings, o)), () => baseline.snapshotNow('local'), (g) => prText(g.packages), imagesFor)
   const scanVariables = useMemo(() => {
     const seen = new Map<string, { variable: string; collection?: string; hex?: string; modes?: Record<string, string> }>()
     for (const p of raws.flatMap((r) => r.facts.paints)) if (p.variable) seen.set(`${p.collection ?? ''}::${p.variable}`, { variable: p.variable, collection: p.collection, hex: p.hex, ...(p.modes ? { modes: p.modes } : {}) })

@@ -8,6 +8,7 @@ import { Dialog } from './Dialog'
 import { ComponentChildren, Fragment, h } from 'preact'
 import { useState } from 'preact/hooks'
 import { cleanNamespace } from '../core/naming'
+import { patternProblem } from '../core/nameRules'
 import { STROKE_POLICY_INFO, validateStrokeTable } from '../core/stroke'
 import { suggestMapping, TOKEN_MODES, tokenPreview } from '../core/tokens'
 import styles from './styles'
@@ -388,6 +389,20 @@ export function SettingsPanel({ settings, patch, onClose, extras, initialTab = '
               placeholder="default"
             />
           </Field>
+          <Field
+            label="Names must match"
+            info={{ title: 'Naming pattern', body: <span>Optional. A regular expression every icon name must match; names that do not are reported as warnings (nothing is renamed or blocked). It is how a team writes a rule like verb-noun: <code>^(add|remove|edit|open)-[a-z-]+$</code>. Names are lowercase kebab-case, after the folders and variant values above are left out. Patterns longer than 200 characters, or ones that can run for a very long time, are refused.</span> }}
+          >
+            <Textbox value={settings.nameRules.pattern} onValueInput={(v) => patch({ nameRules: { ...settings.nameRules, pattern: v } })} placeholder="e.g. ^[a-z]+(-[a-z]+)*$ (empty = any name)" />
+          </Field>
+          {patternProblem(settings.nameRules.pattern) && <div class={styles.sevWarn}>{patternProblem(settings.nameRules.pattern)} The check is skipped until it is fixed.</div>}
+          <Row
+            info={{ title: 'Names start with their category', body: <span>Optional. Warns when a name does not start with its category folder, like <code>arrows-left</code> in <code>arrows</code>. Icons without a category are not checked. Fix many at once with Issues → Rename… → add prefix.</span> }}
+          >
+            <Toggle value={settings.nameRules.categoryPrefix} onValueChange={(v) => patch({ nameRules: { ...settings.nameRules, categoryPrefix: v } })}>
+              Names start with their category
+            </Toggle>
+          </Row>
         </div>
         <div class={styles.section}>
           <span class={styles.sectionTitle}>Grid size</span>

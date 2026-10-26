@@ -1,3 +1,12 @@
+/* Text on the kit's tinted backgrounds (counts, pills, confidence): the kit's light-mode text colours are only 3.2 to 3.9:1 on their own tints,
+   so light mode uses darker ones (4.5:1 or better); dark mode keeps the kit's tokens. test/contrast-css.test.ts measures both. */
+:global(.figma-light) {
+  --ilt-text-brand-on-tint: #0062bd;
+  --ilt-text-danger-on-tint: #b02a0f;
+  --ilt-text-warning-on-tint: #8a4b00;
+  --ilt-text-success-on-tint: #00703a;
+}
+
 .root {
   display: flex;
   flex-direction: column;
@@ -43,9 +52,9 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
   min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px; text-align: center; font-size: 10px; line-height: 18px; font-weight: 600;
   background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary);
 }
-.tabActive .count { background: var(--figma-color-bg-selected); color: var(--figma-color-text-brand); }
-.countError, .tabActive .countError { background: var(--figma-color-bg-danger-tertiary); color: var(--figma-color-text-danger); }
-.countWarn, .tabActive .countWarn { background: var(--figma-color-bg-warning-tertiary); color: var(--figma-color-text-warning); }
+.tabActive .count { background: var(--figma-color-bg-selected); color: var(--ilt-text-brand-on-tint, var(--figma-color-text-brand)); }
+.countError, .tabActive .countError { background: var(--figma-color-bg-danger-tertiary); color: var(--ilt-text-danger-on-tint, var(--figma-color-text-danger)); }
+.countWarn, .tabActive .countWarn { background: var(--figma-color-bg-warning-tertiary); color: var(--ilt-text-warning-on-tint, var(--figma-color-text-warning)); }
 
 /* segmented control (one of N): the active segment is raised, filled and bold */
 .segmented { display: flex; padding: 3px; gap: 2px; border-radius: 8px; background: var(--figma-color-bg-secondary); }
@@ -109,8 +118,8 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
   border: 0; font: inherit; font-size: 10px; font-weight: 500; cursor: pointer;
 }
 .pill svg { width: 12px; height: 12px; }
-.pillError { background: var(--figma-color-bg-danger-tertiary); color: var(--figma-color-text-danger); }
-.pillWarn { background: var(--figma-color-bg-warning-tertiary); color: var(--figma-color-text-warning); }
+.pillError { background: var(--figma-color-bg-danger-tertiary); color: var(--ilt-text-danger-on-tint, var(--figma-color-text-danger)); }
+.pillWarn { background: var(--figma-color-bg-warning-tertiary); color: var(--ilt-text-warning-on-tint, var(--figma-color-text-warning)); }
 .pillInfo { background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary); }
 .pillOk { background: transparent; color: var(--figma-color-text-success); cursor: default; }
 .finding { display: grid; grid-template-columns: 14px 1fr; gap: 6px; align-items: start; }
@@ -196,9 +205,9 @@ button:focus-visible, [role='tab']:focus-visible, [role='radio']:focus-visible, 
 .fixResult { display: flex; gap: 6px; align-items: center; }
 .fixResult svg { width: 14px; height: 14px; }
 .conf { padding: 0 6px; border-radius: 999px; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; background: var(--figma-color-bg-secondary); color: var(--figma-color-text-secondary); }
-.conf_high { background: var(--figma-color-bg-success-tertiary); color: var(--figma-color-text-success); }
-.conf_medium { background: var(--figma-color-bg-warning-tertiary); color: var(--figma-color-text-warning); }
-.conf_low { background: var(--figma-color-bg-danger-tertiary); color: var(--figma-color-text-danger); }
+.conf_high { background: var(--figma-color-bg-success-tertiary); color: var(--ilt-text-success-on-tint, var(--figma-color-text-success)); }
+.conf_medium { background: var(--figma-color-bg-warning-tertiary); color: var(--ilt-text-warning-on-tint, var(--figma-color-text-warning)); }
+.conf_low { background: var(--figma-color-bg-danger-tertiary); color: var(--ilt-text-danger-on-tint, var(--figma-color-text-danger)); }
 .pv { display: flex; align-items: center; gap: 10px; }
 .pvBox { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .pvStage { position: relative; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--figma-color-bg-secondary); color: var(--figma-color-icon); overflow: hidden; }

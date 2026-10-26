@@ -163,6 +163,7 @@ export function processIcons(
       profile: settings.profile,
       grid,
       name,
+      category: cat.slug,
       duplicate: dupeNames.has(name),
       kindColors: icon.slots.length,
       themedOk: icon.svgOk,

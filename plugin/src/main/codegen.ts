@@ -1,7 +1,7 @@
 import { buildName, cleanNamespace, parseVariantName } from '../core/naming'
 import { tokenVarName } from '../core/tokens'
 import { parseStrokeTable, weightForSize } from '../core/stroke'
-import { angularSnippet, cssSnippet, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput, webComponentSnippet } from '../core/snippets'
+import { angularSnippet, cssSnippet, htmlSnippet, overrideNotes, reactComponentSnippet, reactSnippet, SnippetInput, svelteSnippet, vueSnippet, webComponentSnippet } from '../core/snippets'
 import { OverrideClass, Settings } from '../types'
 import { isIconish, toHex, variableInfo, VECTOR_TYPES } from './facts'
 import { newAgg, recordInstance } from './overrides'
@@ -175,7 +175,7 @@ async function generate({ node, language }: { node: SceneNode; language: string 
     const names = used.map((u) => u.name)
     const hint =
       language === 'angular'
-        ? `<!-- ${ns}-icon names used -->\n${names.map((n) => `<${ns}-icon name="${n}" />`).join('\n')}`
+        ? `<!-- ${ns}-icon names used -->\n${names.map((n) => `<${ns}-icon name="${n}"></${ns}-icon>`).join('\n')}`
         : names.map((n) => `${ns}-sprite.svg#${ns}-${n}`).join('\n')
     return [
       { title: `Icons used here (${used.length})`, language: 'PLAINTEXT', code: lines.join('\n') },
@@ -189,6 +189,8 @@ async function generate({ node, language }: { node: SceneNode; language: string 
     angular: { title: 'Angular', code: angularSnippet(input), language: 'HTML' },
     html: { title: 'HTML (sprite)', code: htmlSnippet(input), language: 'HTML' },
     react: { title: 'React', code: `${reactComponentSnippet(input)}\n\n// or without the component:\n${reactSnippet(input)}`, language: 'JAVASCRIPT' },
+    vue: { title: 'Vue', code: vueSnippet(input), language: 'HTML' },
+    svelte: { title: 'Svelte', code: svelteSnippet(input), language: 'HTML' },
     webcomponent: { title: 'Web Component', code: webComponentSnippet(input), language: 'HTML' },
     css: { title: 'CSS variables', code: cssSnippet(input), language: 'CSS' }
   }

@@ -29,6 +29,8 @@ export function manifestFile(b: BuildInput): string {
     icons: b.icons.map((i) => ({
       id: `${n}:${i.name}`,
       name: i.name,
+      ...(b.release?.history?.[i.name]?.since ? { since: b.release.history[i.name].since } : {}),
+      ...(b.release?.history?.[i.name]?.changedIn ? { changedIn: b.release.history[i.name].changedIn } : {}),
       ...(i.aliasOf ? { aliasOf: i.aliasOf } : {}),
       hash: i.hash,
       colorHash: i.colorHash,
@@ -70,7 +72,7 @@ export function manifestFile(b: BuildInput): string {
       usage: {
         sprite: `<svg class="${n}-icon" aria-hidden="true" focusable="false"><use href="${n}-sprite.svg#${symbolId(b, i)}"/></svg>`,
         mask: i.maskSvg ? `<i class="${n}-icon ${n}-icon--${i.name}" aria-hidden="true"></i>` : null,
-        angular: `<${n}-icon name="${i.name}" />`
+        angular: `<${n}-icon name="${i.name}"></${n}-icon>`
       },
       audit: {
         errors: i.findings.filter((f) => f.severity === 'error').length,
@@ -93,8 +95,8 @@ function agentsUsage(b: BuildInput): string {
   const constant = first ? constName(b, first) : 'icon'
   const P = pascal(n)
   const rows: string[] = []
-  if (f.angularModern) rows.push(`| Angular 17.1+ | \`angular/\` | \`<${n}-icon name="${name}" />\`: import \`${C}\` in the component's \`imports\`; icons by name load their category lazily, or \`provide${P}Icons(${constant})\` for tree-shaken ones |`)
-  if (f.angularClassic) rows.push(`| Angular 14+ | \`angular-classic/\` | same tag, \`@Input\` based (\`${C}\` in a module or standalone \`imports\`) |`)
+  if (f.angularModern) rows.push(`| Angular 17.1+ | \`angular/\` | \`<${n}-icon name="${name}"></${n}-icon>\`: import \`${C}\` in the component's \`imports\`; icons by name load their category lazily, or \`provide${P}Icons(${constant})\` for tree-shaken ones |`)
+  if (f.angularClassic) rows.push(`| Angular 14+ | \`angular-classic/\` | same tag (write the closing tag: Angular before 15.1 rejects a self-closing one), \`@Input\` based (\`${C}\` in a module or standalone \`imports\`) |`)
   if (f.react) rows.push(`| React 17+ | \`react/\` | \`<${C} name="${name}" size={24} />\` or \`<${C} icon={${constant}} />\` (imported from \`./icons\`: synchronous and tree-shakable) |`)
   if (f.vue) rows.push(`| Vue 3 | \`vue/\` | \`<${C} name="${name}" :size="24" />\` or \`<${C} :icon="${constant}" />\`; a plain TypeScript file, no \`.vue\` build step |`)
   if (f.svelte) rows.push(`| Svelte 4 and 5 | \`svelte/\` | \`<${C} name="${name}" size={24} />\` or \`<${C} icon={${constant}} />\` |`)
@@ -118,7 +120,7 @@ function agentsRecipes(b: BuildInput): string {
   const ignoredVariants = s.ignoreVariantValues.filter(Boolean)
   return `## Recipes
 ### Use an icon that exists
-1. Look it up in \`icons.json\` (\`icons[].name\`, \`tags\` (from the Figma description), \`category\`, \`categoryLabel\`). Search tags and category, not only the name.
+1. Look it up in \`icons.json\` (\`icons[].name\`, \`tags\` (from the Figma description), \`category\`, \`categoryLabel\`; \`since\` and \`changedIn\` say in which library version it was added and last changed). Search tags and category, not only the name.
 2. Use the package of the stack you are in (table above) with exactly that \`name\`. Never invent a name: a name that is not in \`icons.json\` renders nothing.
 3. Size and colour with the component inputs or the CSS variables below; do not edit the generated files.
 
@@ -160,7 +162,7 @@ Generated ${b.generatedAt} from Figma. ${b.icons.length} icons. Machine-readable
 ${agentsUsage(b)}
 ## Naming grammar
 - Canonical id: \`${n}:<name>\`; \`<name>\` is lowercase kebab-case \`[a-z0-9-]\`, ASCII only.
-- SVG file: \`svg/${n}-<name>.svg\` · sprite symbol: \`#${n}-<name>\` · Angular: \`<${n}-icon name="<name>" />\` (class \`${C}\`)
+- SVG file: \`svg/${n}-<name>.svg\` · sprite symbol: \`#${n}-<name>\` · Angular: \`<${n}-icon name="<name>"></${n}-icon>\` (class \`${C}\`)
 - Mask class (optional file): \`${n}-icon ${n}-icon--<name>\`
 - Variants are separate icons named \`<set>-<variant values>\` (e.g. \`home-filled\`).
 
